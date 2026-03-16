@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title><%= it.contact.name %> -- RESUME</title>
+  <style><%~ it.css %></style>
+</head>
+<body data-flair="<%= it.flair %>">
+
+  <header class="resume-header">
+    <% if (it.nameAscii) { %><pre class="ascii-name"><%~ it.nameAscii %></pre><% } else { %><h1><%= it.contact.name %></h1><% } %>
+    <div class="contact-line">
+      <% if (it.contact.email) { %><span><%= it.contact.email %></span><% } %>
+      <% if (it.contact.phone) { %><span class="sep">//</span><span><%= it.contact.phone %></span><% } %>
+      <% if (it.contact.location) { %><span class="sep">//</span><span><%= it.contact.location %></span><% } %>
+      <% if (it.contact.linkedin) { %><span class="sep">//</span><span><%= it.contact.linkedin %></span><% } %>
+      <% if (it.contact.github) { %><span class="sep">//</span><span><%= it.contact.github %></span><% } %>
+      <% if (it.contact.website) { %><span class="sep">//</span><span><%= it.contact.website %></span><% } %>
+    </div>
+  </header>
+
+  <% if (it.summary) { %>
+  <div class="summary-block"><%= it.summary %></div>
+  <% } %>
+
+  <% if (it.positions.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">EXPERIENCE<span class="section-rule"></span></h2>
+    <% for (const pos of it.positions) { %>
+    <div class="position">
+      <div class="position-header">
+        <span><span class="position-prefix">&gt;&gt;</span><span class="position-title"><%= pos.title.toUpperCase() %></span></span>
+        <span class="position-dates"><%= pos.startDate %> TO <%= pos.endDate ? pos.endDate.toUpperCase() : 'PRESENT' %></span>
+      </div>
+      <div class="position-company"><%= pos.company %><% if (pos.location) { %> / <%= pos.location %><% } %></div>
+      <% if (pos.bullets.length > 0) { %>
+      <ul class="position-bullets">
+        <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
+      </ul>
+      <% } %>
+    </div>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (it.education.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">EDUCATION<span class="section-rule"></span></h2>
+    <% for (const edu of it.education) { %>
+    <div class="education-entry">
+      <div>
+        <span class="edu-institution"><%= edu.institution.toUpperCase() %></span>
+        <% if (edu.degree || edu.fieldOfStudy) { %><span class="edu-degree"><%= edu.degree || '' %><% if (edu.degree && edu.fieldOfStudy) { %>, <% } %><%= edu.fieldOfStudy || '' %></span><% } %>
+      </div>
+      <% if (edu.startDate || edu.endDate) { %>
+      <span class="edu-dates"><% if (edu.startDate) { %><%= edu.startDate %><% } %><% if (edu.endDate) { %> -- <%= edu.endDate %><% } %></span>
+      <% } %>
+    </div>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (it.skills.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">SKILLS<span class="section-rule"></span></h2>
+    <div class="skills-row"><%= it.skills.join('  *  ') %></div>
+  </section>
+  <% } %>
+
+  <% if (it.certifications.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">CERTIFICATIONS<span class="section-rule"></span></h2>
+    <% for (const cert of it.certifications) { %>
+    <div class="cert-entry">[*] <%= cert.name %><% if (cert.authority) { %>  --  <%= cert.authority %><% } %><% if (cert.date) { %>  [<%= cert.date %>]<% } %></div>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (it.projects.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">PROJECTS<span class="section-rule"></span></h2>
+    <% for (const proj of it.projects) { %>
+    <div class="project-entry">
+      <div class="project-title">[*] <%= proj.title %></div>
+      <% if (proj.description) { %><div class="project-desc"><%= proj.description %></div><% } %>
+      <% if (proj.url) { %><div class="project-url"><%= proj.url %></div><% } %>
+    </div>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (it.languages.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">LANGUAGES<span class="section-rule"></span></h2>
+    <div class="skills-row"><% for (let i = 0; i < it.languages.length; i++) { %><%= it.languages[i].name %><% if (it.languages[i].proficiency) { %> (<%= it.languages[i].proficiency %>)<% } %><% if (i < it.languages.length - 1) { %>  *  <% } %><% } %></div>
+  </section>
+  <% } %>
+
+  <% if (it.volunteer.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">VOLUNTEER<span class="section-rule"></span></h2>
+    <% for (const vol of it.volunteer) { %>
+    <div class="position">
+      <div class="position-header">
+        <span><span class="position-prefix">&gt;&gt;</span><span class="position-title"><%= vol.organization.toUpperCase() %><% if (vol.role) { %> -- <%= vol.role %><% } %></span></span>
+        <% if (vol.startDate || vol.endDate) { %><span class="position-dates"><% if (vol.startDate) { %><%= vol.startDate %><% } %><% if (vol.endDate) { %> TO <%= vol.endDate %><% } %></span><% } %>
+      </div>
+    </div>
+    <% } %>
+  </section>
+  <% } %>
+
+  <% if (it.awards.length > 0) { %>
+  <section class="section">
+    <h2 class="section-title">AWARDS<span class="section-rule"></span></h2>
+    <% for (const award of it.awards) { %><div class="cert-entry">[*] <%= award %></div><% } %>
+  </section>
+  <% } %>
+
+</body>
+</html>

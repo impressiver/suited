@@ -10,7 +10,6 @@
   <header class="resume-header">
     <div class="header-left">
       <h1><%= it.contact.name %></h1>
-      <% if (it.summary) { %><p style="font-size:9.5pt;margin-top:4pt;color:#4b5563;"><%= it.summary %></p><% } %>
     </div>
     <div class="header-right">
       <div class="contact-line">
@@ -23,6 +22,12 @@
       </div>
     </div>
   </header>
+
+  <% if (it.summary) { %>
+  <div class="summary-section">
+    <p class="summary-text"><%= it.summary %></p>
+  </div>
+  <% } %>
 
   <% if (it.positions.length > 0) { %>
   <section class="section">

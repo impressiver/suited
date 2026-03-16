@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { ResumeDocument } from '../profile/schema.js';
+import { generateAsciiName } from '../utils/ascii-name.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', 'templates');
@@ -21,6 +22,10 @@ export async function renderResumeHtml(doc: ResumeDocument): Promise<string> {
   // Raw <%~ %> is used only for the trusted CSS string
   const eta = new Eta({ views: templateDir, autoEscape: true });
 
-  const html = eta.renderString(templateSrc, { ...doc, css });
+  const extraData = doc.template === 'retro'
+    ? { nameAscii: generateAsciiName(doc.contact.name) }
+    : {};
+
+  const html = eta.renderString(templateSrc, { ...doc, css, ...extraData });
   return html;
 }

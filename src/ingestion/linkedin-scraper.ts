@@ -26,24 +26,35 @@ const USER_AGENT =
   'Chrome/124.0.0.0 Safari/537.36';
 
 // ---------------------------------------------------------------------------
-// Session persistence
+// Session persistence — only linkedin.com cookies are saved/restored
 // ---------------------------------------------------------------------------
 
 async function loadSession(): Promise<CookieData[]> {
   try {
     if (await fileExists(SESSION_FILE)) {
       const raw = await readFile(SESSION_FILE, 'utf-8');
-      return JSON.parse(raw) as CookieData[];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as CookieData[];
     }
   } catch {
-    // Corrupt session — ignore, will re-authenticate
+    // Corrupt session file — ignore, will re-authenticate
   }
   return [];
 }
 
 async function saveSession(cookies: CookieData[]): Promise<void> {
-  await mkdir(SESSION_DIR, { recursive: true });
-  await writeFile(SESSION_FILE, JSON.stringify(cookies, null, 2), 'utf-8');
+  // Only persist LinkedIn cookies — don't bleed third-party cookies from the session
+  const linkedInCookies = cookies.filter(c =>
+    typeof c.domain === 'string' && c.domain.includes('linkedin.com'),
+  );
+  try {
+    await mkdir(SESSION_DIR, { recursive: true });
+    await writeFile(SESSION_FILE, JSON.stringify(linkedInCookies, null, 2), 'utf-8');
+  } catch (err) {
+    // Non-fatal: warn so the user knows why they'll be re-prompted next time
+    console.warn(`  ⚠  Could not save LinkedIn session: ${(err as Error).message}`);
+    console.warn(`     You will need to log in again on the next run.`);
+  }
 }
 
 export async function clearLinkedInSession(): Promise<void> {
@@ -51,7 +62,7 @@ export async function clearLinkedInSession(): Promise<void> {
     await writeFile(SESSION_FILE, '[]', 'utf-8');
     console.log('LinkedIn session cleared.');
   } catch {
-    // File didn't exist
+    // File didn't exist — nothing to do
   }
 }
 
@@ -68,13 +79,17 @@ function isAuthWall(url: string): boolean {
   );
 }
 
+/**
+ * Returns true only when we're confident we have an authenticated session:
+ * the user-menu element is present AND no sign-in link is visible.
+ * Both conditions must hold — a partially-rendered page fails this check
+ * and triggers a login attempt rather than silently proceeding.
+ */
 async function isLoggedIn(page: Page): Promise<boolean> {
-  const url = page.url();
-  if (isAuthWall(url)) return false;
-  // Check for the "Sign in" button as a secondary indicator
-  const signInBtn = await page.$('a[href*="/login"]');
+  if (isAuthWall(page.url())) return false;
   const navMe = await page.$('.global-nav__me');
-  return navMe !== null || signInBtn === null;
+  const signInBtn = await page.$('a[href*="/login"]');
+  return navMe !== null && signInBtn === null;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,32 +104,61 @@ async function login(
 
   await page.goto('https://www.linkedin.com/login', { waitUntil: 'networkidle2' });
 
+  // Confirm the login form is actually present before typing
+  try {
+    await page.waitForSelector('#username', { timeout: 10_000 });
+  } catch {
+    throw new Error(
+      'LinkedIn login form did not load. The page may have changed or your network is blocking LinkedIn.',
+    );
+  }
+
   await page.type('#username', credentials.email, { delay: 40 });
   await page.type('#password', credentials.password, { delay: 40 });
 
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30_000 }),
-    page.click('[data-litms-control-urn="login-submit"]'),
-  ]);
-
-  const url = page.url();
-  if (isAuthWall(url)) {
+  // Wait for the submit button and confirm it exists before clicking
+  const submitSel = 'button[data-litms-control-urn="login-submit"], button[type="submit"]';
+  try {
+    await page.waitForSelector(submitSel, { timeout: 5_000 });
+  } catch {
     throw new Error(
-      'Login failed or LinkedIn is asking for a verification step. ' +
-      'Try running with --no-headless to complete the challenge manually, ' +
-      'then re-run the import.',
+      'LinkedIn login submit button not found. The login page layout may have changed.',
     );
   }
 
-  // Check for 2FA / security verification page
+  try {
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30_000 }),
+      page.click(submitSel),
+    ]);
+  } catch (err) {
+    // Distinguish timeout (page never navigated) from other errors
+    if ((err as Error).message?.includes('timeout')) {
+      throw new Error(
+        'LinkedIn did not redirect after login — the credentials may be wrong, ' +
+        'or LinkedIn is showing a CAPTCHA. Re-run with --headed to complete it manually.',
+      );
+    }
+    throw err;
+  }
+
+  const url = page.url();
+
   if (url.includes('checkpoint') || url.includes('challenge')) {
     throw new Error(
       'LinkedIn requires a security verification step (2FA / CAPTCHA). ' +
-      'Run with --no-headless, complete the verification, then re-run.',
+      'Re-run with --headed to complete it manually.',
     );
   }
 
-  console.log('  ✓ Logged in successfully');
+  if (isAuthWall(url)) {
+    throw new Error(
+      'Login failed — incorrect credentials or LinkedIn is blocking the login. ' +
+      'Double-check your email and password.',
+    );
+  }
+
+  console.log('  ✓ Logged in');
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +166,6 @@ async function login(
 // ---------------------------------------------------------------------------
 
 async function scrollAndWait(page: Page): Promise<void> {
-  // Scroll incrementally to trigger lazy-loaded sections
   await page.evaluate(async () => {
     await new Promise<void>(resolve => {
       let totalScrolled = 0;
@@ -137,46 +180,78 @@ async function scrollAndWait(page: Page): Promise<void> {
       }, 200);
     });
   });
-
-  // Scroll back to top and give a moment for any remaining renders
   await page.evaluate(() => window.scrollTo(0, 0));
   await new Promise(r => setTimeout(r, 800));
 }
 
-/** Click "see more" / "show all" expanders so full text is visible */
+/** Click every "see more" / "show all" expander to get full section text */
 async function expandSections(page: Page): Promise<void> {
   const expanders = [
-    // "Show all N experiences"
     'a[href*="detail/experience"]',
-    // "Show all N education"
     'a[href*="detail/education"]',
-    // Inline "see more" in about section
-    'button[aria-label*="see more"]',
-    // Skills "show all"
     'a[href*="detail/skills"]',
+    'button[aria-label*="see more"]',
+    'button[aria-label*="See more"]',
   ];
 
   for (const sel of expanders) {
     try {
       const els = await page.$$(sel);
-      for (const el of els.slice(0, 3)) {
-        await el.click().catch(() => {/* ignore if not clickable */});
-        await new Promise(r => setTimeout(r, 400));
+      for (const el of els) {  // no slice — click all of them
+        await el.click().catch(() => {/* element detached or obscured — skip */});
+        await new Promise(r => setTimeout(r, 500));  // wait for lazy content
       }
     } catch {
-      // Selector not found — fine
+      // Selector absent on this profile — fine
     }
   }
 }
 
+/**
+ * Heuristic check that the extracted text looks like a profile, not a login/error page.
+ * LinkedIn's auth wall and error pages contain 500+ characters too, so we can't
+ * rely on length alone.
+ */
+function assertLooksLikeProfile(text: string, originalUrl: string): void {
+  const lower = text.toLowerCase();
+
+  const loginSignals = [
+    'sign in to linkedin',
+    'email or phone',
+    'forgot password',
+    'join now',
+    'create an account',
+  ];
+  for (const signal of loginSignals) {
+    if (lower.includes(signal)) {
+      throw new Error(
+        `The extracted page text looks like a login or redirect page, not a profile.\n` +
+        `Matched phrase: "${signal}"\n` +
+        `The session may have expired. Re-run with --clear-session to re-authenticate.`,
+      );
+    }
+  }
+
+  const profileSignals = ['experience', 'education', 'skills', 'about'];
+  const hasProfileContent = profileSignals.some(s => lower.includes(s));
+  if (!hasProfileContent) {
+    throw new Error(
+      `The extracted page text does not contain recognisable profile sections ` +
+      `(experience, education, skills, about).\n` +
+      `URL: ${originalUrl}\n` +
+      `Check that the URL points to a public LinkedIn profile.`,
+    );
+  }
+}
+
 async function extractProfileText(page: Page): Promise<string> {
-  // Try to get the main content column first; fall back to full body
   const text = await page.evaluate(() => {
-    const candidates = [
+    // Prefer the main content column; fall back to full body
+    const candidates: (Element | null)[] = [
       document.querySelector('main'),
       document.querySelector('.scaffold-layout__main'),
       document.querySelector('#main-content'),
-      document.body,
+      document.body ?? null,
     ];
     for (const el of candidates) {
       if (el) {
@@ -184,7 +259,7 @@ async function extractProfileText(page: Page): Promise<string> {
         if (t && t.length > 500) return t;
       }
     }
-    return document.body.innerText;
+    return (document.body ?? document.documentElement).innerText ?? '';
   });
 
   if (!text || text.length < 100) {
@@ -195,35 +270,100 @@ async function extractProfileText(page: Page): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// URL validation
+// ---------------------------------------------------------------------------
+
+// Require scheme + linkedin.com/in/ + at least one non-slash character as username
+const LINKEDIN_PROFILE_RE = /^https?:\/\/(?:www\.)?linkedin\.com\/in\/([^/?#\s]+)/i;
+
+function validateAndNormaliseUrl(raw: string): string {
+  const url = raw.startsWith('http') ? raw : `https://${raw}`;
+  const m = url.match(LINKEDIN_PROFILE_RE);
+  if (!m || !m[1]) {
+    throw new Error(
+      `"${raw}" does not look like a LinkedIn profile URL.\n` +
+      'Expected format: https://www.linkedin.com/in/your-username',
+    );
+  }
+  // Strip query-string and fragments — use only the canonical profile URL
+  return `https://www.linkedin.com/in/${m[1]}`;
+}
+
+// ---------------------------------------------------------------------------
+// Profile navigation
+// ---------------------------------------------------------------------------
+
+/**
+ * Navigate to a LinkedIn profile page and wait for the main content to render.
+ *
+ * `networkidle2` is intentionally avoided: LinkedIn keeps WebSocket /
+ * long-polling connections open indefinitely, so that event never fires on
+ * their SPA. We wait for the DOM to load and then for the <main> element to
+ * appear instead.
+ */
+async function gotoProfile(page: Page, url: string): Promise<void> {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  try {
+    await page.waitForSelector('main, .scaffold-layout__main, #main-content', {
+      timeout: 20_000,
+    });
+  } catch {
+    // Page loaded but expected element absent — extractProfileText will surface
+    // the real problem (too short, wrong content) with a clearer message.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Manual login (headed mode)
+// ---------------------------------------------------------------------------
+
+/**
+ * In headed mode the user drives the browser themselves.
+ * Poll until LinkedIn's nav shows an authenticated session, then return.
+ * Times out after 5 minutes.
+ */
+async function waitForManualLogin(page: Page): Promise<void> {
+  console.log('  Browser is open — log in to LinkedIn in the browser window...');
+
+  const POLL_MS = 2_000;
+  const TIMEOUT_MS = 5 * 60 * 1_000;
+  const deadline = Date.now() + TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, POLL_MS));
+    // li_at is LinkedIn's primary session cookie — present immediately after
+    // a successful login regardless of which page the browser has landed on.
+    const cookies = await page.cookies('https://www.linkedin.com');
+    if (cookies.some(c => c.name === 'li_at')) {
+      console.log('  ✓ Logged in');
+      return;
+    }
+  }
+
+  throw new Error('Timed out waiting for manual login (5 minutes). Re-run to try again.');
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
 export interface ScrapeOptions {
-  /** Email + password for LinkedIn login (prompted interactively if not supplied and needed) */
   credentials?: { email: string; password: string };
-  /** Show the browser window (useful for debugging or completing manual verification steps) */
+  /** Show the browser window (useful for 2FA / CAPTCHA) */
   headed?: boolean;
 }
 
 export async function scrapeLinkedInProfile(
-  url: string,
+  rawUrl: string,
   options: ScrapeOptions = {},
 ): Promise<string> {
-  // Normalise URL
-  if (!url.startsWith('http')) url = `https://${url}`;
-
-  if (!url.match(/linkedin\.com\/in\//i)) {
-    throw new Error(
-      `"${url}" does not look like a LinkedIn profile URL.\n` +
-      'Expected format: https://www.linkedin.com/in/your-username',
-    );
-  }
+  const url = validateAndNormaliseUrl(rawUrl);
 
   let browser: Browser | undefined;
 
   try {
     browser = await puppeteer.launch({
-      headless: options.headed ? false : true,
+      headless: !options.headed,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     }).catch(err => {
       throw new Error(
@@ -239,61 +379,70 @@ export async function scrapeLinkedInProfile(
     // Restore saved session cookies
     const savedCookies = await loadSession();
     if (savedCookies.length > 0) {
-      await page.setCookie(...savedCookies);
+      await page.setCookie(...(savedCookies as Parameters<typeof page.setCookie>));
     }
 
     console.log(`  Navigating to ${url} ...`);
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 45_000 });
+    await gotoProfile(page, url);
 
-    // Handle auth wall
+    // Handle auth wall — in headed mode, wait for the user to log in manually;
+    // in headless mode, prompt for credentials and drive the login form.
     if (!(await isLoggedIn(page))) {
-      let creds = options.credentials;
+      if (options.headed) {
+        await waitForManualLogin(page);
+      } else {
+        let creds = options.credentials;
 
-      if (!creds) {
-        const { default: inquirer } = await import('inquirer');
-        const answers = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'email',
-            message: 'LinkedIn email:',
-            validate: (v: string) => v.includes('@') || 'Enter a valid email',
-          },
-          {
-            type: 'password',
-            name: 'password',
-            message: 'LinkedIn password:',
-            mask: '*',
-          },
-        ]);
-        creds = answers as { email: string; password: string };
+        if (!creds) {
+          const { default: inquirer } = await import('inquirer');
+          const answers = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'email',
+              message: 'LinkedIn email:',
+              validate: (v: string) => v.includes('@') || 'Enter a valid email',
+            },
+            {
+              type: 'password',
+              name: 'password',
+              message: 'LinkedIn password:',
+              mask: '*',
+            },
+          ]);
+          creds = answers as { email: string; password: string };
+        }
+
+        await login(page, creds);
       }
 
-      await login(page, creds);
-
-      // Navigate back to the original profile after login
       console.log('  Loading profile...');
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45_000 });
+      await gotoProfile(page, url);
 
-      // Persist session so we don't need to log in next time
-      const cookies = await page.cookies();
-      await saveSession(cookies as CookieData[]);
+      // Save session after confirmed successful navigation to the profile
+      await saveSession(await page.cookies() as CookieData[]);
       console.log(`  Session saved to ${SESSION_FILE}`);
     }
 
-    // Final check — did we actually land on the profile?
+    // Guard: confirm we're on the profile, not an auth wall or error page
     if (isAuthWall(page.url())) {
-      throw new Error('Still on auth wall after login attempt. The credentials may be incorrect.');
+      throw new Error(
+        'Landed on an auth wall after navigating to the profile. ' +
+        'Run with --clear-session to force re-authentication.',
+      );
     }
 
     await expandSections(page);
     await scrollAndWait(page);
 
     const text = await extractProfileText(page);
+
+    // Validate extracted text looks like a profile, not a login/error page
+    assertLooksLikeProfile(text, url);
+
     console.log(`  ✓ Extracted ~${Math.round(text.length / 1000)}KB of profile text`);
 
-    // Refresh saved cookies after a successful load
-    const freshCookies = await page.cookies();
-    await saveSession(freshCookies as CookieData[]);
+    // Refresh cookies once — after a fully successful scrape
+    await saveSession(await page.cookies() as CookieData[]);
 
     return text;
   } finally {

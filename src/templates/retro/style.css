@@ -1,0 +1,187 @@
+/* Retro Terminal template — amber phosphor on black, 1970s mainframe aesthetic */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --amber:        #FFB300;
+  --amber-dim:    #CC8800;
+  --amber-faint:  #7A5200;
+  --bg:           #0C0C0C;
+  --font: 'Courier New', Courier, 'Lucida Console', monospace;
+  --page-pad: 0.45in;
+}
+
+@page { size: Letter; margin: 0; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: 8pt;
+  color: var(--amber);
+  background: var(--bg);
+  padding: var(--page-pad);
+  width: 8.5in;
+  height: 11in;
+  overflow: hidden;
+  line-height: 1.45;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+
+.resume-header {
+  border: 1px solid var(--amber-faint);
+  outline: 1px solid var(--amber-faint);
+  outline-offset: 4px;
+  padding: 12pt 14pt 10pt;
+  margin-bottom: 18pt;
+}
+
+.ascii-name {
+  font-family: var(--font);
+  font-size: 5.2pt;
+  line-height: 1.15;
+  white-space: pre;
+  color: var(--amber);
+  margin-bottom: 8pt;
+  letter-spacing: 0;
+  text-shadow:
+    1px 1px 0 #e6a000,
+    2px 2px 0 #cc8c00,
+    3px 3px 0 #b37800;
+}
+
+/* fallback if ascii art unavailable */
+.resume-header h1 {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 12pt;
+  font-weight: normal;
+  letter-spacing: 1pt;
+  text-transform: uppercase;
+  color: var(--amber);
+  line-height: 1.6;
+  margin-bottom: 8pt;
+}
+
+.contact-line {
+  font-size: 7.5pt;
+  color: var(--amber-dim);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.contact-line .sep { margin: 0 5pt; color: var(--amber-faint); }
+
+/* ── Summary ─────────────────────────────────────────────────── */
+
+.summary-block {
+  margin-bottom: 16pt;
+  border-left: 2px solid var(--amber-faint);
+  padding-left: 8pt;
+  font-size: 7.5pt;
+  color: var(--amber-dim);
+  line-height: 1.6;
+}
+
+/* ── Sections ────────────────────────────────────────────────── */
+
+.section { margin-bottom: 14pt; }
+
+.section-title {
+  font-size: 7pt;
+  font-weight: bold;
+  letter-spacing: 2pt;
+  text-transform: uppercase;
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  gap: 6pt;
+  margin-bottom: 8pt;
+}
+
+.section-title::before { content: '--['; color: var(--amber-faint); }
+.section-title::after  { content: ']'; color: var(--amber-faint); flex: 0; margin-right: 4pt; }
+
+.section-rule {
+  display: inline-block;
+  flex: 1;
+  height: 0;
+  border-top: 1px solid var(--amber-faint);
+  margin-left: 2pt;
+}
+
+/* ── Experience ──────────────────────────────────────────────── */
+
+.position { margin-bottom: 11pt; padding-left: 4pt; }
+
+.position-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2pt;
+}
+
+.position-prefix { color: var(--amber-faint); margin-right: 4pt; }
+.position-title  { font-weight: bold; font-size: 8pt; color: var(--amber); }
+.position-dates  { font-size: 7pt; color: var(--amber-dim); white-space: nowrap; }
+.position-dates::before { content: '['; color: var(--amber-faint); }
+.position-dates::after  { content: ']'; color: var(--amber-faint); }
+
+.position-company {
+  font-size: 7.5pt;
+  color: var(--amber-dim);
+  margin-bottom: 4pt;
+  padding-left: 16pt;
+}
+
+.position-bullets { list-style: none; padding-left: 4pt; }
+.position-bullets li {
+  font-size: 7.5pt;
+  color: var(--amber-dim);
+  margin-bottom: 3pt;
+  padding-left: 22pt;
+  position: relative;
+}
+.position-bullets li::before {
+  content: '[*] ';
+  position: absolute;
+  left: 0;
+  color: var(--amber-faint);
+  font-size: 7pt;
+}
+
+/* ── Education ───────────────────────────────────────────────── */
+
+.education-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6pt;
+  padding-left: 4pt;
+}
+
+.edu-institution { font-weight: bold; font-size: 8pt; }
+.edu-degree { font-size: 7.5pt; color: var(--amber-dim); padding-left: 4pt; }
+.edu-dates { font-size: 7pt; color: var(--amber-dim); white-space: nowrap; }
+.edu-dates::before { content: '['; color: var(--amber-faint); }
+.edu-dates::after  { content: ']'; color: var(--amber-faint); }
+
+/* ── Skills ──────────────────────────────────────────────────── */
+
+.skills-row {
+  font-size: 7.5pt;
+  color: var(--amber-dim);
+  padding-left: 4pt;
+  line-height: 1.8;
+}
+
+/* ── Projects ────────────────────────────────────────────────── */
+
+.project-entry { margin-bottom: 8pt; padding-left: 4pt; }
+.project-title { font-weight: bold; font-size: 8pt; }
+.project-desc  { font-size: 7.5pt; color: var(--amber-dim); padding-left: 4pt; margin-top: 2pt; }
+.project-url   { font-size: 7pt; color: var(--amber-faint); padding-left: 4pt; margin-top: 1pt; }
+
+/* ── Misc ────────────────────────────────────────────────────── */
+
+.cert-entry { font-size: 7.5pt; color: var(--amber-dim); margin-bottom: 4pt; padding-left: 4pt; }

@@ -1,26 +1,24 @@
-import { join } from 'path';
 import { detectInput } from '../ingestion/detector.js';
 import { parseLinkedInExport } from '../ingestion/linkedin-export.js';
 import { parseLinkedInPaste } from '../ingestion/linkedin-paste.js';
 import { scrapeLinkedInProfile, clearLinkedInSession } from '../ingestion/linkedin-scraper.js';
 import { extractZip, findCsvDir } from '../utils/zip.js';
-import { saveProfile } from '../profile/serializer.js';
+import { saveSource, sourceMdPath, sourceJsonPath } from '../profile/serializer.js';
 import { profileToMarkdown } from '../profile/markdown.js';
 import { Profile } from '../profile/schema.js';
+import { c } from '../utils/colors.js';
 
 export interface ImportOptions {
   input?: string;
   profileDir?: string;
-  /** Show browser window during scrape (helps with 2FA / CAPTCHA) */
   headed?: boolean;
-  /** Clear saved LinkedIn session and re-authenticate */
   clearSession?: boolean;
+  /** Suppress next-step tip when running as part of the full flow */
+  flow?: boolean;
 }
 
 export async function runImport(options: ImportOptions): Promise<void> {
-  const profileDir = options.profileDir ?? join(process.cwd(), 'output');
-  const profileJson = join(profileDir, 'profile.json');
-  const profileMd = join(profileDir, 'profile.md');
+  const profileDir = options.profileDir ?? 'output';
 
   if (options.clearSession) {
     await clearLinkedInSession();
@@ -43,15 +41,13 @@ export async function runImport(options: ImportOptions): Promise<void> {
 
   console.log('\nDetecting input type...');
   const detected = await detectInput(input.trim());
-  console.log(`  → Detected: ${detected.kind}`);
+  console.log(`  ${c.arr} Detected: ${c.value(detected.kind)}`);
 
   let profile: Profile;
 
   if (detected.kind === 'linkedin-url') {
     console.log('  Scraping LinkedIn profile (Claude will extract the data)...');
-    const pageText = await scrapeLinkedInProfile(detected.value, {
-      headed: options.headed,
-    });
+    const pageText = await scrapeLinkedInProfile(detected.value, { headed: options.headed });
     console.log('  Parsing with Claude (verbatim extraction only)...');
     profile = await parseLinkedInPaste(pageText);
 
@@ -72,23 +68,26 @@ export async function runImport(options: ImportOptions): Promise<void> {
     profile = await parseLinkedInPaste(detected.value);
   }
 
-  await saveProfile(profile, profileJson);
-  await profileToMarkdown(profile, profileMd);
+  await saveSource(profile, profileDir);
+  await profileToMarkdown(profile, sourceMdPath(profileDir));
   printSummary(profile);
 
-  console.log(`\n✓ Profile saved:`);
-  console.log(`  ${profileJson}`);
-  console.log(`  ${profileMd}`);
-  console.log(`\nTip: edit ${profileMd} to refine bullets, then re-run 'resume generate'.`);
+  console.log(`\n${c.ok} ${c.success('Source data saved:')}`);
+  console.log(`   ${c.path(sourceJsonPath(profileDir))}`);
+  console.log(`   ${c.path(sourceMdPath(profileDir))}`);
+
+  if (!options.flow) {
+    console.log(`\n${c.tip("Next: run 'resume refine' to improve and expand your profile with Claude's help.")}`);
+  }
 }
 
 function printSummary(profile: Profile): void {
   console.log('\nProfile summary:');
-  console.log(`  Name:        ${profile.contact.name.value}`);
-  console.log(`  Positions:   ${profile.positions.length}`);
-  console.log(`  Education:   ${profile.education.length}`);
-  console.log(`  Skills:      ${profile.skills.length}`);
-  console.log(`  Projects:    ${profile.projects.length}`);
-  console.log(`  Certs:       ${profile.certifications.length}`);
-  console.log(`  Volunteer:   ${profile.volunteer.length}`);
+  console.log(`  ${c.label('Name:')}      ${profile.contact.name.value}`);
+  console.log(`  ${c.label('Positions:')} ${profile.positions.length}`);
+  console.log(`  ${c.label('Education:')} ${profile.education.length}`);
+  console.log(`  ${c.label('Skills:')}    ${profile.skills.length}`);
+  console.log(`  ${c.label('Projects:')}  ${profile.projects.length}`);
+  console.log(`  ${c.label('Certs:')}     ${profile.certifications.length}`);
+  console.log(`  ${c.label('Volunteer:')} ${profile.volunteer.length}`);
 }

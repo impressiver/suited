@@ -162,7 +162,7 @@ export interface JobAnalysis {
 // ---------------------------------------------------------------------------
 
 export type FlairLevel = 1 | 2 | 3 | 4 | 5;
-export type TemplateName = 'classic' | 'modern' | 'bold';
+export type TemplateName = 'classic' | 'modern' | 'bold' | 'retro';
 
 export interface CuratedPosition {
   positionId: string;
@@ -331,3 +331,66 @@ export const CurationPlanSchema: z.ZodType<CurationPlan> = z.object({
   selectedCertificationIds: z.array(z.string()),
   summaryRef: z.string().nullable(),
 });
+
+// ---------------------------------------------------------------------------
+// Refinement session (phase 2)
+// ---------------------------------------------------------------------------
+
+export interface RefinementQuestion {
+  id: string;
+  /** Position id, "summary", "skills", etc. */
+  targetId: string;
+  /** Brief framing, e.g. "Senior Engineer at Acme Corp (2020–2022)" */
+  context: string;
+  question: string;
+  optional: boolean;
+}
+
+export interface RefinementSession {
+  conductedAt: string;
+  /** SHA-256 of source.json used to detect if source has changed since last refine */
+  sourceHash: string;
+  questions: RefinementQuestion[];
+  /** Map of question id → user's answer */
+  answers: Record<string, string>;
+}
+
+export interface RefinedData {
+  profile: Profile;
+  session: RefinementSession;
+}
+
+// ---------------------------------------------------------------------------
+// Generation config (phase 3)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Saved job descriptions
+// ---------------------------------------------------------------------------
+
+export interface SavedJob {
+  id: string;
+  company: string;
+  title: string;
+  savedAt: string;
+  text: string;
+  /** SHA-256 of text — used to avoid saving duplicates */
+  textHash: string;
+}
+
+// ---------------------------------------------------------------------------
+
+export interface GenerationConfig {
+  createdAt: string;
+  updatedAt: string;
+  flair: FlairLevel;
+  template: TemplateName;
+  /** When set, overrides the flair-based template selection (e.g. 'retro') */
+  templateOverride?: TemplateName;
+  jobTitle: string;
+  company: string;
+  jd?: string;
+  jobAnalysis?: JobAnalysis;
+  /** profile.updatedAt at the time this config was saved — detects stale configs */
+  profileUpdatedAt?: string;
+}

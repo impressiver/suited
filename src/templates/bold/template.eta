@@ -32,10 +32,10 @@
     <div class="sidebar-section">
       <div class="sidebar-section-title">Education</div>
       <% for (const edu of it.education) { %>
-      <div style="margin-bottom:6pt;">
-        <div class="edu-institution" style="font-size:8.5pt;font-weight:600;"><%= edu.institution %></div>
-        <% if (edu.degree) { %><div class="edu-degree" style="font-size:8pt;opacity:0.8;"><%= edu.degree %></div><% } %>
-        <% if (edu.endDate) { %><div class="edu-dates" style="font-size:7.5pt;opacity:0.7;"><%= edu.endDate %></div><% } %>
+      <div class="sidebar-item">
+        <div class="sidebar-item-title"><%= edu.institution %></div>
+        <% if (edu.degree) { %><div class="sidebar-item-sub"><%= edu.degree %></div><% } %>
+        <% if (edu.endDate) { %><div class="sidebar-item-date"><%= edu.endDate %></div><% } %>
       </div>
       <% } %>
     </div>
@@ -44,7 +44,7 @@
     <% if (it.certifications.length > 0) { %>
     <div class="sidebar-section">
       <div class="sidebar-section-title">Certifications</div>
-      <% for (const cert of it.certifications) { %><div style="font-size:8pt;margin-bottom:3pt;opacity:0.9;"><%= cert.name %></div><% } %>
+      <% for (const cert of it.certifications) { %><div class="sidebar-cert"><%= cert.name %></div><% } %>
     </div>
     <% } %>
 
@@ -58,7 +58,7 @@
     <% if (it.awards.length > 0) { %>
     <div class="sidebar-section">
       <div class="sidebar-section-title">Awards</div>
-      <% for (const award of it.awards) { %><div style="font-size:8pt;margin-bottom:3pt;opacity:0.9;"><%= award %></div><% } %>
+      <% for (const award of it.awards) { %><div class="sidebar-cert"><%= award %></div><% } %>
     </div>
     <% } %>
   </aside>

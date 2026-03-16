@@ -8,6 +8,36 @@ export interface CuratorResult {
   refMap: Map<string, RefEntry>;
 }
 
+/**
+ * Guarantees the most recent position is always present.
+ * If it belongs to a promotion chain (multiple roles at the same company),
+ * all roles at that company are included so the promotion track is visible.
+ */
+function ensureMostRecentPosition(plan: CurationPlan, profile: Profile): CurationPlan {
+  if (profile.positions.length === 0) return plan;
+
+  // Most recent = highest startDate lexicographically (YYYY-MM or YYYY both sort correctly)
+  const mostRecent = [...profile.positions].sort(
+    (a, b) => b.startDate.value.localeCompare(a.startDate.value),
+  )[0];
+
+  const recentCompany = mostRecent.company.value.toLowerCase().trim();
+  const promotionChain = profile.positions.filter(
+    p => p.company.value.toLowerCase().trim() === recentCompany,
+  );
+
+  const selectedIds = new Set(plan.selectedPositions.map(p => p.positionId));
+  const missing = promotionChain.filter(p => !selectedIds.has(p.id));
+  if (missing.length === 0) return plan;
+
+  const added = missing.map(pos => ({
+    positionId: pos.id,
+    bulletRefs: pos.bullets.map((_, i) => `b:${pos.id}:${i}`),
+  }));
+
+  return { ...plan, selectedPositions: [...plan.selectedPositions, ...added] };
+}
+
 export async function curateForJob(
   profile: Profile,
   jobAnalysis: JobAnalysis,
@@ -56,5 +86,8 @@ summaryRef: "summary" if relevant, otherwise null.
   // Accuracy guard — throws AccuracyGuardError if any ref is invalid
   assertAccurate(plan, profile, refMap);
 
-  return { plan, refMap };
+  // Hard guarantee: most recent position (and any promotion chain) always included
+  const finalPlan = ensureMostRecentPosition(plan, profile);
+
+  return { plan: finalPlan, refMap };
 }

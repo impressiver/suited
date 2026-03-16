@@ -3,6 +3,7 @@
  * Resume Builder CLI
  * Usage:
  *   resume import [input]
+ *   resume refine
  *   resume generate
  *   resume validate
  */
@@ -10,8 +11,10 @@
 import 'dotenv/config';
 import { Command } from 'commander';
 import { runImport } from './commands/import.js';
+import { runRefine } from './commands/refine.js';
 import { runGenerate } from './commands/generate.js';
 import { runValidate } from './commands/validate.js';
+import { runFlow } from './commands/flow.js';
 
 const program = new Command();
 
@@ -22,7 +25,7 @@ program
 
 program
   .command('import [input]')
-  .description('Import a LinkedIn profile (URL, export ZIP/directory, or pasted text)')
+  .description('Import a LinkedIn profile (URL, export ZIP/directory, or pasted text) → source data')
   .option('--profile-dir <dir>', 'Directory to store profile files', 'output')
   .option('--headed', 'Show browser window during scrape (use for 2FA or CAPTCHA)')
   .option('--clear-session', 'Clear saved LinkedIn session and re-authenticate')
@@ -39,8 +42,21 @@ program
   });
 
 program
+  .command('refine')
+  .description('Improve profile with Claude Q&A → refined data (skips if already done)')
+  .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
+  .action(async (opts: { profileDir?: string }) => {
+    try {
+      await runRefine({ profileDir: opts.profileDir });
+    } catch (err) {
+      console.error(`\n✗ Refine failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('generate')
-  .description('Generate a tailored PDF resume for a specific job')
+  .description('Generate a PDF resume from refined data (skips prompts if settings saved)')
   .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
   .option('--output <dir>', 'Output directory for PDFs')
   .option('--jd <text|path>', 'Job description text or file path (skips prompt)')
@@ -56,7 +72,7 @@ program
 
 program
   .command('validate')
-  .description('Validate the accuracy of a curation plan against the current profile')
+  .description('Validate profile integrity and accuracy guard readiness')
   .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
   .action(async (opts: { profileDir?: string }) => {
     try {
@@ -66,6 +82,20 @@ program
       process.exit(1);
     }
   });
+
+// Default action: run the full pipeline when no subcommand is given
+program.action(async (opts: { profileDir?: string; headed?: boolean; clearSession?: boolean }) => {
+  try {
+    await runFlow({
+      profileDir: opts.profileDir,
+      headed: opts.headed,
+      clearSession: opts.clearSession,
+    });
+  } catch (err) {
+    console.error(`\n✗ ${(err as Error).message}`);
+    process.exit(1);
+  }
+});
 
 program.parseAsync(process.argv).catch(err => {
   console.error(err.message);

@@ -15,6 +15,7 @@ CRITICAL RULES — READ CAREFULLY:
 5. You may NOT invent skills, achievements, or context not present in the profile.
 6. For bulletRefs: use ONLY the bullet IDs listed under each position's "Available bullets" section. Never use a bullet ID from a different position.
 7. summaryRef must be "summary" if the summary is relevant, or null.
+8. ALWAYS include the most recent position. If the candidate held multiple roles at the same company (promotions), include ALL of them — omitting earlier roles at the same company would hide a promotion track record.
 
 Your output will be validated — any invalid ID will abort the pipeline.`;
 

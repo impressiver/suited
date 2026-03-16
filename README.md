@@ -1,14 +1,15 @@
 # resume-builder
 
-A CLI tool that ingests LinkedIn profile data and uses Claude to generate tailored, factually-accurate PDF resumes.
+A CLI tool that ingests LinkedIn profile data, refines it with Claude, and generates tailored, factually-accurate PDF resumes.
 
 **Core guarantee:** every word in the output is traceable to your input data. Claude can only *select* existing profile items by reference ID — it cannot invent, paraphrase, or embellish anything.
 
 ## Features
 
-- Import from LinkedIn data export (ZIP or CSV directory) or pasted profile text
-- Human-editable `profile.md` with full round-trip parsing
-- Claude-powered job description analysis and resume curation
+- Import from a LinkedIn profile URL (Puppeteer scraper with session persistence), data export (ZIP or CSV directory), or pasted profile text
+- Claude-powered refinement: targeted Q&A to fill gaps and sharpen weak bullets before generating
+- Human-editable `refined.md` with full round-trip parsing
+- Optional job description targeting: Claude curates and selects the most relevant items
 - Accuracy guard: all curation references are validated against the source profile before assembly
 - Three visual templates (classic / modern / bold) with five flair levels
 - PDF output via Puppeteer
@@ -16,7 +17,7 @@ A CLI tool that ingests LinkedIn profile data and uses Claude to generate tailor
 ## Requirements
 
 - Node.js 20+
-- An [Anthropic API key](https://console.anthropic.com/)
+- An API key from [Anthropic](https://console.anthropic.com/) **or** [OpenRouter](https://openrouter.ai/)
 
 ## Setup
 
@@ -24,15 +25,64 @@ A CLI tool that ingests LinkedIn profile data and uses Claude to generate tailor
 pnpm install
 pnpm exec puppeteer browsers install chrome
 cp .env.example .env
-# Add your ANTHROPIC_API_KEY to .env
+# Add ANTHROPIC_API_KEY or OPENROUTER_API_KEY to .env
 pnpm build
 ```
 
 ## Usage
 
-### Import a LinkedIn profile
+### Full pipeline (recommended)
 
 ```bash
+node dist/index.js
+```
+
+Runs the three-step flow interactively. Each step is skipped if its output already exists and the upstream data has not changed.
+
+```
+=== Resume Builder ===
+
+Step 1 of 3 — Import
+  Found: Ian White (imported 3/15/2026)
+  ❯ Use existing
+    Import new data
+
+Step 2 of 3 — Refine
+  Refinement already complete (3/15/2026)
+  ❯ Skip — use existing refinement
+    Edit refined.md manually
+    Re-run refinement with Claude
+
+Step 3 of 3 — Generate
+  Previous generation: Acme Corp — Software Engineer (3/15/2026, flair 3)
+  Use the same settings? (Y/n)
+```
+
+### Individual commands
+
+```bash
+node dist/index.js import    # Phase 1: import LinkedIn data
+node dist/index.js refine    # Phase 2: Claude Q&A refinement
+node dist/index.js generate  # Phase 3: generate PDF
+node dist/index.js validate  # Check profile integrity
+```
+
+## The three phases
+
+### Phase 1 — Import → `output/source.json`
+
+Pulls in your raw LinkedIn data verbatim. Supports:
+
+```bash
+# From a LinkedIn profile URL (Puppeteer scraper)
+node dist/index.js import https://www.linkedin.com/in/your-username
+
+# Show browser window (required for 2FA or CAPTCHA)
+node dist/index.js import https://www.linkedin.com/in/your-username --headed
+
+# Clear saved session and re-authenticate
+node dist/index.js import https://www.linkedin.com/in/your-username --clear-session
+
 # From a LinkedIn data export ZIP
 node dist/index.js import ~/Downloads/linkedin-export.zip
 
@@ -43,41 +93,49 @@ node dist/index.js import ~/Downloads/Basic_LinkedInDataExport/
 node dist/index.js import
 ```
 
-This writes `output/profile.json` and `output/profile.md`. Edit `profile.md` directly to add, remove, or reword bullets — changes are detected on the next `generate` run.
+When importing via URL, the scraper launches Chrome, prompts for your LinkedIn credentials on first run, and saves the session to `~/.resume-builder/linkedin-session.json`. Only `linkedin.com` cookies are persisted.
 
-### Generate a resume
+> **Note:** This tool is intended for importing your own LinkedIn profile data. LinkedIn's Terms of Service prohibit automated scraping of their platform.
 
-```bash
-node dist/index.js generate
+### Phase 2 — Refine → `output/refined.json`
+
+Claude analyzes your source data and asks 3–8 targeted questions to improve weak or missing bullets (e.g. "Can you quantify the impact of that migration?"). You answer in the terminal; Claude generates improved bullets from your answers. A before/after diff is shown before anything is saved.
+
+Skipped automatically if `refined.json` already exists and `source.json` has not changed since the last run. If source data changes, the refinement is cleared and must be re-run.
+
+Edit `output/refined.md` manually at any time — changes are detected on next run.
+
+### Phase 3 — Generate → `output/resumes/*.pdf`
+
+Builds the PDF from refined data. Job description is optional:
+
+- **With JD:** Claude analyzes the role and selects the most relevant positions, bullets, skills, and education. Accuracy guard validates every selection.
+- **Without JD:** generates a complete resume from all refined data.
+
+Settings (flair, template, JD) are saved to `output/generation.json` and reused on the next run. If the refined profile has changed, saved settings are discarded automatically.
+
+## Data flow and invalidation
+
+```
+source.json  →  refined.json  →  generation.json  →  PDF
 ```
 
-Interactive flow:
-1. Load profile
-2. Paste or provide a job description
-3. Review Claude's job analysis (override company/title/industry if needed)
-4. Select flair level (1–5); industry-appropriate default is pre-selected
-5. Review curation summary (positions, skills, education, certs selected)
-6. Accuracy check runs automatically
-7. PDF written to `output/resumes/{company}-{role}-{date}.pdf`
-
-### Validate profile integrity
-
-```bash
-node dist/index.js validate
-```
-
-Re-runs the accuracy guard against the current profile to confirm all references resolve correctly.
+| Change | Effect |
+|--------|--------|
+| Re-import with new data | `refined.json` and `generation.json` cleared |
+| Profile edited in `refined.md` or refine re-run | `generation.json` discarded |
+| Re-generate with same settings | Uses saved `generation.json`, no prompts |
 
 ## How the accuracy system works
 
-When curating, the tool serializes all profile bullets into a reference list with stable IDs (`b:pos-0:2`, `b:pos-1:0`, etc.). Claude's prompt instructs it to select *only* from this list by ID. After Claude responds:
+When curating for a job, all profile bullets are serialized into a reference list with stable IDs (`b:pos-0:2`, `b:pos-1:0`, etc.). Claude's prompt instructs it to select *only* from this list by ID. After Claude responds:
 
 1. Every bullet ref is checked to exist in the ref map
-2. Every ref's `kind` is verified (a bullet ref cannot be used as a summary, etc.)
+2. Every ref's `kind` is verified (a bullet ref cannot be used as a summary)
 3. Bullet refs are checked to belong to the claimed position (cross-position assignment is rejected)
 4. Resolved values are compared against stored values
 
-If any check fails, the pipeline halts with a detailed error before any PDF is generated.
+If any check fails, the pipeline halts before any PDF is generated.
 
 ## Templates
 
@@ -93,23 +151,27 @@ Academia, healthcare, and legal roles always use the classic template regardless
 
 ```
 src/
-  commands/         # CLI command handlers (import, generate, validate)
+  commands/         # CLI command handlers (flow, import, refine, generate, validate)
   claude/           # SDK wrapper, accuracy guard, prompts
   generate/         # Job analysis, curation, resume assembly, rendering
-  ingestion/        # LinkedIn export parser, paste parser, normalizer
+  ingestion/        # LinkedIn scraper, export parser, paste parser, normalizer
   pdf/              # Puppeteer PDF export
   profile/          # Schema (Zod), serializer, markdown roundtrip
   templates/        # Eta HTML templates + CSS (classic, modern, bold)
   utils/            # fs, zip, interactive helpers
 output/             # Generated files (git-ignored)
-  profile.json
-  profile.md
+  source.json       # Phase 1 output: raw LinkedIn data
+  source.md
+  refined.json      # Phase 2 output: Claude-refined data
+  refined.md
+  generation.json   # Phase 3 output: saved generation settings
   resumes/
 ```
 
 ## Development
 
 ```bash
-pnpm dev import         # Run without building
-pnpm build              # Compile TypeScript → dist/
+pnpm dev            # Run full pipeline without building
+pnpm dev import     # Run a specific command without building
+pnpm build          # Compile TypeScript → dist/
 ```

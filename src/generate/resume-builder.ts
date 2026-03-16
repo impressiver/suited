@@ -1,8 +1,33 @@
 import {
   Profile, CurationPlan, ResumeDocument, FlairLevel, TemplateName, IndustryVertical,
+  GenerationConfig,
 } from '../profile/schema.js';
 import { resolvePath } from '../claude/accuracy-guard.js';
 import { RefEntry } from '../claude/prompts/curate.js';
+
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/** Converts "YYYY-MM" → "Mon YYYY". Passes through "YYYY" or other formats unchanged. */
+function formatDate(date: string | undefined): string | undefined {
+  if (!date) return undefined;
+  const m = date.match(/^(\d{4})-(\d{2})$/);
+  if (m) {
+    const month = parseInt(m[2], 10);
+    if (month >= 1 && month <= 12) return `${MONTH_ABBR[month - 1]} ${m[1]}`;
+  }
+  return date;
+}
+
+/** Strips country-only location strings (e.g. "United States") that add no useful context. */
+function filterLocation(location: string | undefined): string | undefined {
+  if (!location) return undefined;
+  const COUNTRY_ONLY = /^(United States|USA|US|United Kingdom|UK|Canada|Australia|Germany|France|India|China|Japan|Brazil|Mexico|Netherlands|Sweden|Norway|Denmark|Switzerland|New Zealand|Ireland|Singapore|South Korea|Spain|Italy|Portugal|Poland|Austria|Belgium|Finland|Israel|UAE|United Arab Emirates)$/i;
+  return COUNTRY_ONLY.test(location.trim()) ? undefined : location;
+}
 
 // ---------------------------------------------------------------------------
 // Template selection
@@ -79,7 +104,7 @@ export function assembleResumeDocument(
     name: profile.contact.name.value,
     email: profile.contact.email?.value,
     phone: profile.contact.phone?.value,
-    location: profile.contact.location?.value,
+    location: filterLocation(profile.contact.location?.value),
     linkedin: profile.contact.linkedin?.value,
     website: profile.contact.website?.value,
     github: profile.contact.github?.value,
@@ -94,9 +119,9 @@ export function assembleResumeDocument(
     return {
       title: pos.title.value,
       company: pos.company.value,
-      location: pos.location?.value,
-      startDate: pos.startDate.value,
-      endDate: pos.endDate?.value,
+      location: filterLocation(pos.location?.value),
+      startDate: formatDate(pos.startDate.value)!,
+      endDate: formatDate(pos.endDate?.value),
       bullets,
     };
   });
@@ -108,8 +133,8 @@ export function assembleResumeDocument(
       institution: edu.institution.value,
       degree: edu.degree?.value,
       fieldOfStudy: edu.fieldOfStudy?.value,
-      startDate: edu.startDate?.value,
-      endDate: edu.endDate?.value,
+      startDate: formatDate(edu.startDate?.value),
+      endDate: formatDate(edu.endDate?.value),
     };
   });
 
@@ -172,6 +197,77 @@ export function assembleResumeDocument(
     template,
     jobTitle,
     company,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Full assembler — includes all profile data, no curation
+// ---------------------------------------------------------------------------
+
+export function assembleFullResumeDocument(
+  profile: Profile,
+  config: GenerationConfig,
+): ResumeDocument {
+  const { effectiveFlair, effectiveTemplate } = getFlairInfo(
+    config.flair,
+    config.jobAnalysis?.industry ?? 'general',
+  );
+
+  const contact = {
+    name: profile.contact.name.value,
+    email: profile.contact.email?.value,
+    phone: profile.contact.phone?.value,
+    location: filterLocation(profile.contact.location?.value),
+    linkedin: profile.contact.linkedin?.value,
+    website: profile.contact.website?.value,
+    github: profile.contact.github?.value,
+  };
+
+  return {
+    contact,
+    summary: profile.summary?.value,
+    positions: profile.positions.map(pos => ({
+      title: pos.title.value,
+      company: pos.company.value,
+      location: filterLocation(pos.location?.value),
+      startDate: formatDate(pos.startDate.value)!,
+      endDate: formatDate(pos.endDate?.value),
+      bullets: pos.bullets.map(b => b.value),
+    })),
+    education: profile.education.map(edu => ({
+      institution: edu.institution.value,
+      degree: edu.degree?.value,
+      fieldOfStudy: edu.fieldOfStudy?.value,
+      startDate: formatDate(edu.startDate?.value),
+      endDate: formatDate(edu.endDate?.value),
+    })),
+    skills: profile.skills.map(s => s.name.value),
+    projects: profile.projects.map(p => ({
+      title: p.title.value,
+      description: p.description?.value,
+      url: p.url?.value,
+    })),
+    certifications: profile.certifications.map(c => ({
+      name: c.name.value,
+      authority: c.authority?.value,
+      date: c.startDate?.value,
+    })),
+    languages: profile.languages.map(l => ({
+      name: l.name.value,
+      proficiency: l.proficiency?.value,
+    })),
+    volunteer: profile.volunteer.map(v => ({
+      organization: v.organization.value,
+      role: v.role?.value,
+      startDate: v.startDate?.value,
+      endDate: v.endDate?.value,
+    })),
+    awards: profile.awards.map(a => a.value),
+    flair: effectiveFlair,
+    template: effectiveTemplate,
+    jobTitle: config.jobTitle,
+    company: config.company,
     generatedAt: new Date().toISOString(),
   };
 }

@@ -22,11 +22,16 @@ program
 
 program
   .command('import [input]')
-  .description('Import a LinkedIn profile (export ZIP, export directory, or pasted text)')
+  .description('Import a LinkedIn profile (URL, export ZIP/directory, or pasted text)')
   .option('--profile-dir <dir>', 'Directory to store profile files', 'output')
-  .action(async (input: string | undefined, opts: { profileDir?: string }) => {
+  .option('--headed', 'Show browser window during scrape (use for 2FA or CAPTCHA)')
+  .option('--clear-session', 'Clear saved LinkedIn session and re-authenticate')
+  .action(async (
+    input: string | undefined,
+    opts: { profileDir?: string; headed?: boolean; clearSession?: boolean },
+  ) => {
     try {
-      await runImport({ input, profileDir: opts.profileDir });
+      await runImport({ input, profileDir: opts.profileDir, headed: opts.headed, clearSession: opts.clearSession });
     } catch (err) {
       console.error(`\n✗ Import failed: ${(err as Error).message}`);
       process.exit(1);

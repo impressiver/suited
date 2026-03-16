@@ -1,0 +1,80 @@
+/* Modern template — two-column header, accent color, sans-serif */
+:root {
+  --color-accent: #2563eb;
+  --color-text: #1f2937;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-accent-bg: #eff6ff;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --page-margin: 0.6in;
+}
+
+body[data-flair="4"] { --color-accent: #7c3aed; --color-accent-bg: #f5f3ff; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  font-size: 10pt;
+  color: var(--color-text);
+  background: #ffffff;
+  padding: var(--page-margin);
+  max-width: 8.5in;
+  margin: 0 auto;
+  line-height: 1.45;
+}
+
+/* Header — two column */
+.resume-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12pt;
+  margin-bottom: 14pt;
+  padding-bottom: 10pt;
+  border-bottom: 2pt solid var(--color-accent);
+}
+.resume-header h1 { font-size: 22pt; font-weight: 700; color: var(--color-accent); }
+.header-right { text-align: right; }
+.contact-line { font-size: 8.5pt; color: var(--color-muted); line-height: 1.7; }
+
+/* Sections */
+.section { margin-bottom: 11pt; }
+.section-title {
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2pt;
+  color: var(--color-accent);
+  border-bottom: 1pt solid var(--color-border);
+  padding-bottom: 2pt;
+  margin-bottom: 6pt;
+}
+
+/* Experience */
+.position { margin-bottom: 8pt; }
+.position-header { display: flex; justify-content: space-between; align-items: baseline; }
+.position-title { font-weight: 600; font-size: 10pt; }
+.position-dates { font-size: 9pt; color: var(--color-muted); background: var(--color-accent-bg); padding: 1pt 5pt; border-radius: 3pt; }
+.position-company { font-size: 9pt; color: var(--color-muted); margin-top: 1pt; }
+.position-bullets { margin-top: 3pt; margin-left: 10pt; }
+.position-bullets li { margin-bottom: 2.5pt; font-size: 9pt; }
+
+/* Education */
+.education-entry { margin-bottom: 6pt; display: flex; justify-content: space-between; align-items: baseline; }
+.edu-left .edu-institution { font-weight: 600; }
+.edu-left .edu-degree { font-size: 9pt; color: var(--color-muted); margin-top: 1pt; }
+.edu-dates { font-size: 9pt; color: var(--color-muted); }
+
+/* Skills */
+.skills-pills { display: flex; flex-wrap: wrap; gap: 4pt; }
+.skill-pill { background: var(--color-accent-bg); color: var(--color-accent); padding: 2pt 7pt; border-radius: 10pt; font-size: 8.5pt; font-weight: 500; }
+
+/* Projects */
+.project-entry { margin-bottom: 6pt; }
+.project-title { font-weight: 600; font-size: 9.5pt; }
+.project-desc { font-size: 9pt; color: var(--color-text); margin-top: 1pt; }
+.project-url { font-size: 8.5pt; color: var(--color-accent); }
+
+/* Certifications */
+.cert-entry { font-size: 9pt; margin-bottom: 3pt; }

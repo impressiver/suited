@@ -1,0 +1,70 @@
+/* Classic template — ATS-safe, single column, serif */
+:root {
+  --color-accent: #000000;
+  --color-text: #222222;
+  --color-muted: #555555;
+  --color-border: #cccccc;
+  --font-body: Georgia, 'Times New Roman', Times, serif;
+  --font-heading: Georgia, 'Times New Roman', Times, serif;
+  --font-mono: 'Courier New', Courier, monospace;
+  --page-margin: 0.75in;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  font-size: 10.5pt;
+  color: var(--color-text);
+  background: #ffffff;
+  padding: var(--page-margin);
+  max-width: 8.5in;
+  margin: 0 auto;
+  line-height: 1.4;
+}
+
+/* Header */
+.resume-header { text-align: center; margin-bottom: 16pt; border-bottom: 1.5pt solid var(--color-accent); padding-bottom: 10pt; }
+.resume-header h1 { font-size: 18pt; font-weight: bold; letter-spacing: 0.5pt; }
+.contact-line { font-size: 9pt; color: var(--color-muted); margin-top: 4pt; }
+.contact-line span + span::before { content: ' | '; }
+
+/* Sections */
+.section { margin-bottom: 12pt; }
+.section-title {
+  font-size: 11pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1pt;
+  border-bottom: 0.75pt solid var(--color-border);
+  padding-bottom: 2pt;
+  margin-bottom: 6pt;
+}
+
+/* Experience */
+.position { margin-bottom: 8pt; }
+.position-header { display: flex; justify-content: space-between; align-items: baseline; }
+.position-title { font-weight: bold; font-size: 10.5pt; }
+.position-dates { font-size: 9.5pt; color: var(--color-muted); white-space: nowrap; }
+.position-company { font-style: italic; font-size: 9.5pt; color: var(--color-muted); }
+.position-bullets { margin-top: 3pt; margin-left: 12pt; }
+.position-bullets li { margin-bottom: 2pt; font-size: 9.5pt; }
+
+/* Education */
+.education-entry { margin-bottom: 6pt; }
+.education-header { display: flex; justify-content: space-between; }
+.edu-institution { font-weight: bold; }
+.edu-dates { font-size: 9.5pt; color: var(--color-muted); }
+.edu-degree { font-style: italic; font-size: 9.5pt; }
+
+/* Skills */
+.skills-list { font-size: 9.5pt; line-height: 1.6; }
+
+/* Projects */
+.project-entry { margin-bottom: 6pt; }
+.project-title { font-weight: bold; font-size: 10pt; }
+.project-desc { font-size: 9.5pt; }
+.project-url { font-size: 9pt; color: var(--color-muted); }
+
+/* Certifications */
+.cert-entry { margin-bottom: 4pt; font-size: 9.5pt; }

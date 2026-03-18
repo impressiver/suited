@@ -17,10 +17,16 @@
   - Generate a GitHub PAT (fine-grained) with **Contents: Read and Write** scoped to `homebrew-suited`
   - This lets the release workflow push formula updates to the tap repo
 
-Once both secrets are in place, pushing a version tag triggers the full release pipeline:
+Once both secrets are in place, use the versioning script to bump, tag, and publish in one step:
 
 ```bash
-git tag v1.0.1 && git push origin v1.0.1
+pnpm version:bump --push
 ```
 
-This will build the binaries, publish to npm, create the GitHub release, and update the Homebrew formula automatically.
+This detects the bump level from commit messages (patch/minor/major), updates `package.json`, commits, tags, and pushes. GitHub Actions then builds the binaries, publishes to npm, creates the GitHub release, and updates the Homebrew formula automatically.
+
+To preview without making changes:
+
+```bash
+pnpm version:bump --dry-run
+```

@@ -18,6 +18,7 @@
     "build": "tsc && rm -rf dist/templates && cp -r src/templates dist/templates",
     "build:bundle": "node scripts/build-binary.mjs",
     "build:binary": "node scripts/build-binary.mjs && node scripts/package-sea.mjs",
+    "version:bump": "node scripts/version.mjs",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js"
   },

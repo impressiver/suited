@@ -2,7 +2,8 @@
 
 A CLI tool that generates tailored, factually-accurate PDF resumes from source data (eg. LinkedIn profile).
 
-You paste a job description, suited picks the most relevant parts of your background, and produces a polished PDF — without inventing anything. Every word in the output traces back to something you actually wrote.
+You import your raw resume data, refine it with help from AI, then add job descriptions. Suited picks the most relevant parts of your background, offers suggestions, and produces a polished PDF — without inventing anything.
+Every word in the output traces back to something you actually wrote.
 
 ## How it works
 

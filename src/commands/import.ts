@@ -5,6 +5,7 @@ import { scrapeLinkedInProfile, clearLinkedInSession } from '../ingestion/linked
 import { extractZip, findCsvDir } from '../utils/zip.js';
 import { saveSource, sourceMdPath, sourceJsonPath, loadContactMeta, mergeContactMeta } from '../profile/serializer.js';
 import { profileToMarkdown } from '../profile/markdown.js';
+import { ensureContactDetails } from '../utils/contact.js';
 import { Profile } from '../profile/schema.js';
 import { c } from '../utils/colors.js';
 
@@ -39,24 +40,24 @@ export async function runImport(options: ImportOptions): Promise<void> {
     input = (answers as { input: string }).input;
   }
 
-  console.log('\nDetecting input type...');
+  console.log(c.muted('\nHmm, let me see what you\'ve got...'));
   const detected = await detectInput(input.trim());
-  console.log(`  ${c.arr} Detected: ${c.value(detected.kind)}`);
+  console.log(`  ${c.arr} ${c.value(detected.kind)}`);
 
   let profile: Profile;
 
   if (detected.kind === 'linkedin-url') {
-    console.log('  Scraping LinkedIn profile (Claude will extract the data)...');
+    console.log(c.muted('  Scraping LinkedIn profile...'));
     const pageText = await scrapeLinkedInProfile(detected.value, { headed: options.headed });
-    console.log('  Parsing with Claude (verbatim extraction only)...');
+    console.log(c.muted('  Extracting data with Claude (verbatim only, no embellishment)...'));
     profile = await parseLinkedInPaste(pageText);
 
   } else if (detected.kind === 'export-zip') {
-    console.log('  Extracting ZIP...');
+    console.log(c.muted('  Unzipping the goods...'));
     const extracted = await extractZip(detected.value);
     const found = await findCsvDir(extracted);
     if (!found) throw new Error('No CSV files found in the ZIP archive.');
-    console.log('  Parsing LinkedIn export (no AI used)...');
+    console.log(c.muted('  Parsing LinkedIn export (no AI, just raw data)...'));
     profile = await parseLinkedInExport(found);
 
   } else if (detected.kind === 'export-dir') {
@@ -77,22 +78,28 @@ export async function runImport(options: ImportOptions): Promise<void> {
   await profileToMarkdown(profile, sourceMdPath(profileDir));
   printSummary(profile);
 
-  console.log(`\n${c.ok} ${c.success('Source data saved:')}`);
+  console.log(`\n${c.ok} ${c.success('Profile imported and saved.')}`);
   console.log(`   ${c.path(sourceJsonPath(profileDir))}`);
   console.log(`   ${c.path(sourceMdPath(profileDir))}`);
 
+  // Collect any missing contact details (email, phone, headline, LinkedIn)
+  const { default: inquirer } = await import('inquirer');
+  await ensureContactDetails(profile, profileDir, inquirer);
+
   if (!options.flow) {
-    console.log(`\n${c.tip("Next: run 'resume refine' to improve and expand your profile with Claude's help.")}`);
+    console.log(`\n  ${c.star} ${c.tip("Next: run 'resume refine' — Claude will fill gaps and sharpen your bullets.")}`);
   }
 }
 
 function printSummary(profile: Profile): void {
-  console.log('\nProfile summary:');
-  console.log(`  ${c.label('Name:')}      ${profile.contact.name.value}`);
-  console.log(`  ${c.label('Positions:')} ${profile.positions.length}`);
-  console.log(`  ${c.label('Education:')} ${profile.education.length}`);
-  console.log(`  ${c.label('Skills:')}    ${profile.skills.length}`);
-  console.log(`  ${c.label('Projects:')}  ${profile.projects.length}`);
-  console.log(`  ${c.label('Certs:')}     ${profile.certifications.length}`);
-  console.log(`  ${c.label('Volunteer:')} ${profile.volunteer.length}`);
+  console.log(`\n  ${c.ok} ${c.value(profile.contact.name.value)} — ${c.cheeky('nice to meet you.')}`);
+  const stats = [
+    `${profile.positions.length} positions`,
+    `${profile.education.length} education`,
+    `${profile.skills.length} skills`,
+    ...(profile.projects.length      ? [`${profile.projects.length} projects`]      : []),
+    ...(profile.certifications.length ? [`${profile.certifications.length} certs`]  : []),
+    ...(profile.volunteer.length      ? [`${profile.volunteer.length} volunteer`]    : []),
+  ];
+  console.log(`  ${c.muted(stats.join('  ·  '))}`);
 }

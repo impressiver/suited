@@ -1,11 +1,11 @@
 {
-  "name": "resume-builder",
+  "name": "suited",
   "version": "1.0.0",
   "description": "CLI tool to generate tailored, factually-accurate resumes from LinkedIn data",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "resume": "./dist/index.js"
+    "suited": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc && rm -rf dist/templates && cp -r src/templates dist/templates",

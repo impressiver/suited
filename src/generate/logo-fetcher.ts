@@ -9,7 +9,7 @@
  *   4. Other .svg references in img src / href attributes
  */
 
-const UA = 'Mozilla/5.0 (compatible; resume-builder/1.0)';
+const UA = 'Mozilla/5.0 (compatible; suited/1.0)';
 const TIMEOUT_MS = 7000;
 const MAX_SVG_BYTES = 100_000;
 

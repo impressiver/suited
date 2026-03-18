@@ -1,4 +1,4 @@
-# resume-builder
+# suited
 
 A CLI tool that ingests LinkedIn profile data, refines it with Claude, and generates tailored, factually-accurate PDF resumes.
 
@@ -34,16 +34,16 @@ pnpm build
 ### Full pipeline (recommended)
 
 ```bash
-node dist/index.js
+suited
 ```
 
 Runs the three-step flow interactively. Each step is skipped if its output already exists and the upstream data has not changed.
 
 ```
-=== Resume Builder ===
+=== Suited ===
 
 Step 1 of 3 — Import
-  Found: Ian White (imported 3/15/2026)
+  Found: Alex Johnson (imported 3/15/2026)
   ❯ Use existing
     Import new data
 
@@ -61,10 +61,10 @@ Step 3 of 3 — Generate
 ### Individual commands
 
 ```bash
-node dist/index.js import    # Phase 1: import LinkedIn data
-node dist/index.js refine    # Phase 2: Claude Q&A refinement
-node dist/index.js generate  # Phase 3: generate PDF
-node dist/index.js validate  # Check profile integrity
+suited import    # Phase 1: import LinkedIn data
+suited refine    # Phase 2: Claude Q&A refinement
+suited generate  # Phase 3: generate PDF
+suited validate  # Check profile integrity
 ```
 
 ## The three phases
@@ -75,25 +75,25 @@ Pulls in your raw LinkedIn data verbatim. Supports:
 
 ```bash
 # From a LinkedIn profile URL (Puppeteer scraper)
-node dist/index.js import https://www.linkedin.com/in/your-username
+suited import https://www.linkedin.com/in/your-username
 
 # Show browser window (required for 2FA or CAPTCHA)
-node dist/index.js import https://www.linkedin.com/in/your-username --headed
+suited import https://www.linkedin.com/in/your-username --headed
 
 # Clear saved session and re-authenticate
-node dist/index.js import https://www.linkedin.com/in/your-username --clear-session
+suited import https://www.linkedin.com/in/your-username --clear-session
 
 # From a LinkedIn data export ZIP
-node dist/index.js import ~/Downloads/linkedin-export.zip
+suited import ~/Downloads/linkedin-export.zip
 
 # From a CSV export directory
-node dist/index.js import ~/Downloads/Basic_LinkedInDataExport/
+suited import ~/Downloads/Basic_LinkedInDataExport/
 
 # From pasted text (prompts for input)
-node dist/index.js import
+suited import
 ```
 
-When importing via URL, the scraper launches Chrome, prompts for your LinkedIn credentials on first run, and saves the session to `~/.resume-builder/linkedin-session.json`. Only `linkedin.com` cookies are persisted.
+When importing via URL, the scraper launches Chrome, prompts for your LinkedIn credentials on first run, and saves the session to `~/.suited/linkedin-session.json`. Only `linkedin.com` cookies are persisted.
 
 > **Note:** This tool is intended for importing your own LinkedIn profile data. LinkedIn's Terms of Service prohibit automated scraping of their platform.
 

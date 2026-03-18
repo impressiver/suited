@@ -3,6 +3,7 @@ import {
   refinedJsonPath, refinedMdPath, sourceJsonPath,
   loadJobs, loadJobRefinement, saveJobRefinement, deleteJobRefinement,
 } from '../profile/serializer.js';
+import { runProfileEditor } from './profile-editor.js';
 import { profileToMarkdown, markdownToProfile } from '../profile/markdown.js';
 import { callWithTool } from '../claude/client.js';
 import { fileExists } from '../utils/fs.js';
@@ -187,6 +188,7 @@ async function reviewBullets(
     const { action } = await inquirer.prompt([
       {
         type: 'list',
+        loop: false,
         name: 'action',
         message: 'This bullet:',
         choices: [
@@ -233,6 +235,7 @@ async function reviewSummary(
   const { action } = await inquirer.prompt([
     {
       type: 'list',
+      loop: false,
       name: 'action',
       message: 'This summary:',
       choices: [
@@ -305,6 +308,7 @@ async function reviewRefinements(
   const { action } = await inquirer.prompt([
     {
       type: 'list',
+      loop: false,
       name: 'action',
       message: 'Accept these changes?',
       choices: [
@@ -460,6 +464,7 @@ async function applyExpertPolish(
     const { scope } = await inquirer.prompt([
       {
         type: 'list',
+        loop: false,
         name: 'scope',
         message: 'Polish experience bullets for:',
         choices: [
@@ -557,6 +562,7 @@ async function runConsultantReview(
 
   const { action } = await inquirer.prompt([{
     type: 'list',
+    loop: false,
     name: 'action',
     message: 'Incorporate consultant feedback?',
     choices: [
@@ -641,6 +647,7 @@ async function runJobRefinements(
   const { jobId } = await inquirer.prompt([
     {
       type: 'list',
+      loop: false,
       name: 'jobId',
       message: 'Select a job to manage its curation:',
       choices: [
@@ -667,6 +674,7 @@ async function runJobRefinements(
     const { action } = await inquirer.prompt([
       {
         type: 'list',
+        loop: false,
         name: 'action',
         message: 'What would you like to do?',
         choices: [
@@ -755,16 +763,18 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       const { action } = await inquirer.prompt([
         {
           type: 'list',
+          loop: false,
           name: 'action',
           message: 'What would you like to do?',
           choices: [
-            { value: 'skip',       name: 'Skip — use existing refinement' },
             { value: 'consultant', name: 'Consultant review — get professional feedback' },
             { value: 'polish',     name: 'Expert polish — improve writing quality' },
             { value: 'prompt',     name: 'Prompt — tell Claude what to change' },
             { value: 'edit',       name: 'Edit refined.md manually' },
+            { value: 'manual',     name: 'Edit profile manually  (bullets, skills, positions, education)' },
             { value: 'jobs',       name: 'Job refinements — manage per-job curation plans' },
             { value: 'rerun',      name: 'Re-run refinement with Claude' },
+            { value: 'skip',       name: c.muted('← Back') },
           ],
         },
       ]) as { action: string };
@@ -792,6 +802,11 @@ export async function runRefine(options: RefineOptions): Promise<void> {
         const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), originalProfile);
         await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
         console.log(`\n${c.ok} ${c.success('refined.json updated from edited markdown.')}`);
+        return;
+      }
+
+      if (action === 'manual') {
+        await runProfileEditor({ profileDir });
         return;
       }
 
@@ -885,6 +900,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
   const { followUp } = await inquirer.prompt([
     {
       type: 'list',
+      loop: false,
       name: 'followUp',
       message: 'What next?',
       choices: [

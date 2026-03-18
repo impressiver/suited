@@ -15,11 +15,15 @@ import { runRefine } from './commands/refine.js';
 import { runGenerate } from './commands/generate.js';
 import { runValidate } from './commands/validate.js';
 import { runFlow } from './commands/flow.js';
+import { runImprove } from './commands/improve.js';
+import { runContact } from './commands/contact.js';
+import { runJobs } from './commands/jobs.js';
+import { runPrepare } from './commands/prepare.js';
 
 const program = new Command();
 
 program
-  .name('resume')
+  .name('suited')
   .description('Generate tailored, factually-accurate resumes from LinkedIn data')
   .version('1.0.0');
 
@@ -79,6 +83,58 @@ program
       await runValidate(opts);
     } catch (err) {
       console.error(`\n✗ Validation failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('improve')
+  .description('Improve profile health: Q&A refinement, summary, bullet editing')
+  .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
+  .action(async (opts: { profileDir?: string }) => {
+    try {
+      await runImprove(opts);
+    } catch (err) {
+      console.error(`\n✗ Improve failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('contact')
+  .description('View and edit contact information')
+  .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
+  .action(async (opts: { profileDir?: string }) => {
+    try {
+      await runContact({ profileDir: opts.profileDir });
+    } catch (err) {
+      console.error(`\n✗ Contact failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('jobs')
+  .description('Manage saved job descriptions')
+  .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
+  .action(async (opts: { profileDir?: string }) => {
+    try {
+      await runJobs({ profileDir: opts.profileDir });
+    } catch (err) {
+      console.error(`\n✗ Jobs failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('prepare')
+  .description('Prepare a curated resume for a specific job description')
+  .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
+  .action(async (opts: { profileDir?: string }) => {
+    try {
+      await runPrepare({ profileDir: opts.profileDir });
+    } catch (err) {
+      console.error(`\n✗ Prepare failed: ${(err as Error).message}`);
       process.exit(1);
     }
   });

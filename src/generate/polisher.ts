@@ -1,7 +1,7 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
 import { JobAnalysis, ResumeDocument } from '../profile/schema.js';
 import { callWithTool } from '../claude/client.js';
-import { JOB_TAILORED_POLISH_SYSTEM } from '../claude/prompts/refine.js';
+import { JOB_TAILORED_POLISH_SYSTEM, CONTENT_TWEAK_SYSTEM } from '../claude/prompts/refine.js';
 
 // ---------------------------------------------------------------------------
 // Tool schema
@@ -104,6 +104,63 @@ export async function polishResumeForJob(
   const output = await callWithTool<PolishOutput>(JOB_TAILORED_POLISH_SYSTEM, prompt, polishTool);
 
   // Apply polished bullets back to the document
+  const updatedPositions = [...doc.positions];
+  for (const change of output.positions ?? []) {
+    const { index, bullets } = change;
+    if (index < 0 || index >= updatedPositions.length) continue;
+    if (!Array.isArray(bullets) || bullets.length === 0) continue;
+    updatedPositions[index] = { ...updatedPositions[index], bullets };
+  }
+
+  const updatedDoc: ResumeDocument = { ...doc, positions: updatedPositions };
+  if (output.summary?.trim()) updatedDoc.summary = output.summary.trim();
+
+  return updatedDoc;
+}
+
+// ---------------------------------------------------------------------------
+// Content tweak — natural language instruction → Claude rewrites
+// ---------------------------------------------------------------------------
+
+function buildTweakPrompt(doc: ResumeDocument, instruction: string): string {
+  const lines: string[] = [];
+
+  lines.push(`## Instruction`);
+  lines.push(instruction);
+  lines.push('');
+
+  if (doc.summary) {
+    lines.push('## Summary');
+    lines.push(doc.summary);
+    lines.push('');
+  }
+
+  lines.push('## Experience (positions indexed from 0)');
+  doc.positions.forEach((pos, i) => {
+    lines.push(`\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`);
+    if (pos.bullets.length === 0) {
+      lines.push('  (no bullets)');
+    } else {
+      pos.bullets.forEach(b => lines.push(`  • ${b}`));
+    }
+  });
+
+  return lines.join('\n');
+}
+
+/**
+ * Rewrites resume bullets according to a natural language instruction.
+ * Restricts to rephrasing/reframing existing content — does NOT add new facts.
+ */
+export async function tweakResumeContent(
+  doc: ResumeDocument,
+  instruction: string,
+): Promise<ResumeDocument> {
+  if (doc.positions.length === 0) return doc;
+
+  const prompt = buildTweakPrompt(doc, instruction);
+  const output = await callWithTool<PolishOutput>(CONTENT_TWEAK_SYSTEM, prompt, polishTool);
+
   const updatedPositions = [...doc.positions];
   for (const change of output.positions ?? []) {
     const { index, bullets } = change;

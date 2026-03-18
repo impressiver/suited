@@ -16,7 +16,7 @@ import {
   getRecommendedFlair, getFlairInfo,
 } from '../generate/resume-builder.js';
 import { renderResumeHtml } from '../generate/renderer.js';
-import { polishResumeForJob } from '../generate/polisher.js';
+import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.js';
 import { autoTrimToFit } from '../generate/trimmer.js';
 import { evaluateForJob, printJobEvaluation, applyJobFeedback, enrichFindingsWithUserInput, resumeDocContext } from '../generate/consultant.js';
 import { fetchSvgsFromUrl, discoverLogoSvgs } from '../generate/logo-fetcher.js';
@@ -25,7 +25,8 @@ import { buildFitOverrideCss, SQUEEZE_THRESHOLDS, SQUEEZE_GIVES_UP_AT, type Sque
 import { exportToPdf, measurePageFit } from '../pdf/exporter.js';
 import { fileExists } from '../utils/fs.js';
 import { openInEditor } from '../utils/interactive.js';
-import type { FlairLevel, IndustryVertical, GenerationConfig, SavedJob, Profile, ResumeDocument, JobRefinement } from '../profile/schema.js';
+import { createSpinner } from '../utils/spinner.js';
+import type { FlairLevel, IndustryVertical, GenerationConfig, SavedJob, Profile, ResumeDocument, JobRefinement, TemplateName } from '../profile/schema.js';
 import { c } from '../utils/colors.js';
 
 export interface GenerateOptions {
@@ -48,85 +49,6 @@ const INDUSTRY_LABELS: Record<IndustryVertical, string> = {
   'ai': 'AI / Machine Learning',
 };
 
-// ---------------------------------------------------------------------------
-// Contact details guard
-// ---------------------------------------------------------------------------
-
-async function ensureContactDetails(
-  profile: Profile,
-  profileDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
-): Promise<Profile> {
-  const missing: string[] = [];
-  if (!profile.contact.headline) missing.push('job title');
-  if (!profile.contact.email)    missing.push('email');
-  if (!profile.contact.phone)    missing.push('phone');
-  if (!profile.contact.linkedin) missing.push('LinkedIn URL');
-  if (missing.length === 0) return profile;
-
-  console.log(`\n${c.warn} ${c.warning(`Missing contact info: ${missing.join(', ')}`)}`);
-
-  const now = new Date().toISOString();
-  const userEdit = (v: string) => ({ value: v, source: { kind: 'user-edit' as const, editedAt: now } });
-  const updates: Partial<Profile['contact']> = {};
-
-  if (!profile.contact.headline) {
-    const { headline } = await inquirer.prompt([
-      { type: 'input', name: 'headline', message: 'Current job title / headline (leave blank to skip):' },
-    ]) as { headline: string };
-    if (headline.trim()) updates.headline = userEdit(headline.trim());
-  }
-
-  if (!profile.contact.email) {
-    const { email } = await inquirer.prompt([
-      { type: 'input', name: 'email', message: 'Email address (leave blank to skip):' },
-    ]) as { email: string };
-    if (email.trim()) updates.email = userEdit(email.trim());
-  }
-
-  if (!profile.contact.phone) {
-    const { phone } = await inquirer.prompt([
-      { type: 'input', name: 'phone', message: 'Phone number (leave blank to skip):' },
-    ]) as { phone: string };
-    if (phone.trim()) updates.phone = userEdit(phone.trim());
-  }
-
-  if (!profile.contact.linkedin) {
-    const { linkedin } = await inquirer.prompt([
-      { type: 'input', name: 'linkedin', message: 'LinkedIn URL (leave blank to skip):' },
-    ]) as { linkedin: string };
-    if (linkedin.trim()) updates.linkedin = userEdit(linkedin.trim());
-  }
-
-  if (Object.keys(updates).length === 0) return profile;
-
-  const updated: Profile = { ...profile, contact: { ...profile.contact, ...updates } };
-
-  // Persist to whichever profile is active
-  if (await fileExists(refinedJsonPath(profileDir))) {
-    const refined = await loadRefined(profileDir);
-    await saveRefined({ ...refined, profile: updated }, profileDir);
-  } else {
-    await saveSource(updated, profileDir);
-  }
-
-  // Also persist to contact.json so these details survive future re-imports
-  const existing = await loadContactMeta(profileDir);
-  await saveContactMeta({
-    ...existing,
-    ...(updates.headline ? { headline: updates.headline.value } : {}),
-    ...(updates.email    ? { email:    updates.email.value    } : {}),
-    ...(updates.phone    ? { phone:    updates.phone.value    } : {}),
-    ...(updates.linkedin ? { linkedin: updates.linkedin.value } : {}),
-    ...(updates.location ? { location: updates.location.value } : {}),
-  }, profileDir);
-
-  console.log(`  ${c.ok} ${c.success('Contact details saved.')}`);
-
-  return updated;
-}
-
 export async function runGenerate(options: GenerateOptions): Promise<void> {
   const { default: inquirer } = await import('inquirer');
 
@@ -142,8 +64,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   if (!usingRefined) {
     console.log(c.tip("  Tip: run 'resume refine' first to improve your profile with Claude's help."));
   }
-
-  profile = await ensureContactDetails(profile, profileDir, inquirer);
 
   // Check for saved generation config — discard it if the profile has changed
   const savedConfig = await loadGenerationConfig(profileDir);
@@ -186,13 +106,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const templateOverride = config.templateOverride;
     let resumeDoc;
     if (config.jd) {
-      // Analyze JD (may already be in saved config)
+      // [1/4] Analyze JD (may already be in saved config)
       if (!config.jobAnalysis) {
-        console.log(c.muted('\nAnalyzing job description...'));
+        const spinner1 = createSpinner('[1/4] Reading the job posting tea leaves...');
         config.jobAnalysis = await analyzeJobDescription(config.jd);
+        spinner1.stop();
         // Auto-save this JD and capture the job ID
         const savedId = await autoSaveJob(config.jd, config.jobAnalysis.company, config.jobAnalysis.title, profileDir);
         if (!config.jobId) config.jobId = savedId;
+      } else {
+        console.log(c.muted('[1/4] Job analysis (from saved config)'));
       }
 
       const { jobAnalysis } = config;
@@ -237,54 +160,115 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       }
       console.log(`  ${c.label('Template:')} ${effectiveTemplate} ${c.muted(`(flair ${effectiveFlair})`)}`);
 
-      // Check for stored job refinement (skip Claude curation if available)
+      // [2/4] Curation — with in-session re-run support (Phase 3 preview)
       let curatorResult: import('../generate/curator.js').CuratorResult | undefined;
       let usedStoredRefinement = false;
+      let skipStoredForThisRun = false;
+      let previewApproved = false;
 
-      if (config.jobId) {
-        const stored = await loadJobRefinement(profileDir, config.jobId);
-        if (stored) {
-          console.log(c.muted(`\nUsing stored job refinement from ${new Date(stored.createdAt).toLocaleDateString()}...`));
-          curatorResult = { plan: stored.plan, refMap: buildRefMapForProfile(profile) };
-          usedStoredRefinement = true;
+      while (!previewApproved) {
+        // Load stored refinement if available (unless user just re-ran curation)
+        if (config.jobId && !curatorResult && !skipStoredForThisRun) {
+          const stored = await loadJobRefinement(profileDir, config.jobId);
+          if (stored) {
+            console.log(c.muted(`\nUsing stored job refinement from ${new Date(stored.createdAt).toLocaleDateString()}...`));
+            curatorResult = { plan: stored.plan, refMap: buildRefMapForProfile(profile) };
+            usedStoredRefinement = true;
+          }
+        }
+
+        if (!curatorResult) {
+          const spinner2 = createSpinner('[2/4] Handpicking your finest career moments...');
+          try {
+            curatorResult = await curateForJob(profile, config.jobAnalysis);
+            spinner2.stop();
+          } catch (err) {
+            spinner2.stop();
+            console.error(`\n${c.fail} ${c.error(`Curation failed: ${(err as Error).message}`)}`);
+            const { retry } = await inquirer.prompt([
+              { type: 'confirm', name: 'retry', message: 'Retry curation?', default: true },
+            ]) as { retry: boolean };
+            if (retry) { reuseConfig = false; continue; }
+            break;
+          }
+          // Save this refinement for future reuse
+          if (config.jobId) {
+            const refinement: JobRefinement = {
+              jobId: config.jobId,
+              createdAt: new Date().toISOString(),
+              jobAnalysis: config.jobAnalysis,
+              plan: curatorResult.plan,
+            };
+            await saveJobRefinement(refinement, profileDir);
+          }
+        } else {
+          console.log(c.muted('[2/4] Curation (from stored refinement)'));
+        }
+
+        // Phase 3: Bullet-level preview before section checkboxes
+        const { plan } = curatorResult;
+        const selectedPosIds = new Set(plan.selectedPositions.map(p => p.positionId));
+        console.log(`\n  ${c.header(`Curated for: ${config.jobAnalysis.title} @ ${config.jobAnalysis.company}`)}\n`);
+        console.log(`  ${c.label('Experience')}  ${c.muted(`(${plan.selectedPositions.length} of ${profile.positions.length} positions)`)}`);
+        for (const pos of profile.positions) {
+          const sel = plan.selectedPositions.find(s => s.positionId === pos.id);
+          const dateRange = `${pos.startDate.value}–${pos.endDate?.value ?? 'Present'}`;
+          if (sel) {
+            console.log(`    ${c.ok} ${c.value(pos.title.value)} ${c.muted(`@ ${pos.company.value}`)}  ${c.muted(dateRange)}`);
+            for (const ref of sel.bulletRefs) {
+              const parts = ref.split(':');
+              if (parts.length >= 3) {
+                const bulletIdx = parseInt(parts[2], 10);
+                const bullet = pos.bullets[bulletIdx];
+                if (bullet) {
+                  const preview = bullet.value.length > 90 ? bullet.value.slice(0, 90) + '…' : bullet.value;
+                  console.log(`        ${c.muted('·')} ${preview}`);
+                }
+              }
+            }
+          } else {
+            console.log(`    ${c.muted(`✕ ${pos.title.value} @ ${pos.company.value}  ${dateRange}`)}`);
+          }
+        }
+
+        if (plan.selectedSkillIds.length > 0) {
+          const skillNames = profile.skills
+            .filter(s => plan.selectedSkillIds.includes(s.id))
+            .map(s => s.name.value);
+          console.log(`\n  ${c.label('Skills')}  ${c.muted(`(${skillNames.length})`)}  ${skillNames.join(', ')}`);
+        }
+        if (plan.selectedEducationIds.length > 0) {
+          const edus = profile.education
+            .filter(e => plan.selectedEducationIds.includes(e.id))
+            .map(e => [e.degree?.value, e.fieldOfStudy?.value, '—', e.institution.value].filter(Boolean).join(' '));
+          console.log(`  ${c.label('Education')}  ${c.muted(`(${edus.length})`)}  ${edus.join(' | ')}`);
+        }
+        console.log('');
+
+        const { previewAction } = await inquirer.prompt([{
+          type: 'list',
+          loop: false,
+          name: 'previewAction',
+          message: 'Curation preview:',
+          choices: [
+            { value: 'continue', name: '[Enter] Continue' },
+            { value: 'rerun',    name: '[r] Re-run curation' },
+          ],
+        }]) as { previewAction: string };
+
+        if (previewAction === 'rerun') {
+          // Clear in-session result; don't load from disk next iteration
+          curatorResult = undefined;
+          usedStoredRefinement = false;
+          skipStoredForThisRun = true;
+        } else {
+          previewApproved = true;
         }
       }
 
-      if (!curatorResult) {
-        console.log(c.muted('\nCurating resume with Claude...'));
-        try {
-          curatorResult = await curateForJob(profile, config.jobAnalysis);
-        } catch (err) {
-          console.error(`\n${c.fail} ${c.error(`Curation failed: ${(err as Error).message}`)}`);
-          const { retry } = await inquirer.prompt([
-            { type: 'confirm', name: 'retry', message: 'Retry curation?', default: true },
-          ]) as { retry: boolean };
-          if (retry) { reuseConfig = false; continue; }
-          break;
-        }
-        // Save this refinement for future reuse
-        if (config.jobId) {
-          const refinement: JobRefinement = {
-            jobId: config.jobId,
-            createdAt: new Date().toISOString(),
-            jobAnalysis: config.jobAnalysis,
-            plan: curatorResult.plan,
-          };
-          await saveJobRefinement(refinement, profileDir);
-        }
-      }
+      if (!curatorResult) break; // curation aborted
 
       const { plan } = curatorResult;
-      console.log('\nCuration Summary:');
-      if (usedStoredRefinement) console.log(c.muted('  (from stored refinement)'));
-      console.log(`  ${c.label('Positions:')} ${plan.selectedPositions.length}`);
-      for (const selPos of plan.selectedPositions) {
-        const pos = profile.positions.find(p => p.id === selPos.positionId);
-        console.log(`    ${c.muted('•')} ${pos?.title.value} ${c.muted(`@ ${pos?.company.value} (${selPos.bulletRefs.length} bullets)`)}`);
-      }
-      console.log(`  ${c.label('Skills:')}    ${plan.selectedSkillIds.length}`);
-      console.log(`  ${c.label('Education:')} ${plan.selectedEducationIds.length}`);
-
       console.log(`\n${c.ok} ${c.success('Accuracy check passed')}`);
       resumeDoc = assembleResumeDocument(
         profile, plan, curatorResult.refMap,
@@ -292,63 +276,70 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         config.jobTitle, config.company,
       );
 
-      // Auto-polish bullets to fit the job — no user interaction, no facts added
-      console.log(c.muted(`Polishing bullets for ${config.jobAnalysis.title} at ${config.jobAnalysis.company}...`));
+      // [3/4] Auto-polish bullets — no user interaction, no facts added
+      const spinner3 = createSpinner('[3/4] Buffing the bullets to a mirror shine...');
       try {
         resumeDoc = await polishResumeForJob(resumeDoc, config.jobAnalysis);
+        spinner3.stop();
       } catch (err) {
+        spinner3.stop();
         console.log(c.muted(`  Polish skipped (${(err as Error).message})`));
       }
 
-      // Hiring consultant evaluation — show before the final confirm so user can iterate
-      console.log(c.muted('\nRunning job fit review...'));
-      try {
-        const jobEval = await evaluateForJob(resumeDoc, config.jobAnalysis);
-        printJobEvaluation(jobEval);
+      // [4/4] Hiring consultant evaluation — skip if reusing config with stored refinement
+      if (!reuseConfig || !usedStoredRefinement) {
+        const spinner4 = createSpinner('[4/4] Getting a second opinion from our imaginary consultant...');
+        try {
+          const jobEval = await evaluateForJob(resumeDoc, config.jobAnalysis);
+          spinner4.stop();
+          printJobEvaluation(jobEval);
 
-        if (jobEval.gaps.length > 0) {
-          const { feedbackAction } = await inquirer.prompt([{
-            type: 'list',
-            name: 'feedbackAction',
-            message: 'Incorporate consultant feedback?',
-            choices: [
-              { value: 'skip', name: 'Skip' },
-              { value: 'all',  name: 'Apply all suggestions' },
-              { value: 'pick', name: 'Choose which suggestions to apply' },
-            ],
-          }]) as { feedbackAction: string };
+          if (jobEval.gaps.length > 0) {
+            const { feedbackAction } = await inquirer.prompt([{
+              type: 'list',
+              loop: false,
+              name: 'feedbackAction',
+              message: 'Incorporate consultant feedback?',
+              choices: [
+                { value: 'skip', name: 'Skip' },
+                { value: 'all',  name: 'Apply all suggestions' },
+                { value: 'pick', name: 'Choose which suggestions to apply' },
+              ],
+            }]) as { feedbackAction: string };
 
-          if (feedbackAction !== 'skip') {
-            let selectedGaps = jobEval.gaps;
-            if (feedbackAction === 'pick') {
-              const { chosen } = await inquirer.prompt([{
-                type: 'checkbox',
-                name: 'chosen',
-                message: 'Select suggestions to apply:',
-                choices: jobEval.gaps.map((gap, i) => ({
-                  name: `${gap.area}: ${gap.issue}`,
-                  value: i,
-                  checked: true,
-                })),
-              }]) as { chosen: number[] };
-              selectedGaps = chosen.map(i => jobEval.gaps[i]);
-            }
+            if (feedbackAction !== 'skip') {
+              let selectedGaps = jobEval.gaps;
+              if (feedbackAction === 'pick') {
+                const { chosen } = await inquirer.prompt([{
+                  type: 'checkbox',
+                  name: 'chosen',
+                  message: 'Select suggestions to apply:',
+                  choices: jobEval.gaps.map((gap, i) => ({
+                    name: `${gap.area}: ${gap.issue}`,
+                    value: i,
+                    checked: true,
+                  })),
+                }]) as { chosen: number[] };
+                selectedGaps = chosen.map(i => jobEval.gaps[i]);
+              }
 
-            if (selectedGaps.length > 0) {
-              // Ask Claude what facts are needed, then prompt user for answers
-              selectedGaps = await enrichFindingsWithUserInput(selectedGaps, inquirer, resumeDocContext(resumeDoc));
-
-              console.log(c.muted('\nApplying consultant feedback...'));
-              try {
-                resumeDoc = await applyJobFeedback(resumeDoc, config.jobAnalysis, selectedGaps);
-              } catch (err) {
-                console.log(c.muted(`  Failed to apply feedback: ${(err as Error).message}`));
+              if (selectedGaps.length > 0) {
+                selectedGaps = await enrichFindingsWithUserInput(selectedGaps, inquirer, resumeDocContext(resumeDoc));
+                console.log(c.muted('\nApplying consultant feedback...'));
+                try {
+                  resumeDoc = await applyJobFeedback(resumeDoc, config.jobAnalysis, selectedGaps);
+                } catch (err) {
+                  console.log(c.muted(`  Failed to apply feedback: ${(err as Error).message}`));
+                }
               }
             }
           }
+        } catch (err) {
+          spinner4.stop();
+          console.log(c.muted(`  Job fit review unavailable: ${(err as Error).message}`));
         }
-      } catch (err) {
-        console.log(c.muted(`  Job fit review unavailable: ${(err as Error).message}`));
+      } else {
+        console.log(c.muted('[4/4] Job fit review skipped (using stored evaluation)'));
       }
     } else {
       // No JD — include everything
@@ -412,24 +403,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       console.log(c.muted('\nGenerating all templates...'));
       const generatedPaths = await generateAllTemplates(resumeDoc, namePart, resumesDir, inquirer, profileDir);
       config.profileUpdatedAt = profile.updatedAt;
+      config.resolvedTemplate = resumeDoc.template;
       await saveGenerationConfig(config, profileDir);
       console.log(`\n${c.ok} ${c.success(`Generated ${generatedPaths.length} resume(s).`)}`);
       console.log(c.muted(`  Settings saved to ${generationConfigPath(profileDir)}`));
     } else {
-      // Single template
-      const outputPath = `${resumesDir}/${namePart}-${date}-${hhmm}.pdf`;
-
-      // Render → squeeze CSS → content trim → export
-      console.log(c.muted('Rendering HTML...'));
+      // Single template — render, fit-check, export
+      let outputPath = `${resumesDir}/${namePart}-${date}-${hhmm}.pdf`;
       let html = await renderResumeHtml(resumeDoc);
 
       let fitCancelled = false;
       console.log(c.muted('Checking page fit...'));
-
-      // Phase 1: try progressive CSS adjustments before touching content
       html = await trySqueeze(html, resumeDoc);
 
-      // Phase 2: if still overflowing after max CSS squeeze, ask the user
       while (true) { // eslint-disable-line no-constant-condition
         const fit = await measurePageFit(html);
         if (!fit.overflows) break;
@@ -470,39 +456,149 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       console.log(c.muted('Generating PDF...'));
       await exportToPdf(html, { template: resumeDoc.template, outputPath });
 
-      // Save config so this run is repeatable; stamp profile version for stale-check
+      // Save config; stamp resolved template + profile version
       config.profileUpdatedAt = profile.updatedAt;
+      config.resolvedTemplate = resumeDoc.template;
       await saveGenerationConfig(config, profileDir);
-      console.log(`\n${c.ok} ${c.success('Resume generated:')} ${c.path(outputPath)}`);
-      console.log(c.muted(`  Settings saved to ${generationConfigPath(profileDir)}`));
-    };
+      console.log(`\n${c.ok} ${c.success('Resume is ready to ship:')} ${c.path(outputPath)}`);
+      console.log(c.muted(`  Settings saved · ${generationConfigPath(profileDir)}`));
 
-    const { next } = await inquirer.prompt([
-      {
-        type: 'list', name: 'next', message: 'What next?',
-        choices: [
-          { value: 'done', name: 'Done' },
-          { value: 'flair', name: 'Try a different flair level' },
-          { value: 'newjd', name: 'Generate for a different job' },
-          { value: 'edit', name: 'Edit refined data and regenerate' },
-        ],
-      },
-    ]) as { next: string };
+      // -----------------------------------------------------------------------
+      // "What next?" inner loop — handles open, tweak, template without
+      // re-running the full curation flow.
+      // -----------------------------------------------------------------------
+      let innerLoop = true;
+      while (innerLoop) {
+        const { next } = await inquirer.prompt([
+          {
+            type: 'list', name: 'next',
+            message: "What's next?",
+            choices: [
+              { value: 'done',     name: `${c.ok} Done — looks great!` },
+              { value: 'open',     name: `Open PDF                 ${c.muted('(open in default viewer)')}` },
+              { value: 'tweak',    name: `Tweak content            ${c.muted('(natural language → Claude rewrites)')}` },
+              { value: 'template', name: `Change template          ${c.muted(`(currently: ${resumeDoc.template})`)}` },
+              { value: 'newjd',    name: `Target a different job   ${c.muted('(start fresh with a new JD)')}` },
+              { value: 'edit',     name: `Edit profile data        ${c.muted('(opens editor, re-curates)')}` },
+            ],
+          },
+        ]) as { next: string };
 
-    if (next === 'done') {
-      continueLoop = false;
-    } else if (next === 'flair') {
-      reuseConfig = false;
-      options.flair = undefined;
-      config.jd = config.jd; // keep JD
-    } else if (next === 'newjd') {
-      reuseConfig = false;
-      options.jd = undefined;
-      options.flair = undefined;
-    } else if (next === 'edit') {
-      await editRefinedProfile(profileDir);
-      reuseConfig = false;
+        if (next === 'done') {
+          innerLoop = false;
+          continueLoop = false;
+        } else if (next === 'open') {
+          await openPdf(outputPath);
+        } else if (next === 'tweak') {
+          const { instruction } = await inquirer.prompt([
+            {
+              type: 'input', name: 'instruction',
+              message: 'What would you like to change?\n  (e.g. "tighten the bullets", "emphasize leadership", "remove mentions of Python")\n>',
+            },
+          ]) as { instruction: string };
+          if (instruction.trim()) {
+            const spinner = createSpinner('Applying tweak...');
+            try {
+              resumeDoc = await tweakResumeContent(resumeDoc, instruction.trim());
+              spinner.stop();
+            } catch (err) {
+              spinner.stop();
+              console.log(c.muted(`  Tweak failed: ${(err as Error).message}`));
+              continue;
+            }
+            const newNowTs = new Date();
+            const newDate = newNowTs.toISOString().slice(0, 10);
+            const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
+            outputPath = `${resumesDir}/${namePart}-${newDate}-${newHhmm}.pdf`;
+            let tweakedHtml = await renderResumeHtml(resumeDoc);
+            tweakedHtml = await trySqueeze(tweakedHtml, resumeDoc);
+            await exportToPdf(tweakedHtml, { template: resumeDoc.template, outputPath });
+            console.log(`${c.ok} ${c.success('Tweaked and ready:')} ${c.path(outputPath)}`);
+            console.log(c.muted('  (Previous PDF still exists with its original timestamp — no work lost.)'));
+          }
+        } else if (next === 'template') {
+          const { newTemplate } = await inquirer.prompt([
+            {
+              type: 'list', name: 'newTemplate',
+              message: 'Choose template:',
+              choices: [
+                { value: 'classic',  name: 'Classic' },
+                { value: 'modern',   name: 'Modern' },
+                { value: 'bold',     name: 'Bold' },
+                { value: 'retro',    name: 'Retro Terminal' },
+                { value: 'timeline', name: 'Timeline' },
+              ],
+              default: resumeDoc.template,
+            },
+          ]) as { newTemplate: TemplateName };
+          if (newTemplate === 'timeline' && !resumeDoc.logoDataUris) {
+            resumeDoc = { ...resumeDoc, logoDataUris: await collectTimelineLogos(resumeDoc, inquirer, profileDir) };
+          }
+          resumeDoc = { ...resumeDoc, template: newTemplate };
+          config.resolvedTemplate = newTemplate;
+          await saveGenerationConfig(config, profileDir);
+          console.log(c.muted(`Generating PDF with ${newTemplate} template...`));
+          const newNowTs = new Date();
+          const newDate = newNowTs.toISOString().slice(0, 10);
+          const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
+          outputPath = `${resumesDir}/${namePart}-${newDate}-${newHhmm}.pdf`;
+          let templateHtml = await renderResumeHtml(resumeDoc);
+          templateHtml = await trySqueeze(templateHtml, resumeDoc);
+          await exportToPdf(templateHtml, { template: resumeDoc.template, outputPath });
+          console.log(`${c.ok} ${c.success('Resume generated:')} ${c.path(outputPath)}`);
+        } else if (next === 'newjd') {
+          reuseConfig = false;
+          options.jd = undefined;
+          options.flair = undefined;
+          innerLoop = false;
+        } else if (next === 'edit') {
+          await editRefinedProfile(profileDir);
+          reuseConfig = false;
+          innerLoop = false;
+        }
+      }
     }
+
+    // If inner loop ran, continueLoop is already set by the 'done' case
+    // For the allTemplates path we still need the old "What next?" behavior
+    if (config.allTemplates) {
+      const { next } = await inquirer.prompt([
+        {
+          type: 'list', name: 'next', message: 'What next?',
+          choices: [
+            { value: 'done',  name: 'Done' },
+            { value: 'newjd', name: 'Target a different job' },
+            { value: 'edit',  name: 'Edit profile data and regenerate' },
+          ],
+        },
+      ]) as { next: string };
+      if (next === 'done') {
+        continueLoop = false;
+      } else if (next === 'newjd') {
+        reuseConfig = false;
+        options.jd = undefined;
+        options.flair = undefined;
+      } else if (next === 'edit') {
+        await editRefinedProfile(profileDir);
+        reuseConfig = false;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Open PDF with the OS default viewer
+// ---------------------------------------------------------------------------
+
+async function openPdf(filePath: string): Promise<void> {
+  const { exec } = await import('child_process');
+  const platform = process.platform;
+  if (platform === 'darwin') {
+    exec(`open "${filePath}"`);
+  } else if (platform === 'linux') {
+    exec(`xdg-open "${filePath}"`);
+  } else {
+    console.log(c.muted(`  (Cannot auto-open on ${platform} — open manually: ${filePath})`));
   }
 }
 
@@ -672,6 +768,7 @@ async function pickSavedJob(
   const { choice } = await inquirer.prompt([
     {
       type: 'list',
+      loop: false,
       name: 'choice',
       message: 'Choose a saved job description:',
       choices: [

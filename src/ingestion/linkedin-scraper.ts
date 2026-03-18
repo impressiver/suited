@@ -17,7 +17,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { fileExists } from '../utils/fs.js';
 
-const SESSION_DIR = join(homedir(), '.resume-builder');
+const SESSION_DIR = join(homedir(), '.suited');
 const SESSION_FILE = join(SESSION_DIR, 'linkedin-session.json');
 
 const USER_AGENT =

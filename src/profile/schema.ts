@@ -422,6 +422,8 @@ export interface GenerationConfig {
   template: TemplateName;
   /** When set, overrides the flair-based template selection (e.g. 'retro') */
   templateOverride?: TemplateName;
+  /** The actual template used when the last PDF was exported (for dashboard display) */
+  resolvedTemplate?: TemplateName;
   /** When true, generate one PDF per template instead of a single file */
   allTemplates?: boolean;
   /** ID of the saved job this config was generated for — links to a JobRefinement */

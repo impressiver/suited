@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { dirname, join } from 'path';
-import { Profile, ProfileSchema, RefinedData, GenerationConfig, SavedJob } from './schema.js';
+import { Profile, ProfileSchema, RefinedData, GenerationConfig, SavedJob, JobRefinement, ContactMeta } from './schema.js';
 import { fileExists } from '../utils/fs.js';
 
 // ---------------------------------------------------------------------------
@@ -146,6 +146,72 @@ export async function deleteJob(id: string, profileDir: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Contact metadata — persisted across re-imports
+// ---------------------------------------------------------------------------
+
+export function contactMetaPath(profileDir: string): string {
+  return join(profileDir, 'contact.json');
+}
+
+export async function loadContactMeta(profileDir: string): Promise<ContactMeta> {
+  const path = contactMetaPath(profileDir);
+  if (!(await fileExists(path))) return {};
+  return readJson<ContactMeta>(path);
+}
+
+export async function saveContactMeta(meta: ContactMeta, profileDir: string): Promise<void> {
+  // Only store keys that have a value — omit undefined/empty
+  const clean: ContactMeta = Object.fromEntries(
+    Object.entries(meta).filter(([, v]) => typeof v === 'string' && (v as string).length > 0),
+  ) as ContactMeta;
+  await writeJson(contactMetaPath(profileDir), clean);
+}
+
+/**
+ * Merge saved contact metadata into a profile, filling only fields that are
+ * absent in the profile. LinkedIn-provided values always take precedence.
+ */
+export function mergeContactMeta(profile: Profile, meta: ContactMeta): Profile {
+  const now = new Date().toISOString();
+  const src = { kind: 'user-edit' as const, editedAt: now };
+  const wrap = (v: string) => ({ value: v, source: src });
+
+  const contact = { ...profile.contact };
+  if (meta.headline && !contact.headline) contact.headline = wrap(meta.headline);
+  if (meta.email    && !contact.email)    contact.email    = wrap(meta.email);
+  if (meta.phone    && !contact.phone)    contact.phone    = wrap(meta.phone);
+  if (meta.location && !contact.location) contact.location = wrap(meta.location);
+  if (meta.linkedin && !contact.linkedin) contact.linkedin = wrap(meta.linkedin);
+  if (meta.website  && !contact.website)  contact.website  = wrap(meta.website);
+  if (meta.github   && !contact.github)   contact.github   = wrap(meta.github);
+
+  return { ...profile, contact };
+}
+
+// ---------------------------------------------------------------------------
+// Job refinements — per-job curation plans
+// ---------------------------------------------------------------------------
+
+export function jobRefinementPath(profileDir: string, jobId: string): string {
+  return join(profileDir, 'refinements', `${jobId}.json`);
+}
+
+export async function loadJobRefinement(profileDir: string, jobId: string): Promise<JobRefinement | null> {
+  const path = jobRefinementPath(profileDir, jobId);
+  if (!(await fileExists(path))) return null;
+  return readJson<JobRefinement>(path);
+}
+
+export async function saveJobRefinement(refinement: JobRefinement, profileDir: string): Promise<void> {
+  await writeJson(jobRefinementPath(profileDir, refinement.jobId), refinement);
+}
+
+export async function deleteJobRefinement(jobId: string, profileDir: string): Promise<void> {
+  const { unlink } = await import('fs/promises');
+  await unlink(jobRefinementPath(profileDir, jobId)).catch(() => {/* already absent */});
+}
+
+// ---------------------------------------------------------------------------
 // Invalidation helpers
 // ---------------------------------------------------------------------------
 
@@ -163,6 +229,28 @@ export async function clearGenerationConfig(profileDir: string): Promise<void> {
 
 // ---------------------------------------------------------------------------
 // Legacy helpers — used internally and by validate command
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Logo cache — persists resolved SVG data URIs keyed by company/institution name
+// ---------------------------------------------------------------------------
+
+export function logoCachePath(profileDir: string): string {
+  return join(profileDir, 'logo-cache.json');
+}
+
+export async function loadLogoCache(profileDir: string): Promise<Record<string, string>> {
+  try {
+    return await readJson<Record<string, string>>(logoCachePath(profileDir));
+  } catch {
+    return {};
+  }
+}
+
+export async function saveLogoCache(cache: Record<string, string>, profileDir: string): Promise<void> {
+  await writeJson(logoCachePath(profileDir), cache);
+}
+
 // ---------------------------------------------------------------------------
 
 export async function loadProfile(filePath: string): Promise<Profile> {

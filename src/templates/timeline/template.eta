@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title><%= it.contact.name %> — Resume</title>
+  <style><%~ it.css %></style>
+</head>
+<body data-flair="<%= it.flair %>">
+<%
+const shortDate = (d) => !d ? '' : d.replace(/\b(\d{4})\b/, (_, y) => "'" + y.slice(2));
+
+const domainFor = (name) => {
+  const tldMatch = name.match(/(\S+)\.(ai|io|co|org|net|edu|dev|app|com)\b/i);
+  if (tldMatch) return (tldMatch[1] + '.' + tldMatch[2]).toLowerCase();
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+};
+
+const logoUrl  = (name) => 'https://logo.clearbit.com/' + domainFor(name);
+const logoInit = (name) => name.trim().charAt(0).toUpperCase();
+const onLogoError = `if(!this.dataset.tried){this.dataset.tried='1';this.src='https://www.google.com/s2/favicons?domain='+this.dataset.domain+'&sz=32';}else{var s=document.createElement('span');s.className='logo-initial';s.textContent=this.dataset.initial;this.replaceWith(s);}`;
+// Use pre-fetched data URI if available; fall back to Clearbit at render time
+const logoSrc  = (name) => (it.logoDataUris && it.logoDataUris[name]) || logoUrl(name);
+%>
+
+  <header class="resume-header">
+    <div class="header-left">
+      <h1><%= it.contact.name %></h1>
+      <% if (it.contact.headline || it.contact.location) { %><div class="header-subtitle"><%= it.contact.headline || '' %><% if (it.contact.headline && it.contact.location) { %> <span class="header-sep">//</span><% } %><% if (it.contact.location) { %> <%= it.contact.location %><% } %></div><% } %>
+    </div>
+    <div class="header-right">
+      <% if (it.contact.email) { %><div><a href="mailto:<%= it.contact.email %>"><%= it.contact.email %></a></div><% } %>
+      <% if (it.contact.phone) { %><div><%= it.contact.phone %></div><% } %>
+      <% if (it.contact.linkedin) { %><div><a href="<%= it.contact.linkedin %>"><%= it.contact.linkedin.replace(/^https?:\/\/(www\.)?/, '') %></a></div><% } %>
+      <% if (it.contact.github) { %><div><a href="<%= it.contact.github %>"><%= it.contact.github.replace(/^https?:\/\/(www\.)?/, '') %></a></div><% } %>
+      <% if (it.contact.website) { %><div><a href="<%= it.contact.website %>"><%= it.contact.website.replace(/^https?:\/\/(www\.)?/, '') %></a></div><% } %>
+    </div>
+  </header>
+
+  <div class="body-content">
+
+    <div class="main-column">
+
+      <% if (it.summary) { %>
+      <p class="summary-text"><%= it.summary %></p>
+      <% } %>
+
+      <% if (it.positions.length > 0) { %>
+      <section class="section section-experience">
+        <h2 class="section-title">Experience</h2>
+        <div class="timeline-list positions-list">
+          <% for (const pos of it.positions) { %>
+          <div class="timeline-entry">
+            <div class="entry-dates">
+              <div><%= shortDate(pos.startDate) %></div>
+              <% if (!pos.endDate) { %><div class="date-present">Present</div><% } else { %><div><%= shortDate(pos.endDate) %></div><% } %>
+            </div>
+            <div class="entry-logo-col">
+              <img class="entry-logo-img"
+                   src="<%= logoSrc(pos.company) %>"
+                   data-domain="<%= domainFor(pos.company) %>"
+                   data-initial="<%= logoInit(pos.company) %>"
+                   onerror="<%= onLogoError %>">
+            </div>
+            <div class="entry-content">
+              <div class="entry-header">
+                <span class="entry-company"><%= pos.company %><% if (pos.location) { %> · <%= pos.location %><% } %></span>
+                <span class="entry-title"><%= pos.title %></span>
+              </div>
+              <% if (pos.bullets.length > 0) { %>
+              <div class="entry-body">
+                <% for (const bullet of pos.bullets) { %><p><%= bullet %></p><% } %>
+              </div>
+              <% } %>
+            </div>
+          </div>
+          <% } %>
+        </div>
+      </section>
+      <% } %>
+
+      <% if (it.education.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Education</h2>
+        <div class="timeline-list">
+          <% for (const edu of it.education) { %>
+          <div class="timeline-entry">
+            <div class="entry-dates">
+              <% if (edu.startDate) { %><div><%= shortDate(edu.startDate) %></div><% } %>
+              <% if (edu.endDate) { %><div><%= shortDate(edu.endDate) %></div><% } %>
+            </div>
+            <div class="entry-logo-col">
+              <img class="entry-logo-img"
+                   src="<%= logoSrc(edu.institution) %>"
+                   data-domain="<%= domainFor(edu.institution) %>"
+                   data-initial="<%= logoInit(edu.institution) %>"
+                   onerror="<%= onLogoError %>">
+            </div>
+            <div class="entry-content">
+              <div class="entry-header">
+                <span class="entry-company"><%= edu.institution %></span>
+                <% if (edu.degree || edu.fieldOfStudy) { %><span class="entry-title"><%= edu.degree || '' %><% if (edu.degree && edu.fieldOfStudy) { %>, <% } %><%= edu.fieldOfStudy || '' %></span><% } %>
+              </div>
+            </div>
+          </div>
+          <% } %>
+        </div>
+      </section>
+      <% } %>
+
+      <% if (it.projects.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Projects</h2>
+        <div class="timeline-list">
+          <% for (const proj of it.projects) { %>
+          <div class="timeline-entry">
+            <div class="entry-dates"></div>
+            <div class="entry-logo-col"></div>
+            <div class="entry-content">
+              <div class="entry-header">
+                <span class="entry-title"><%= proj.title %></span>
+              </div>
+              <% if (proj.description) { %><div class="entry-body"><p><%= proj.description %></p></div><% } %>
+              <% if (proj.url) { %><div class="entry-url"><%= proj.url %></div><% } %>
+            </div>
+          </div>
+          <% } %>
+        </div>
+      </section>
+      <% } %>
+
+      <% if (it.volunteer.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Volunteer</h2>
+        <div class="timeline-list">
+          <% for (const vol of it.volunteer) { %>
+          <div class="timeline-entry">
+            <div class="entry-dates">
+              <% if (vol.startDate) { %><div><%= shortDate(vol.startDate) %></div><% } %>
+              <% if (vol.endDate) { %><div><%= shortDate(vol.endDate) %></div><% } %>
+            </div>
+            <div class="entry-logo-col"></div>
+            <div class="entry-content">
+              <div class="entry-header">
+                <span class="entry-company"><%= vol.organization %></span>
+                <% if (vol.role) { %><span class="entry-title"><%= vol.role %></span><% } %>
+              </div>
+            </div>
+          </div>
+          <% } %>
+        </div>
+      </section>
+      <% } %>
+
+    </div><!-- .main-column -->
+
+    <div class="side-column">
+
+      <% if (it.skills.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Skills</h2>
+        <ul class="side-skill-list">
+          <% for (const skill of it.skills) { %><li><%= skill %></li><% } %>
+        </ul>
+      </section>
+      <% } %>
+
+      <% if (it.certifications.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Certifications</h2>
+        <% for (const cert of it.certifications) { %>
+        <div class="side-item"><%= cert.name %><% if (cert.authority) { %><span class="side-muted"> · <%= cert.authority %></span><% } %></div>
+        <% } %>
+      </section>
+      <% } %>
+
+      <% if (it.languages.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Languages</h2>
+        <% for (const lang of it.languages) { %>
+        <div class="side-item"><%= lang.name %><% if (lang.proficiency) { %><span class="side-muted"> (<%= lang.proficiency %>)</span><% } %></div>
+        <% } %>
+      </section>
+      <% } %>
+
+      <% if (it.awards.length > 0) { %>
+      <section class="section">
+        <h2 class="section-title">Awards</h2>
+        <% for (const award of it.awards) { %><div class="side-item"><%= award %></div><% } %>
+      </section>
+      <% } %>
+
+    </div><!-- .side-column -->
+
+  </div><!-- .body-content -->
+
+</body>
+</html>

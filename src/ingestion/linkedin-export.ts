@@ -59,6 +59,7 @@ function parseContact(rows: Row[], file: string) {
   const r = rows[0];
   return {
     name: s(`${r['First Name'] ?? ''} ${r['Last Name'] ?? ''}`.trim(), file, 'First Name + Last Name'),
+    headline: opt(r, 'Headline', file),
     email: opt(r, 'Email Address', file),
     phone: opt(r, 'Phone Numbers', file),
     location: opt(r, 'Location', file) ?? opt(r, 'Geo Location', file),

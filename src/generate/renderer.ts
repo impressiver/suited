@@ -8,7 +8,7 @@ import { generateAsciiName } from '../utils/ascii-name.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = join(__dirname, '..', 'templates');
 
-export async function renderResumeHtml(doc: ResumeDocument): Promise<string> {
+export async function renderResumeHtml(doc: ResumeDocument, fitOverrideCss?: string): Promise<string> {
   const templateDir = join(TEMPLATES_DIR, doc.template);
   const templatePath = join(templateDir, 'template.eta');
   const cssPath = join(templateDir, 'style.css');
@@ -22,10 +22,23 @@ export async function renderResumeHtml(doc: ResumeDocument): Promise<string> {
   // Raw <%~ %> is used only for the trusted CSS string
   const eta = new Eta({ views: templateDir, autoEscape: true });
 
-  const extraData = doc.template === 'retro'
-    ? { nameAscii: generateAsciiName(doc.contact.name) }
-    : {};
+  const extraData: Record<string, unknown> = {};
 
-  const html = eta.renderString(templateSrc, { ...doc, css, ...extraData });
+  if (doc.template === 'retro') {
+    extraData.nameAscii = generateAsciiName(doc.contact.name);
+  }
+
+  // Logo data URIs are pre-fetched interactively before first render (see generate.ts)
+  if (doc.template === 'timeline' && doc.logoDataUris) {
+    extraData.logoDataUris = doc.logoDataUris;
+  }
+
+  let html = eta.renderString(templateSrc, { ...doc, css, ...extraData });
+
+  // Inject fit-override CSS after </head> open tag's style block, before </head>
+  if (fitOverrideCss) {
+    html = html.replace('</head>', `<style>${fitOverrideCss}</style></head>`);
+  }
+
   return html;
 }

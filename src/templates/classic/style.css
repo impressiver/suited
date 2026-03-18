@@ -3,11 +3,15 @@
   --color-accent: #000000;
   --color-text: #222222;
   --color-muted: #555555;
-  --color-border: #cccccc;
+  --color-border: #bbbbbb;
   --font-body: Georgia, 'Times New Roman', Times, serif;
   --font-heading: Georgia, 'Times New Roman', Times, serif;
-  --page-margin: 0.6in;
+  --page-margin: 0.70in;
 }
+
+/* Flair 2 — Classic+: deep navy accent; name also picks up the color */
+body[data-flair="2"] { --color-accent: #1a3050; }
+body[data-flair="2"] .resume-header h1 { color: var(--color-accent); }
 
 @page { size: Letter; margin: 0; }
 
@@ -22,50 +26,76 @@ body {
   width: 8.5in;
   height: 11in;
   overflow: hidden;
-  line-height: 1.35;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
-/* Header */
-.resume-header { text-align: center; margin-bottom: 10pt; border-bottom: 1.5pt solid var(--color-accent); padding-bottom: 7pt; }
-.resume-header h1 { font-size: 17pt; font-weight: bold; letter-spacing: 0.5pt; }
-.contact-line { font-size: 8.5pt; color: var(--color-muted); margin-top: 3pt; }
-.contact-line span + span::before { content: ' | '; }
+a { color: inherit; text-decoration: none; }
 
-/* Sections */
-.section { margin-bottom: 9pt; }
+/* Header — left-aligned, name anchored to rule */
+.resume-header { margin-bottom: 10pt; border-bottom: 1.5pt solid var(--color-accent); padding-bottom: 6pt; }
+.resume-header h1 { font-size: 20pt; font-weight: bold; letter-spacing: 0.3pt; }
+.header-subtitle { font-size: 9pt; color: var(--color-muted); margin-top: 2pt; }
+.contact-line { font-size: 9pt; color: var(--color-muted); margin-top: 4pt; }
+.contact-line span + span::before { content: ' · '; }
+
+/* Sections — small fixed gap between all sections */
+.section { margin-bottom: 8pt; }
+
+/* Experience expands to fill available page height */
+.section-experience {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8pt;
+}
+.positions-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8pt;
+}
+.positions-list .position { margin-bottom: 0; }
+
 .section-title {
   font-size: 10pt;
   font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 1pt;
-  border-bottom: 0.75pt solid var(--color-border);
+  font-variant: small-caps;
+  letter-spacing: 0.5pt;
+  color: var(--color-accent);
+  border-bottom: 1pt solid var(--color-border);
   padding-bottom: 2pt;
-  margin-bottom: 5pt;
+  margin-bottom: 6pt;
 }
 
-/* Experience */
-.position { margin-bottom: 7pt; }
+/* Experience — company is the primary identifier, title subordinate */
+.position { margin-bottom: 8pt; }
 .position-header { display: flex; justify-content: space-between; align-items: baseline; }
-.position-title { font-weight: bold; font-size: 10pt; }
+.position-company { font-weight: bold; font-size: 10pt; color: var(--color-text); }
 .position-dates { font-size: 9pt; color: var(--color-muted); white-space: nowrap; }
-.position-company { font-style: italic; font-size: 9pt; color: var(--color-muted); }
-.position-bullets { margin-top: 2pt; margin-left: 12pt; }
-.position-bullets li { margin-bottom: 1.5pt; font-size: 9pt; }
+.position-title { font-style: italic; font-size: 9pt; color: var(--color-muted); margin-top: 1pt; }
+.position-location { font-size: 9pt; color: var(--color-muted); font-weight: normal; }
+.position-bullets { margin-top: 3pt; margin-left: 14pt; }
+.position-bullets li { margin-bottom: 2pt; font-size: 9.5pt; }
 
 /* Education */
 .education-entry { margin-bottom: 5pt; }
 .education-header { display: flex; justify-content: space-between; }
 .edu-institution { font-weight: bold; }
 .edu-dates { font-size: 9pt; color: var(--color-muted); }
-.edu-degree { font-style: italic; font-size: 9pt; }
+.edu-degree { font-style: italic; font-size: 9pt; color: var(--color-muted); }
 
 /* Skills */
-.skills-list { font-size: 9pt; line-height: 1.5; }
+.skills-list { font-size: 9pt; line-height: 1.6; }
 
 /* Projects */
 .project-entry { margin-bottom: 5pt; }
 .project-title { font-weight: bold; font-size: 9.5pt; }
-.project-desc { font-size: 9pt; }
+.project-desc { font-size: 9pt; margin-top: 1pt; }
 .project-url { font-size: 8.5pt; color: var(--color-muted); }
 
 /* Certifications */

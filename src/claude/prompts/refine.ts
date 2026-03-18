@@ -112,7 +112,7 @@ Rules:
 - Each bullet should be specific and ideally quantified if the candidate provided numbers.
 - Keep bullets concise — one sentence, under 120 characters where possible.
 - If the candidate's answer does not improve a section, leave that section's bullets unchanged.
-- For skills: only add skills the candidate explicitly mentioned.
+- For skills: always review and clean up the existing skills list for resume use. LinkedIn skills are often poorly formatted — rename verbose technical terms to clean equivalents (e.g. "Amazon Web Services (AWS)" → "AWS"), consolidate overlapping entries, and drop low-value or redundant ones. Also add any skills the candidate mentioned in their answers. Use replacedSkills to provide the full cleaned list.
 ${WRITING_RULES}`;
 
 export const refinementsToolSchema: Tool = {
@@ -144,7 +144,12 @@ export const refinementsToolSchema: Tool = {
       },
       addedSkills: {
         type: 'array',
-        description: 'New skills to add. Omit if not adding skills.',
+        description: 'New skills to add on top of existing ones. Omit if using replacedSkills or not adding skills.',
+        items: { type: 'string' },
+      },
+      replacedSkills: {
+        type: 'array',
+        description: 'Complete replacement for the entire skills list — use this to clean up and reformat LinkedIn-imported skills for resume use. Omit if skills are not being changed.',
         items: { type: 'string' },
       },
       removeSections: {
@@ -160,6 +165,42 @@ export const refinementsToolSchema: Tool = {
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Expert polish — improve writing quality without adding new information
+// ---------------------------------------------------------------------------
+
+export const EXPERT_POLISH_SYSTEM = `You are a professional resume writer with 20 years of experience helping candidates land roles at top companies. Your job is to make resume content as compelling as possible while remaining completely truthful.
+
+Rules:
+- Never invent facts, metrics, technologies, or achievements not grounded in the original text. Everything you write must be true based on what is provided.
+- You may expand phrasing to make impact clearer — e.g. if the original says "worked on the checkout flow", you can write "rebuilt the checkout flow" if that's what the context implies. Use judgment.
+- Bullets: open with a strong, specific past-tense action verb (built, led, shipped, cut, drove, launched, etc.). Never start with a weak verb like "helped", "assisted", "worked on", or "was responsible for".
+- Make bullets tight — one punchy sentence, under 120 characters where possible.
+- Preserve every number and specific detail that exists. Do not remove them; do not add new ones.
+- If a bullet is already strong and specific, leave it exactly as written.
+- Summary: 2–3 sentences maximum. Specific about domains, technologies, and scope of impact. No fluff or filler.
+- For skills: clean up LinkedIn-imported skills for resume use. Rename verbose technical terms to clean, recognizable equivalents (e.g. "Amazon Web Services (AWS)" → "AWS", "Node.js" stays "Node.js"). Consolidate overlapping entries. Drop low-value or redundant ones. Use replacedSkills to provide the full updated list.
+- Only include positionRefinements for positions where you actually changed at least one bullet.
+- If a section was not selected for improvement, omit it entirely from the output.
+${WRITING_RULES}`;
+
+// ---------------------------------------------------------------------------
+// Job-tailored polish — auto-applied after curation to sharpen bullet fit
+// ---------------------------------------------------------------------------
+
+export const JOB_TAILORED_POLISH_SYSTEM = `You are a professional resume writer. Your job is to sharpen existing resume bullet points so they better demonstrate the candidate's fit for a specific role.
+
+Rules:
+- Never invent facts, metrics, technologies, or achievements not grounded in the original text. Everything you write must be true based on what is provided.
+- You may expand phrasing to make relevance to the role clearer — surface implications in the original text, sharpen the framing, or make the scope of impact more explicit. Use judgment.
+- If a skill or technology from the job's requirements appears naturally in the bullet's existing context, you may make it more prominent or precise — but never invent it.
+- Open bullets with a strong, specific past-tense action verb. Never "helped", "assisted", "worked on".
+- One punchy sentence per bullet. Under 120 characters where possible. No semicolons joining two thoughts.
+- Preserve every number and specific detail. Do not remove or invent metrics.
+- If a bullet is already strong and relevant to the role, leave it exactly as written.
+- Only return positions where you changed at least one bullet. Omit unchanged positions.
+${WRITING_RULES}`;
 
 // ---------------------------------------------------------------------------
 // Direct prompt (targeted single-shot edit)

@@ -20,6 +20,7 @@ export interface Sourced<T> {
 
 export interface ContactInfo {
   name: Sourced<string>;
+  headline?: Sourced<string>;  // current professional title / tagline
   email?: Sourced<string>;
   phone?: Sourced<string>;
   location?: Sourced<string>;
@@ -133,7 +134,8 @@ export type IndustryVertical =
   | 'academia'
   | 'healthcare'
   | 'legal'
-  | 'general';
+  | 'general'
+  | 'ai';
 
 export type SeniorityLevel =
   | 'intern'
@@ -142,6 +144,9 @@ export type SeniorityLevel =
   | 'senior'
   | 'staff'
   | 'principal'
+  | 'lead'
+  | 'architect'
+  | 'manager'
   | 'director'
   | 'vp'
   | 'c-level';
@@ -162,7 +167,7 @@ export interface JobAnalysis {
 // ---------------------------------------------------------------------------
 
 export type FlairLevel = 1 | 2 | 3 | 4 | 5;
-export type TemplateName = 'classic' | 'modern' | 'bold' | 'retro';
+export type TemplateName = 'classic' | 'modern' | 'bold' | 'retro' | 'timeline';
 
 export interface CuratedPosition {
   positionId: string;
@@ -202,6 +207,7 @@ export interface ResumeEducation {
 export interface ResumeDocument {
   contact: {
     name: string;
+    headline?: string;  // current professional title / tagline
     email?: string;
     phone?: string;
     location?: string;
@@ -223,6 +229,8 @@ export interface ResumeDocument {
   jobTitle: string;
   company: string;
   generatedAt: string;
+  /** Pre-fetched logo data URIs keyed by company/institution name (timeline template). */
+  logoDataUris?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -267,6 +275,7 @@ export const ProfileSchema: z.ZodType<Profile> = z.object({
   updatedAt: z.string(),
   contact: z.object({
     name: sourced(z.string()),
+    headline: sourced(z.string()).optional(),
     email: sourced(z.string()).optional(),
     phone: sourced(z.string()).optional(),
     location: sourced(z.string()).optional(),
@@ -361,6 +370,32 @@ export interface RefinedData {
 }
 
 // ---------------------------------------------------------------------------
+// Persistent contact metadata — survives re-imports
+// ---------------------------------------------------------------------------
+
+/** Plain-string contact fields entered by the user, persisted in contact.json. */
+export interface ContactMeta {
+  headline?: string;  // current professional title / tagline
+  email?: string;
+  phone?: string;
+  location?: string;
+  linkedin?: string;
+  website?: string;
+  github?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Job refinements — per-job curation plan, stored for reuse
+// ---------------------------------------------------------------------------
+
+export interface JobRefinement {
+  jobId: string;
+  createdAt: string;
+  jobAnalysis: JobAnalysis;
+  plan: CurationPlan;
+}
+
+// ---------------------------------------------------------------------------
 // Generation config (phase 3)
 // ---------------------------------------------------------------------------
 
@@ -387,6 +422,10 @@ export interface GenerationConfig {
   template: TemplateName;
   /** When set, overrides the flair-based template selection (e.g. 'retro') */
   templateOverride?: TemplateName;
+  /** When true, generate one PDF per template instead of a single file */
+  allTemplates?: boolean;
+  /** ID of the saved job this config was generated for — links to a JobRefinement */
+  jobId?: string;
   jobTitle: string;
   company: string;
   jd?: string;

@@ -3,7 +3,7 @@ import { parseLinkedInExport } from '../ingestion/linkedin-export.js';
 import { parseLinkedInPaste } from '../ingestion/linkedin-paste.js';
 import { scrapeLinkedInProfile, clearLinkedInSession } from '../ingestion/linkedin-scraper.js';
 import { extractZip, findCsvDir } from '../utils/zip.js';
-import { saveSource, sourceMdPath, sourceJsonPath } from '../profile/serializer.js';
+import { saveSource, sourceMdPath, sourceJsonPath, loadContactMeta, mergeContactMeta } from '../profile/serializer.js';
 import { profileToMarkdown } from '../profile/markdown.js';
 import { Profile } from '../profile/schema.js';
 import { c } from '../utils/colors.js';
@@ -67,6 +67,11 @@ export async function runImport(options: ImportOptions): Promise<void> {
     console.log('  Parsing with Claude (verbatim extraction only)...');
     profile = await parseLinkedInPaste(detected.value);
   }
+
+  // Merge any previously saved contact metadata (email, phone, etc.)
+  // so re-imports don't wipe out manually entered contact details.
+  const contactMeta = await loadContactMeta(profileDir);
+  profile = mergeContactMeta(profile, contactMeta);
 
   await saveSource(profile, profileDir);
   await profileToMarkdown(profile, sourceMdPath(profileDir));

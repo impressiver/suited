@@ -13,12 +13,12 @@ export const analyzeJdTool: Tool = {
       title: { type: 'string', description: 'Job title' },
       industry: {
         type: 'string',
-        enum: ['software-engineering', 'finance', 'design', 'marketing', 'consulting', 'academia', 'healthcare', 'legal', 'general'],
+        enum: ['software-engineering', 'finance', 'design', 'marketing', 'consulting', 'academia', 'healthcare', 'legal', 'general', 'ai'],
         description: 'Industry vertical',
       },
       seniority: {
         type: 'string',
-        enum: ['intern', 'junior', 'mid', 'senior', 'staff', 'principal', 'director', 'vp', 'c-level'],
+        enum: ['intern', 'junior', 'mid', 'senior', 'staff', 'principal', 'lead', 'architect', 'manager', 'director', 'vp', 'c-level'],
         description: 'Seniority level inferred from title and requirements',
       },
       keySkills: {

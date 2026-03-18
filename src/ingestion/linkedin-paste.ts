@@ -101,6 +101,7 @@ export async function parseLinkedInPaste(pastedText: string): Promise<Profile> {
     updatedAt: now,
     contact: {
       name: s(extracted.contact.name, inputHash),
+      headline: extracted.contact.headline ? s(extracted.contact.headline, inputHash) : undefined,
       email: extracted.contact.email ? s(extracted.contact.email, inputHash) : undefined,
       phone: extracted.contact.phone ? s(extracted.contact.phone, inputHash) : undefined,
       location: extracted.contact.location ? s(extracted.contact.location, inputHash) : undefined,

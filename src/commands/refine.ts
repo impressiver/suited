@@ -1,6 +1,7 @@
 import {
   loadSource, saveRefined, loadRefined, hashSource,
   refinedJsonPath, refinedMdPath, sourceJsonPath,
+  loadJobs, loadJobRefinement, saveJobRefinement, deleteJobRefinement,
 } from '../profile/serializer.js';
 import { profileToMarkdown, markdownToProfile } from '../profile/markdown.js';
 import { callWithTool } from '../claude/client.js';
@@ -9,12 +10,17 @@ import { openInEditor } from '../utils/interactive.js';
 import {
   profileToRefineText, REFINE_QUESTIONS_SYSTEM, questionsToolSchema,
   REFINE_APPLY_SYSTEM, refinementsToolSchema, buildQAContext,
-  DIRECT_EDIT_SYSTEM,
+  DIRECT_EDIT_SYSTEM, EXPERT_POLISH_SYSTEM,
 } from '../claude/prompts/refine.js';
+import { curateForJob } from '../generate/curator.js';
 import {
-  Profile, Sourced, RefinementQuestion, RefinementSession,
+  Profile, Sourced, RefinementQuestion, RefinementSession, JobRefinement,
 } from '../profile/schema.js';
 import { c } from '../utils/colors.js';
+import { evaluateProfile, printProfileEvaluation, enrichFindingsWithUserInput } from '../generate/consultant.js';
+import {
+  APPLY_PROFILE_FEEDBACK_SYSTEM, buildProfileFeedbackPrompt, ConsultantFinding,
+} from '../claude/prompts/consultant.js';
 
 export interface RefineOptions {
   profileDir?: string;
@@ -32,6 +38,7 @@ interface RefinementsOutput {
   positionRefinements: Array<{ positionId: string; bullets: string[] }>;
   improvedSummary?: string;
   addedSkills?: string[];
+  replacedSkills?: string[];
   removeSections?: string[];
   removePositionIds?: string[];
 }
@@ -81,7 +88,12 @@ function applyRefinements(profile: Profile, refinements: RefinementsOutput): Pro
     updated.summary = userEdit(refinements.improvedSummary.trim());
   }
 
-  if (refinements.addedSkills?.length) {
+  if (refinements.replacedSkills !== undefined) {
+    updated.skills = refinements.replacedSkills.map((s, i) => ({
+      id: `skill-refined-${i}`,
+      name: userEdit(s),
+    }));
+  } else if (refinements.addedSkills?.length) {
     const existingNames = new Set(updated.skills.map(s => s.name.value.toLowerCase()));
     const nextId = updated.skills.length;
     const newSkills = refinements.addedSkills
@@ -109,17 +121,18 @@ async function collectAnswers(
   console.log(`\nClaude has ${c.value(String(questions.length))} question(s) to improve your profile:\n`);
 
   for (const q of questions) {
-    console.log(`  ${c.muted(`[${q.context}]`)}`);
+    // Context is embedded in the message so Inquirer controls all output
+    // and cursor position stays correct. A preceding console.log() causes
+    // Inquirer v12 to miscalculate the cursor location on re-render.
     const result = await inquirer.prompt([
       {
         type: 'input',
         name: 'answer',
-        message: q.question + (q.optional ? ' (optional)' : ''),
+        message: `${c.muted(`[${q.context}]`)} ${q.question}${q.optional ? c.muted(' (optional)') : ''}`,
       },
     ]);
     const answer = (result as { answer: string }).answer.trim();
     if (answer) answers[q.id] = answer;
-    console.log();
   }
 
   return answers;
@@ -245,8 +258,12 @@ async function reviewRefinements(
   });
   const summaryChanged = refined.summary?.value !== original.summary?.value;
   const addedSkills = refined.skills.filter(s => !original.skills.find(os => os.id === s.id));
+  const skillsReplaced =
+    refined.skills.some(s => s.id.startsWith('skill-refined-')) &&
+    JSON.stringify(original.skills.map(s => s.name.value)) !==
+    JSON.stringify(refined.skills.map(s => s.name.value));
 
-  if (!changedPositions.length && !summaryChanged && !addedSkills.length) {
+  if (!changedPositions.length && !summaryChanged && !addedSkills.length && !skillsReplaced) {
     console.log(`\n  ${c.muted('No changes proposed.')}`);
     return original;
   }
@@ -263,7 +280,11 @@ async function reviewRefinements(
     if (original.summary) console.log(`    ${c.removed(`- ${original.summary.value}`)}`);
     if (refined.summary)  console.log(`    ${c.added(`+ ${refined.summary.value}`)}`);
   }
-  if (addedSkills.length > 0) {
+  if (skillsReplaced) {
+    console.log(`\n  ${c.value('Skills (cleaned up for resume use):')}`);
+    console.log(`    ${c.removed(`- ${original.skills.map(s => s.name.value).join(', ')}`)}`);
+    console.log(`    ${c.added(`+ ${refined.skills.map(s => s.name.value).join(', ')}`)}`);
+  } else if (addedSkills.length > 0) {
     console.log(`\n  ${c.value('Added skills:')} ${c.added(addedSkills.map(s => s.name.value).join(', '))}`);
   }
 
@@ -309,7 +330,19 @@ async function reviewRefinements(
     );
   }
 
-  if (addedSkills.length > 0) {
+  if (skillsReplaced) {
+    console.log();
+    const { kept } = await inquirer.prompt([
+      {
+        type: 'checkbox',
+        name: 'kept',
+        message: 'Select skills to keep from the cleaned-up list:',
+        choices: refined.skills.map(s => ({ name: s.name.value, value: s.id, checked: true })),
+      },
+    ]) as { kept: string[] };
+    const keptSet = new Set(kept);
+    result.skills = refined.skills.filter(s => keptSet.has(s.id));
+  } else if (addedSkills.length > 0) {
     console.log();
     const { kept } = await inquirer.prompt([
       {
@@ -368,6 +401,322 @@ async function applyDirectPrompt(
 }
 
 // ---------------------------------------------------------------------------
+// Expert polish — proactive writing improvement on selected sections
+// ---------------------------------------------------------------------------
+
+async function applyExpertPolish(
+  profile: Profile,
+  session: RefinementSession,
+  profileDir: string,
+): Promise<void> {
+  const { default: inquirer } = await import('inquirer');
+
+  // Build section choices from what the profile actually contains
+  const sectionChoices = [
+    profile.summary
+      ? { name: 'Summary', value: 'summary', checked: true }
+      : null,
+    profile.positions.length > 0
+      ? { name: `Experience bullets  (${profile.positions.length} position${profile.positions.length === 1 ? '' : 's'})`, value: 'experience', checked: true }
+      : null,
+    profile.skills.length > 0
+      ? { name: `Skills  (${profile.skills.length} — clean up for resume use)`, value: 'skills', checked: true }
+      : null,
+  ].filter(Boolean) as Array<{ name: string; value: string; checked: boolean }>;
+
+  if (sectionChoices.length === 0) {
+    console.log(c.muted('No sections available to polish.'));
+    return;
+  }
+
+  const { selectedSections } = await inquirer.prompt([
+    {
+      type: 'checkbox',
+      name: 'selectedSections',
+      message: 'Select sections for expert polish:',
+      choices: sectionChoices,
+    },
+  ]) as { selectedSections: string[] };
+
+  if (selectedSections.length === 0) return;
+
+  // If experience is selected and there are multiple positions, let the user narrow down
+  let targetPositionIds: string[] | null = null; // null = all
+  if (selectedSections.includes('experience') && profile.positions.length > 1) {
+    const { scope } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'scope',
+        message: 'Polish experience bullets for:',
+        choices: [
+          { name: 'All positions', value: 'all' },
+          { name: 'Choose specific positions…', value: 'select' },
+        ],
+      },
+    ]) as { scope: string };
+
+    if (scope === 'select') {
+      const { chosen } = await inquirer.prompt([
+        {
+          type: 'checkbox',
+          name: 'chosen',
+          message: 'Select positions to polish:',
+          choices: profile.positions.map(p => ({
+            name: `${p.title.value}  ${c.muted(`@ ${p.company.value}`)}`,
+            value: p.id,
+            checked: true,
+          })),
+        },
+      ]) as { chosen: string[] };
+      targetPositionIds = chosen.length > 0 ? chosen : null;
+    }
+  }
+
+  // Describe what we're improving for the prompt
+  const improvingParts: string[] = [];
+  if (selectedSections.includes('summary')) improvingParts.push('the summary');
+  if (selectedSections.includes('experience')) {
+    if (targetPositionIds) {
+      const labels = targetPositionIds.map(id => {
+        const p = profile.positions.find(pos => pos.id === id);
+        return p ? `${p.title.value} at ${p.company.value} (${p.id})` : id;
+      });
+      improvingParts.push(`experience bullets for: ${labels.join('; ')}`);
+    } else {
+      improvingParts.push('all experience bullets');
+    }
+  }
+  if (selectedSections.includes('skills')) improvingParts.push('the skills list');
+
+  const positionConstraint = targetPositionIds
+    ? `\nFor experience, only improve bullets for these position IDs: ${targetPositionIds.join(', ')}. Leave all other positions unchanged and omit them from positionRefinements.`
+    : '';
+
+  const skillsConstraint = selectedSections.includes('skills')
+    ? '\nFor skills: clean up and reformat the existing skills list for resume use using replacedSkills. Do not leave skills unchanged — always provide a cleaned list when skills are selected.'
+    : '';
+
+  const instruction = `Improve only: ${improvingParts.join(', ')}.${positionConstraint}${skillsConstraint}\n\nLeave all other sections exactly as they are — omit them from the output entirely.\n\n${profileToRefineText(profile)}`;
+
+  console.log(c.muted(`\nPolishing ${improvingParts.join(' and ')} with Claude...`));
+
+  const rawRefinements = await callWithTool<RefinementsOutput>(
+    EXPERT_POLISH_SYSTEM,
+    instruction,
+    refinementsToolSchema,
+  );
+
+  const proposedProfile = applyRefinements(profile, rawRefinements);
+  const finalProfile = await reviewRefinements(profile, proposedProfile);
+
+  if (finalProfile === profile) return; // nothing accepted
+
+  await saveRefined({ profile: finalProfile, session }, profileDir);
+  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  console.log(`\n${c.ok} ${c.success('Polished profile saved')}`);
+  console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
+}
+
+// ---------------------------------------------------------------------------
+// Hiring consultant profile review
+// ---------------------------------------------------------------------------
+
+async function runConsultantReview(
+  profile: Profile,
+  session: RefinementSession,
+  profileDir: string,
+): Promise<Profile> {
+  const { default: inquirer } = await import('inquirer');
+
+  console.log(c.muted('\nRunning hiring consultant review...'));
+  let evaluation;
+  try {
+    evaluation = await evaluateProfile(profile);
+  } catch (err) {
+    console.log(c.muted(`  Consultant review unavailable: ${(err as Error).message}`));
+    return profile;
+  }
+
+  printProfileEvaluation(evaluation);
+
+  if (evaluation.improvements.length === 0) return profile;
+
+  const { action } = await inquirer.prompt([{
+    type: 'list',
+    name: 'action',
+    message: 'Incorporate consultant feedback?',
+    choices: [
+      { value: 'skip',       name: 'Skip' },
+      { value: 'all',        name: 'Apply all suggestions' },
+      { value: 'pick',       name: 'Choose which suggestions to apply' },
+    ],
+  }]) as { action: string };
+
+  if (action === 'skip') return profile;
+
+  let selected: ConsultantFinding[] = evaluation.improvements;
+  if (action === 'pick') {
+    const { chosen } = await inquirer.prompt([{
+      type: 'checkbox',
+      name: 'chosen',
+      message: 'Select suggestions to apply:',
+      choices: evaluation.improvements.map((imp, i) => ({
+        name: `${imp.area}: ${imp.issue}`,
+        value: i,
+        checked: true,
+      })),
+    }]) as { chosen: number[] };
+    selected = chosen.map(i => evaluation.improvements[i]);
+    if (selected.length === 0) return profile;
+  }
+
+  // Let Claude determine which findings need additional facts from the candidate
+  const profileText = profileToRefineText(profile);
+  selected = await enrichFindingsWithUserInput(selected, inquirer, profileText);
+
+  console.log(c.muted('\nApplying consultant feedback with Claude...'));
+  let rawRefinements;
+  try {
+    rawRefinements = await callWithTool<RefinementsOutput>(
+      APPLY_PROFILE_FEEDBACK_SYSTEM,
+      buildProfileFeedbackPrompt(profileText, selected),
+      refinementsToolSchema,
+    );
+  } catch (err) {
+    console.log(c.muted(`  Failed to apply feedback: ${(err as Error).message}`));
+    return profile;
+  }
+
+  const proposedProfile = applyRefinements(profile, rawRefinements);
+  const finalProfile = await reviewRefinements(profile, proposedProfile);
+
+  if (finalProfile !== profile) {
+    await saveRefined({ profile: finalProfile, session }, profileDir);
+    await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+    console.log(`\n${c.ok} ${c.success('Profile updated with consultant feedback.')}`);
+  }
+
+  return finalProfile;
+}
+
+// ---------------------------------------------------------------------------
+// Job refinements — per-job curation plans managed from refine command
+// ---------------------------------------------------------------------------
+
+async function runJobRefinements(
+  profile: Profile,
+  session: RefinementSession,
+  profileDir: string,
+): Promise<void> {
+  const { default: inquirer } = await import('inquirer');
+
+  const jobs = await loadJobs(profileDir);
+  if (jobs.length === 0) {
+    console.log(c.muted('  No saved job descriptions yet. Run "resume generate" with a JD first.'));
+    return;
+  }
+
+  // Build choice list showing which jobs already have stored refinements
+  const refinementStatus = await Promise.all(
+    jobs.map(async j => {
+      const r = await loadJobRefinement(profileDir, j.id);
+      return { job: j, refinement: r };
+    }),
+  );
+
+  const { jobId } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'jobId',
+      message: 'Select a job to manage its curation:',
+      choices: [
+        ...refinementStatus.map(({ job, refinement }) => ({
+          name: `${job.company} — ${job.title}  ${c.muted(refinement
+            ? `refined ${new Date(refinement.createdAt).toLocaleDateString()}`
+            : 'not yet curated')}`,
+          value: job.id,
+        })),
+        { name: c.muted('← Back'), value: '__back__' },
+      ],
+    },
+  ]) as { jobId: string };
+
+  if (jobId === '__back__') return;
+
+  const { job, refinement } = refinementStatus.find(r => r.job.id === jobId)!;
+
+  if (refinement) {
+    console.log(`\n${c.ok} Stored refinement for ${c.value(`${job.company} — ${job.title}`)}`);
+    console.log(`   Curated ${new Date(refinement.createdAt).toLocaleString()}`);
+    console.log(`   ${refinement.plan.selectedPositions.length} positions · ${refinement.plan.selectedSkillIds.length} skills`);
+
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          { value: 'done',   name: 'Done' },
+          { value: 'recurate', name: '↻ Re-curate (regenerate with Claude)' },
+          { value: 'delete', name: '✗ Delete stored refinement' },
+        ],
+      },
+    ]) as { action: string };
+
+    if (action === 'done') return;
+    if (action === 'delete') {
+      await deleteJobRefinement(jobId, profileDir);
+      console.log(c.muted(`  Deleted refinement for ${job.company} — ${job.title}.`));
+      return;
+    }
+    // fall through to re-curate
+  } else {
+    console.log(`\nNo stored refinement for ${c.value(`${job.company} — ${job.title}`)}. Curating now...`);
+  }
+
+  // Run curation
+  console.log(c.muted('\nCurating with Claude...'));
+  let curatorResult;
+  try {
+    curatorResult = await curateForJob(profile, {
+      company: job.company,
+      title: job.title,
+      industry: refinement?.jobAnalysis.industry ?? 'general',
+      seniority: refinement?.jobAnalysis.seniority ?? 'mid',
+      keySkills: refinement?.jobAnalysis.keySkills ?? [],
+      mustHaves: refinement?.jobAnalysis.mustHaves ?? [],
+      niceToHaves: refinement?.jobAnalysis.niceToHaves ?? [],
+      summary: job.text,
+    });
+  } catch (err) {
+    console.error(`\n${c.fail} ${c.error(`Curation failed: ${(err as Error).message}`)}`);
+    return;
+  }
+
+  // If we don't have a full job analysis from before, re-analyze the JD text inline
+  // (curateForJob uses what we pass; for a fresh curate we at minimum need the job text)
+  const newRefinement: JobRefinement = {
+    jobId,
+    createdAt: new Date().toISOString(),
+    jobAnalysis: refinement?.jobAnalysis ?? {
+      company: job.company,
+      title: job.title,
+      industry: 'general',
+      seniority: 'mid',
+      keySkills: [],
+      mustHaves: [],
+      niceToHaves: [],
+      summary: job.text.slice(0, 200),
+    },
+    plan: curatorResult.plan,
+  };
+  await saveJobRefinement(newRefinement, profileDir);
+
+  console.log(`\n${c.ok} ${c.success('Refinement saved')} for ${c.value(`${job.company} — ${job.title}`)}`);
+  console.log(`   ${curatorResult.plan.selectedPositions.length} positions · ${curatorResult.plan.selectedSkillIds.length} skills`);
+}
+
+// ---------------------------------------------------------------------------
 // Main command
 // ---------------------------------------------------------------------------
 
@@ -395,15 +744,28 @@ export async function runRefine(options: RefineOptions): Promise<void> {
           name: 'action',
           message: 'What would you like to do?',
           choices: [
-            { value: 'skip',   name: 'Skip — use existing refinement' },
-            { value: 'prompt', name: 'Prompt — tell Claude what to change' },
-            { value: 'edit',   name: 'Edit refined.md manually' },
-            { value: 'rerun',  name: 'Re-run refinement with Claude' },
+            { value: 'skip',       name: 'Skip — use existing refinement' },
+            { value: 'consultant', name: 'Consultant review — get professional feedback' },
+            { value: 'polish',     name: 'Expert polish — improve writing quality' },
+            { value: 'prompt',     name: 'Prompt — tell Claude what to change' },
+            { value: 'edit',       name: 'Edit refined.md manually' },
+            { value: 'jobs',       name: 'Job refinements — manage per-job curation plans' },
+            { value: 'rerun',      name: 'Re-run refinement with Claude' },
           ],
         },
       ]) as { action: string };
 
       if (action === 'skip') return;
+
+      if (action === 'consultant') {
+        await runConsultantReview(existing.profile, existing.session, profileDir);
+        return;
+      }
+
+      if (action === 'polish') {
+        await applyExpertPolish(existing.profile, existing.session, profileDir);
+        return;
+      }
 
       if (action === 'prompt') {
         await applyDirectPrompt(existing.profile, existing.session, profileDir);
@@ -416,6 +778,11 @@ export async function runRefine(options: RefineOptions): Promise<void> {
         const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), originalProfile);
         await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
         console.log(`\n${c.ok} ${c.success('refined.json updated from edited markdown.')}`);
+        return;
+      }
+
+      if (action === 'jobs') {
+        await runJobRefinements(existing.profile, existing.session, profileDir);
         return;
       }
       // fall through to re-run
@@ -497,5 +864,38 @@ export async function runRefine(options: RefineOptions): Promise<void> {
   console.log(`\n${c.ok} ${c.success('Refined data saved:')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
   console.log(`   ${c.path(refinedMdPath(profileDir))}`);
+
+  // Auto-run consultant review after refinement
+  await runConsultantReview(finalProfile, session, profileDir);
+
+  const { followUp } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'followUp',
+      message: 'What next?',
+      choices: [
+        { value: 'done',       name: 'Done' },
+        { value: 'polish',     name: 'Expert polish — have a pro improve the writing' },
+        { value: 'prompt',     name: 'Prompt — make a targeted change' },
+        { value: 'consultant', name: 'Consultant review again' },
+        { value: 'jobs',       name: 'Job refinements — manage per-job curation plans' },
+      ],
+    },
+  ]) as { followUp: string };
+
+  if (followUp === 'polish') {
+    const saved = await loadRefined(profileDir);
+    await applyExpertPolish(saved.profile, saved.session, profileDir);
+  } else if (followUp === 'prompt') {
+    const saved = await loadRefined(profileDir);
+    await applyDirectPrompt(saved.profile, saved.session, profileDir);
+  } else if (followUp === 'consultant') {
+    const saved = await loadRefined(profileDir);
+    await runConsultantReview(saved.profile, saved.session, profileDir);
+  } else if (followUp === 'jobs') {
+    const saved = await loadRefined(profileDir);
+    await runJobRefinements(saved.profile, saved.session, profileDir);
+  }
+
   console.log(`\n${c.tip(`Tip: edit ${refinedMdPath(profileDir)} to make manual changes, then choose "Edit" on next run.`)}`);
 }

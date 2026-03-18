@@ -13,9 +13,9 @@
       <% if (it.contact.email) { %><span><%= it.contact.email %></span><% } %>
       <% if (it.contact.phone) { %><span class="sep">//</span><span><%= it.contact.phone %></span><% } %>
       <% if (it.contact.location) { %><span class="sep">//</span><span><%= it.contact.location %></span><% } %>
-      <% if (it.contact.linkedin) { %><span class="sep">//</span><span><%= it.contact.linkedin %></span><% } %>
-      <% if (it.contact.github) { %><span class="sep">//</span><span><%= it.contact.github %></span><% } %>
-      <% if (it.contact.website) { %><span class="sep">//</span><span><%= it.contact.website %></span><% } %>
+      <% if (it.contact.linkedin) { %><span class="sep">//</span><span><a href="<%= it.contact.linkedin %>"><%= it.contact.linkedin.replace(/^https?:\/\/(www\.)?/, '') %></a></span><% } %>
+      <% if (it.contact.github) { %><span class="sep">//</span><span><a href="<%= it.contact.github %>"><%= it.contact.github.replace(/^https?:\/\/(www\.)?/, '') %></a></span><% } %>
+      <% if (it.contact.website) { %><span class="sep">//</span><span><a href="<%= it.contact.website %>"><%= it.contact.website.replace(/^https?:\/\/(www\.)?/, '') %></a></span><% } %>
     </div>
   </header>
 
@@ -24,22 +24,24 @@
   <% } %>
 
   <% if (it.positions.length > 0) { %>
-  <section class="section">
+  <section class="section section-experience">
     <h2 class="section-title">EXPERIENCE<span class="section-rule"></span></h2>
-    <% for (const pos of it.positions) { %>
-    <div class="position">
-      <div class="position-header">
-        <span><span class="position-prefix">&gt;&gt;</span><span class="position-title"><%= pos.title.toUpperCase() %></span></span>
-        <span class="position-dates"><%= pos.startDate %> TO <%= pos.endDate ? pos.endDate.toUpperCase() : 'PRESENT' %></span>
+    <div class="positions-list">
+      <% for (const pos of it.positions) { %>
+      <div class="position">
+        <div class="position-header">
+          <span><span class="position-prefix">&gt;&gt;</span><span class="position-company"><%= pos.company.toUpperCase() %><% if (pos.location) { %> / <%= pos.location.toUpperCase() %><% } %></span></span>
+          <span class="position-dates"><%= pos.startDate %> TO <%= pos.endDate ? pos.endDate.toUpperCase() : 'PRESENT' %></span>
+        </div>
+        <div class="position-title"><%= pos.title %></div>
+        <% if (pos.bullets.length > 0) { %>
+        <ul class="position-bullets">
+          <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
+        </ul>
+        <% } %>
       </div>
-      <div class="position-company"><%= pos.company %><% if (pos.location) { %> / <%= pos.location %><% } %></div>
-      <% if (pos.bullets.length > 0) { %>
-      <ul class="position-bullets">
-        <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
-      </ul>
       <% } %>
     </div>
-    <% } %>
   </section>
   <% } %>
 

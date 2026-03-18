@@ -10,15 +10,16 @@
   <header class="resume-header">
     <div class="header-left">
       <h1><%= it.contact.name %></h1>
+      <% if (it.contact.headline) { %><div class="header-subtitle"><%= it.contact.headline %></div><% } %>
     </div>
     <div class="header-right">
       <div class="contact-line">
         <% if (it.contact.email) { %><div><%= it.contact.email %></div><% } %>
         <% if (it.contact.phone) { %><div><%= it.contact.phone %></div><% } %>
         <% if (it.contact.location) { %><div><%= it.contact.location %></div><% } %>
-        <% if (it.contact.linkedin) { %><div><%= it.contact.linkedin %></div><% } %>
-        <% if (it.contact.github) { %><div><%= it.contact.github %></div><% } %>
-        <% if (it.contact.website) { %><div><%= it.contact.website %></div><% } %>
+        <% if (it.contact.linkedin) { %><div><a href="<%= it.contact.linkedin %>"><%= it.contact.linkedin.replace(/^https?:\/\/(www\.)?/, '') %></a></div><% } %>
+        <% if (it.contact.github) { %><div><a href="<%= it.contact.github %>"><%= it.contact.github.replace(/^https?:\/\/(www\.)?/, '') %></a></div><% } %>
+        <% if (it.contact.website) { %><div><a href="<%= it.contact.website %>"><%= it.contact.website.replace(/^https?:\/\/(www\.)?/, '') %></a></div><% } %>
       </div>
     </div>
   </header>
@@ -30,22 +31,24 @@
   <% } %>
 
   <% if (it.positions.length > 0) { %>
-  <section class="section">
+  <section class="section section-experience">
     <h2 class="section-title">Experience</h2>
-    <% for (const pos of it.positions) { %>
-    <div class="position">
-      <div class="position-header">
-        <span class="position-title"><%= pos.title %></span>
-        <span class="position-dates"><%= pos.startDate %> – <%= pos.endDate || 'Present' %></span>
+    <div class="positions-list">
+      <% for (const pos of it.positions) { %>
+      <div class="position">
+        <div class="position-header">
+          <span class="position-company"><%= pos.company %><% if (pos.location) { %><span class="position-location"> · <%= pos.location %></span><% } %></span>
+          <span class="position-dates"><%= pos.startDate %> – <%= pos.endDate || 'Present' %></span>
+        </div>
+        <div class="position-title"><%= pos.title %></div>
+        <% if (pos.bullets.length > 0) { %>
+        <ul class="position-bullets">
+          <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
+        </ul>
+        <% } %>
       </div>
-      <div class="position-company"><%= pos.company %><% if (pos.location) { %> · <%= pos.location %><% } %></div>
-      <% if (pos.bullets.length > 0) { %>
-      <ul class="position-bullets">
-        <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
-      </ul>
       <% } %>
     </div>
-    <% } %>
   </section>
   <% } %>
 
@@ -101,7 +104,7 @@
   <section class="section">
     <h2 class="section-title">Languages</h2>
     <div class="skills-pills">
-      <% for (const lang of it.languages) { %><span class="skill-pill"><%= lang.name %><% if (lang.proficiency) { %> · <%= lang.proficiency %><% } %></span><% } %>
+      <% for (const lang of it.languages) { %><span class="skill-pill"><%= lang.name %><% if (lang.proficiency) { %> (<%= lang.proficiency %>)<% } %></span><% } %>
     </div>
   </section>
   <% } %>
@@ -112,11 +115,12 @@
     <% for (const vol of it.volunteer) { %>
     <div class="position">
       <div class="position-header">
-        <span class="position-title"><%= vol.organization %><% if (vol.role) { %> — <%= vol.role %><% } %></span>
+        <span class="position-company"><%= vol.organization %></span>
         <% if (vol.startDate || vol.endDate) { %>
         <span class="position-dates"><% if (vol.startDate) { %><%= vol.startDate %><% } %><% if (vol.endDate) { %> – <%= vol.endDate %><% } %></span>
         <% } %>
       </div>
+      <% if (vol.role) { %><div class="position-title"><%= vol.role %></div><% } %>
     </div>
     <% } %>
   </section>

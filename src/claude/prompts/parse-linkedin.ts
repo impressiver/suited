@@ -21,6 +21,7 @@ export const parseLinkedInTool: Tool = {
         required: ['name'],
         properties: {
           name: { type: 'string', description: 'Full name exactly as in profile' },
+          headline: { type: 'string', description: 'Professional headline / current title tagline shown under the name' },
           email: { type: 'string' },
           phone: { type: 'string' },
           location: { type: 'string' },
@@ -136,6 +137,7 @@ export const parseLinkedInTool: Tool = {
 export type ParsedLinkedInProfile = {
   contact: {
     name: string;
+    headline?: string;
     email?: string;
     phone?: string;
     location?: string;

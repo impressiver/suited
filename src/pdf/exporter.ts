@@ -19,10 +19,11 @@ export interface PageFitResult {
 // Margins are controlled entirely by CSS (body padding / @page rules).
 // Setting Puppeteer margins to zero prevents double-application.
 const MARGINS: Record<TemplateName, { top: string; right: string; bottom: string; left: string }> = {
-  classic: { top: '0', right: '0', bottom: '0', left: '0' },
-  modern:  { top: '0', right: '0', bottom: '0', left: '0' },
-  bold:    { top: '0', right: '0', bottom: '0', left: '0' },
-  retro:   { top: '0', right: '0', bottom: '0', left: '0' },
+  classic:  { top: '0', right: '0', bottom: '0', left: '0' },
+  modern:   { top: '0', right: '0', bottom: '0', left: '0' },
+  bold:     { top: '0', right: '0', bottom: '0', left: '0' },
+  retro:    { top: '0', right: '0', bottom: '0', left: '0' },
+  timeline: { top: '0', right: '0', bottom: '0', left: '0' },
 };
 
 function launchBrowser() {
@@ -39,6 +40,12 @@ function launchBrowser() {
   }
 }
 
+// Letter paper at CSS 96 dpi: 8.5 × 11 in = 816 × 1056 px.
+// Setting the viewport to these dimensions before layout ensures the HTML
+// is computed at the same width as the PDF page, so content fills the
+// full page width with no right-side gap.
+const LETTER_VIEWPORT = { width: 816, height: 1056 };
+
 /**
  * Measures whether the rendered HTML fits within one printed page.
  * Returns the ratio of content height to page height (>1 = clipped).
@@ -47,6 +54,7 @@ export async function measurePageFit(html: string): Promise<PageFitResult> {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
+    await page.setViewport(LETTER_VIEWPORT);
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const { scrollH, clientH } = await page.evaluate(() => ({
       scrollH: document.body.scrollHeight,
@@ -66,6 +74,7 @@ export async function exportToPdf(html: string, options: PdfOptions): Promise<vo
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
+    await page.setViewport(LETTER_VIEWPORT);
     await page.setContent(html, { waitUntil: 'networkidle0' });
     await page.pdf({
       path: options.outputPath,

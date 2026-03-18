@@ -8,57 +8,37 @@
 <body data-flair="<%= it.flair %>">
 
   <aside class="sidebar">
-    <h1><%= it.contact.name %></h1>
-    <div class="job-title"><%= it.jobTitle %></div>
+    <div class="sidebar-header">
+      <h1><%= it.contact.name %></h1>
+      <% if (it.contact.headline) { %><div class="job-title"><%= it.contact.headline %></div><% } %>
+    </div>
 
     <div class="sidebar-section">
       <div class="sidebar-section-title">Contact</div>
-      <% if (it.contact.email) { %><div class="contact-item">✉ <%= it.contact.email %></div><% } %>
-      <% if (it.contact.phone) { %><div class="contact-item">☎ <%= it.contact.phone %></div><% } %>
-      <% if (it.contact.location) { %><div class="contact-item">⌖ <%= it.contact.location %></div><% } %>
-      <% if (it.contact.linkedin) { %><div class="contact-item">in <%= it.contact.linkedin %></div><% } %>
-      <% if (it.contact.github) { %><div class="contact-item">⎇ <%= it.contact.github %></div><% } %>
-      <% if (it.contact.website) { %><div class="contact-item">🌐 <%= it.contact.website %></div><% } %>
+      <% if (it.contact.email) { %>
+      <div class="contact-item"><span class="contact-label">Email</span><%= it.contact.email %></div>
+      <% } %>
+      <% if (it.contact.phone) { %>
+      <div class="contact-item"><span class="contact-label">Phone</span><%= it.contact.phone %></div>
+      <% } %>
+      <% if (it.contact.location) { %>
+      <div class="contact-item"><span class="contact-label">Location</span><%= it.contact.location %></div>
+      <% } %>
+      <% if (it.contact.linkedin) { %>
+      <div class="contact-item"><span class="contact-label">LinkedIn</span><a href="<%= it.contact.linkedin %>"><%= it.contact.linkedin.replace(/^https?:\/\/(www\.)?/, '') %></a></div>
+      <% } %>
+      <% if (it.contact.github) { %>
+      <div class="contact-item"><span class="contact-label">GitHub</span><a href="<%= it.contact.github %>"><%= it.contact.github.replace(/^https?:\/\/(www\.)?/, '') %></a></div>
+      <% } %>
+      <% if (it.contact.website) { %>
+      <div class="contact-item"><span class="contact-label">Web</span><a href="<%= it.contact.website %>"><%= it.contact.website.replace(/^https?:\/\/(www\.)?/, '') %></a></div>
+      <% } %>
     </div>
 
     <% if (it.skills.length > 0) { %>
     <div class="sidebar-section">
       <div class="sidebar-section-title">Skills</div>
       <% for (const skill of it.skills) { %><div class="skill-item"><%= skill %></div><% } %>
-    </div>
-    <% } %>
-
-    <% if (it.education.length > 0) { %>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Education</div>
-      <% for (const edu of it.education) { %>
-      <div class="sidebar-item">
-        <div class="sidebar-item-title"><%= edu.institution %></div>
-        <% if (edu.degree) { %><div class="sidebar-item-sub"><%= edu.degree %></div><% } %>
-        <% if (edu.endDate) { %><div class="sidebar-item-date"><%= edu.endDate %></div><% } %>
-      </div>
-      <% } %>
-    </div>
-    <% } %>
-
-    <% if (it.certifications.length > 0) { %>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Certifications</div>
-      <% for (const cert of it.certifications) { %><div class="sidebar-cert"><%= cert.name %></div><% } %>
-    </div>
-    <% } %>
-
-    <% if (it.languages.length > 0) { %>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Languages</div>
-      <% for (const lang of it.languages) { %><div class="skill-item"><%= lang.name %><% if (lang.proficiency) { %> · <%= lang.proficiency %><% } %></div><% } %>
-    </div>
-    <% } %>
-
-    <% if (it.awards.length > 0) { %>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Awards</div>
-      <% for (const award of it.awards) { %><div class="sidebar-cert"><%= award %></div><% } %>
     </div>
     <% } %>
   </aside>
@@ -72,21 +52,49 @@
     <% } %>
 
     <% if (it.positions.length > 0) { %>
-    <section class="section">
+    <section class="section section-experience">
       <h2 class="section-title">Experience</h2>
-      <% for (const pos of it.positions) { %>
-      <div class="position">
-        <div class="position-header">
-          <span class="position-title"><%= pos.title %></span>
-          <span class="position-dates"><%= pos.startDate %> – <%= pos.endDate || 'Present' %></span>
+      <div class="positions-list">
+        <% for (const pos of it.positions) { %>
+        <div class="position">
+          <div class="position-header">
+            <span class="position-company"><%= pos.company %><% if (pos.location) { %> · <%= pos.location %><% } %></span>
+            <span class="position-dates"><%= pos.startDate %> – <%= pos.endDate || 'Present' %></span>
+          </div>
+          <div class="position-title"><%= pos.title %></div>
+          <% if (pos.bullets.length > 0) { %>
+          <ul class="position-bullets">
+            <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
+          </ul>
+          <% } %>
         </div>
-        <div class="position-company"><%= pos.company %><% if (pos.location) { %> · <%= pos.location %><% } %></div>
-        <% if (pos.bullets.length > 0) { %>
-        <ul class="position-bullets">
-          <% for (const bullet of pos.bullets) { %><li><%= bullet %></li><% } %>
-        </ul>
         <% } %>
       </div>
+    </section>
+    <% } %>
+
+    <% if (it.education.length > 0) { %>
+    <section class="section">
+      <h2 class="section-title">Education</h2>
+      <% for (const edu of it.education) { %>
+      <div class="education-entry">
+        <div class="edu-left">
+          <div class="edu-institution"><%= edu.institution %></div>
+          <% if (edu.degree || edu.fieldOfStudy) { %>
+          <div class="edu-degree"><%= edu.degree || '' %><% if (edu.degree && edu.fieldOfStudy) { %>, <% } %><%= edu.fieldOfStudy || '' %></div>
+          <% } %>
+        </div>
+        <div class="edu-dates"><% if (edu.startDate) { %><%= edu.startDate %><% } %><% if (edu.endDate) { %> – <%= edu.endDate %><% } %></div>
+      </div>
+      <% } %>
+    </section>
+    <% } %>
+
+    <% if (it.certifications.length > 0) { %>
+    <section class="section">
+      <h2 class="section-title">Certifications</h2>
+      <% for (const cert of it.certifications) { %>
+      <div class="cert-entry"><strong><%= cert.name %></strong><% if (cert.authority) { %> · <%= cert.authority %><% } %><% if (cert.date) { %> (<%= cert.date %>)<% } %></div>
       <% } %>
     </section>
     <% } %>
@@ -104,19 +112,34 @@
     </section>
     <% } %>
 
+    <% if (it.languages.length > 0) { %>
+    <section class="section">
+      <h2 class="section-title">Languages</h2>
+      <p class="skills-list"><% for (let i = 0; i < it.languages.length; i++) { %><%= it.languages[i].name %><% if (it.languages[i].proficiency) { %> (<%= it.languages[i].proficiency %>)<% } %><% if (i < it.languages.length - 1) { %> · <% } %><% } %></p>
+    </section>
+    <% } %>
+
     <% if (it.volunteer.length > 0) { %>
     <section class="section">
       <h2 class="section-title">Volunteer</h2>
       <% for (const vol of it.volunteer) { %>
       <div class="position">
         <div class="position-header">
-          <span class="position-title"><%= vol.organization %><% if (vol.role) { %> — <%= vol.role %><% } %></span>
+          <span class="position-company"><%= vol.organization %></span>
           <% if (vol.startDate || vol.endDate) { %>
           <span class="position-dates"><% if (vol.startDate) { %><%= vol.startDate %><% } %><% if (vol.endDate) { %> – <%= vol.endDate %><% } %></span>
           <% } %>
         </div>
+        <% if (vol.role) { %><div class="position-title"><%= vol.role %></div><% } %>
       </div>
       <% } %>
+    </section>
+    <% } %>
+
+    <% if (it.awards.length > 0) { %>
+    <section class="section">
+      <h2 class="section-title">Awards</h2>
+      <% for (const award of it.awards) { %><div class="cert-entry"><%= award %></div><% } %>
     </section>
     <% } %>
 

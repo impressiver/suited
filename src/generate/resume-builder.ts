@@ -1,5 +1,5 @@
 import {
-  Profile, CurationPlan, ResumeDocument, FlairLevel, TemplateName, IndustryVertical,
+  Profile, CurationPlan, ResumeDocument, ResumePosition, FlairLevel, TemplateName, IndustryVertical,
   GenerationConfig,
 } from '../profile/schema.js';
 import { resolvePath } from '../claude/accuracy-guard.js';
@@ -22,11 +22,59 @@ function formatDate(date: string | undefined): string | undefined {
   return date;
 }
 
+/** Ensures a URL has an https:// scheme so it works as an href. */
+function normalizeUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 /** Strips country-only location strings (e.g. "United States") that add no useful context. */
 function filterLocation(location: string | undefined): string | undefined {
   if (!location) return undefined;
   const COUNTRY_ONLY = /^(United States|USA|US|United Kingdom|UK|Canada|Australia|Germany|France|India|China|Japan|Brazil|Mexico|Netherlands|Sweden|Norway|Denmark|Switzerland|New Zealand|Ireland|Singapore|South Korea|Spain|Italy|Portugal|Poland|Austria|Belgium|Finland|Israel|UAE|United Arab Emirates)$/i;
   return COUNTRY_ONLY.test(location.trim()) ? undefined : location;
+}
+
+// ---------------------------------------------------------------------------
+// Role merging — consecutive positions at the same company collapse into one
+// ---------------------------------------------------------------------------
+
+/**
+ * Merges runs of consecutive positions at the same company into a single entry.
+ * Positions are assumed to be in most-recent-first order (standard resume order).
+ * For each run: title = most recent role, dates = full span, bullets = all combined.
+ */
+function mergeConsecutiveRoles(positions: ResumePosition[]): ResumePosition[] {
+  if (positions.length === 0) return [];
+  const result: ResumePosition[] = [];
+  let run: ResumePosition[] = [positions[0]];
+
+  const flush = () => {
+    if (run.length === 1) {
+      result.push(run[0]);
+    } else {
+      // run[0] is the most recent; run[run.length-1] is the oldest
+      result.push({
+        title: run[0].title,
+        company: run[0].company,
+        location: run[0].location,
+        startDate: run[run.length - 1].startDate,
+        endDate: run[0].endDate,
+        bullets: run.flatMap(p => p.bullets),
+      });
+    }
+  };
+
+  for (let i = 1; i < positions.length; i++) {
+    if (positions[i].company.toLowerCase() === run[0].company.toLowerCase()) {
+      run.push(positions[i]);
+    } else {
+      flush();
+      run = [positions[i]];
+    }
+  }
+  flush();
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,29 +150,32 @@ export function assembleResumeDocument(
 
   const contact = {
     name: profile.contact.name.value,
+    headline: profile.contact.headline?.value,
     email: profile.contact.email?.value,
     phone: profile.contact.phone?.value,
     location: filterLocation(profile.contact.location?.value),
-    linkedin: profile.contact.linkedin?.value,
-    website: profile.contact.website?.value,
-    github: profile.contact.github?.value,
+    linkedin: normalizeUrl(profile.contact.linkedin?.value),
+    website: normalizeUrl(profile.contact.website?.value),
+    github: normalizeUrl(profile.contact.github?.value),
   };
 
   const summary = plan.summaryRef ? resolveRef(profile, refMap, plan.summaryRef) : undefined;
 
-  const positions = plan.selectedPositions.map(selPos => {
-    const pos = profile.positions.find(p => p.id === selPos.positionId);
-    if (!pos) throw new Error(`Position "${selPos.positionId}" not found`);
-    const bullets = selPos.bulletRefs.map(ref => resolveRef(profile, refMap, ref));
-    return {
-      title: pos.title.value,
-      company: pos.company.value,
-      location: filterLocation(pos.location?.value),
-      startDate: formatDate(pos.startDate.value)!,
-      endDate: formatDate(pos.endDate?.value),
-      bullets,
-    };
-  });
+  const positions = mergeConsecutiveRoles(
+    plan.selectedPositions.map(selPos => {
+      const pos = profile.positions.find(p => p.id === selPos.positionId);
+      if (!pos) throw new Error(`Position "${selPos.positionId}" not found`);
+      const bullets = selPos.bulletRefs.map(ref => resolveRef(profile, refMap, ref));
+      return {
+        title: pos.title.value,
+        company: pos.company.value,
+        location: filterLocation(pos.location?.value),
+        startDate: formatDate(pos.startDate.value)!,
+        endDate: formatDate(pos.endDate?.value),
+        bullets,
+      };
+    }),
+  );
 
   const education = plan.selectedEducationIds.map(eduId => {
     const edu = profile.education.find(e => e.id === eduId);
@@ -138,11 +189,11 @@ export function assembleResumeDocument(
     };
   });
 
-  const skills = plan.selectedSkillIds.map(skillId => {
-    const skill = profile.skills.find(s => s.id === skillId);
-    if (!skill) throw new Error(`Skill "${skillId}" not found`);
-    return skill.name.value;
-  });
+  // Filter out stale skill IDs (e.g. after replacedSkills renames them to skill-refined-*)
+  const resolvedSkills = plan.selectedSkillIds
+    .map(skillId => profile.skills.find(s => s.id === skillId))
+    .filter((s): s is NonNullable<typeof s> => s !== undefined);
+  const skills = (resolvedSkills.length > 0 ? resolvedSkills : profile.skills).map(s => s.name.value);
 
   const projects = plan.selectedProjectIds.map(projId => {
     const proj = profile.projects.find(p => p.id === projId);
@@ -216,25 +267,26 @@ export function assembleFullResumeDocument(
 
   const contact = {
     name: profile.contact.name.value,
+    headline: profile.contact.headline?.value,
     email: profile.contact.email?.value,
     phone: profile.contact.phone?.value,
     location: filterLocation(profile.contact.location?.value),
-    linkedin: profile.contact.linkedin?.value,
-    website: profile.contact.website?.value,
-    github: profile.contact.github?.value,
+    linkedin: normalizeUrl(profile.contact.linkedin?.value),
+    website: normalizeUrl(profile.contact.website?.value),
+    github: normalizeUrl(profile.contact.github?.value),
   };
 
   return {
     contact,
     summary: profile.summary?.value,
-    positions: profile.positions.map(pos => ({
+    positions: mergeConsecutiveRoles(profile.positions.map(pos => ({
       title: pos.title.value,
       company: pos.company.value,
       location: filterLocation(pos.location?.value),
       startDate: formatDate(pos.startDate.value)!,
       endDate: formatDate(pos.endDate?.value),
       bullets: pos.bullets.map(b => b.value),
-    })),
+    }))),
     education: profile.education.map(edu => ({
       institution: edu.institution.value,
       degree: edu.degree?.value,
@@ -266,7 +318,11 @@ export function assembleFullResumeDocument(
     awards: profile.awards.map(a => a.value),
     flair: effectiveFlair,
     template: effectiveTemplate,
-    jobTitle: config.jobTitle,
+    // When no JD is provided and the user left the title as the default "Resume",
+    // fall back to the contact headline, then the most recent position title.
+    jobTitle: (config.jobTitle === 'Resume' || !config.jobTitle)
+      ? (profile.contact.headline?.value ?? profile.positions[0]?.title.value ?? config.jobTitle)
+      : config.jobTitle,
     company: config.company,
     generatedAt: new Date().toISOString(),
   };

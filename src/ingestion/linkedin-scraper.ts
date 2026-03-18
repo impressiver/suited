@@ -184,27 +184,109 @@ async function scrollAndWait(page: Page): Promise<void> {
   await new Promise(r => setTimeout(r, 800));
 }
 
-/** Click every "see more" / "show all" expander to get full section text */
-async function expandSections(page: Page): Promise<void> {
-  const expanders = [
-    'a[href*="detail/experience"]',
-    'a[href*="detail/education"]',
-    'a[href*="detail/skills"]',
+/**
+ * Click inline "see more" / "show more" buttons that expand content in place.
+ * These are buttons within individual entries — they do NOT navigate the page.
+ * Navigation links ("Show all N experiences") are handled separately by visiting
+ * each detail sub-page.
+ */
+async function expandInlineContent(page: Page): Promise<void> {
+  const buttonSelectors = [
     'button[aria-label*="see more"]',
     'button[aria-label*="See more"]',
+    'button[aria-label*="show more"]',
+    'button[aria-label*="Show more"]',
+    // Inline text clamp expanders used in experience/education entries
+    '.inline-show-more-text__button',
+    'button.lt-line-clamp__more',
   ];
 
-  for (const sel of expanders) {
+  for (const sel of buttonSelectors) {
     try {
       const els = await page.$$(sel);
-      for (const el of els) {  // no slice — click all of them
-        await el.click().catch(() => {/* element detached or obscured — skip */});
-        await new Promise(r => setTimeout(r, 500));  // wait for lazy content
+      for (const el of els) {
+        await el.click().catch(() => {/* detached or obscured — skip */});
+        await new Promise(r => setTimeout(r, 300));
       }
     } catch {
       // Selector absent on this profile — fine
     }
   }
+}
+
+/**
+ * Collect all "Show all {section}" detail sub-page URLs present on the current page.
+ * These are anchor tags whose href contains "/details/" and lead to full section views.
+ * Typical examples:
+ *   /in/{username}/details/experience/
+ *   /in/{username}/details/skills/
+ *   /in/{username}/details/projects/
+ *   /in/{username}/details/recommendations/
+ */
+async function collectDetailUrls(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const seen = new Set<string>();
+    const urls: string[] = [];
+    for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/details/"]'))) {
+      // Normalize: strip query-string and fragment, ensure trailing slash
+      const normalized = a.href.split('?')[0].split('#')[0].replace(/\/*$/, '/');
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        urls.push(normalized);
+      }
+    }
+    return urls;
+  });
+}
+
+/**
+ * On LinkedIn detail pages (e.g. /details/skills/) there is sometimes a
+ * "Load more results" button for pagination. Click it repeatedly until it
+ * disappears, then scroll to trigger any remaining lazy-loaded items.
+ */
+async function loadAllOnDetailPage(page: Page): Promise<void> {
+  const loadMoreSel = [
+    'button[aria-label*="Load more"]',
+    'button[aria-label*="load more"]',
+    'button.scaffold-finite-scroll__load-button',
+  ];
+
+  // Click "Load more" up to 20 times to avoid infinite loops on huge lists
+  for (let i = 0; i < 20; i++) {
+    let clicked = false;
+    for (const sel of loadMoreSel) {
+      try {
+        const btn = await page.$(sel);
+        if (btn) {
+          await btn.click();
+          await new Promise(r => setTimeout(r, 1_200));
+          clicked = true;
+          break;
+        }
+      } catch { /* gone — fine */ }
+    }
+    if (!clicked) break;
+  }
+
+  await expandInlineContent(page);
+  await scrollAndWait(page);
+}
+
+/** Extract the text content from a detail sub-page. */
+async function extractDetailPageText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const candidates: (Element | null)[] = [
+      document.querySelector('main'),
+      document.querySelector('.scaffold-layout__main'),
+      document.querySelector('#main-content'),
+      document.body,
+    ];
+    for (const el of candidates) {
+      const t = el ? (el as HTMLElement).innerText : '';
+      if (t && t.length > 100) return t;
+    }
+    return '';
+  });
 }
 
 /**
@@ -431,13 +513,42 @@ export async function scrapeLinkedInProfile(
       );
     }
 
-    await expandSections(page);
+    // Step 1: expand inline content on profile page, scroll, extract main profile text
+    await expandInlineContent(page);
     await scrollAndWait(page);
 
-    const text = await extractProfileText(page);
+    const profileText = await extractProfileText(page);
+    assertLooksLikeProfile(profileText, url);
 
-    // Validate extracted text looks like a profile, not a login/error page
-    assertLooksLikeProfile(text, url);
+    // Step 2: collect all "Show all {section}" detail sub-page links
+    const detailUrls = await collectDetailUrls(page);
+    console.log(`  Found ${detailUrls.length} detail section(s): ${
+      detailUrls.map(u => u.match(/\/details\/([^/]+)/)?.[1] ?? u).join(', ')
+    }`);
+
+    // Step 3: visit each detail page and extract its full content
+    const sectionTexts: string[] = [profileText];
+    for (const detailUrl of detailUrls) {
+      const sectionName = detailUrl.match(/\/details\/([^/]+)/)?.[1] ?? 'section';
+      console.log(`  Scraping ${sectionName}...`);
+      try {
+        await gotoProfile(page, detailUrl);
+
+        // Guard: bail if we hit an auth wall mid-scrape
+        if (isAuthWall(page.url())) {
+          console.warn(`  ⚠  Auth wall on ${detailUrl} — skipping section`);
+          continue;
+        }
+
+        await loadAllOnDetailPage(page);
+        const sectionText = await extractDetailPageText(page);
+        if (sectionText.length > 100) sectionTexts.push(sectionText);
+      } catch (err) {
+        console.warn(`  ⚠  Could not scrape ${sectionName}: ${(err as Error).message}`);
+      }
+    }
+
+    const text = sectionTexts.join('\n\n---\n\n');
 
     console.log(`  ✓ Extracted ~${Math.round(text.length / 1000)}KB of profile text`);
 

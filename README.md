@@ -12,34 +12,55 @@ You paste a job description, suited picks the most relevant parts of your backgr
 
 Your data stays on your machine. Nothing is sent anywhere except to the AI API you configure.
 
-## Requirements
+## Installation
 
-- Node.js 20+
-- An API key from [Anthropic](https://console.anthropic.com/) or [OpenRouter](https://openrouter.ai/)
-
-## Setup
+### npm (requires Node.js 20.12+)
 
 ```bash
-git clone https://github.com/impressiver/suited
-cd suited
-pnpm install
-pnpm exec puppeteer browsers install chrome
-cp .env.example .env
+npm install -g suited
 ```
 
-Edit `.env` and add your API key:
+### Pre-built binary (no Node.js required)
+
+Download the latest binary for your platform from [GitHub Releases](https://github.com/impressiver/suited/releases):
+
+| Platform | File |
+|----------|------|
+| macOS (Apple Silicon) | `suited-macos-arm64` |
+| Linux (x64) | `suited-linux-x64` |
+
+Make it executable and move it somewhere on your PATH:
+
+```bash
+chmod +x suited-macos-arm64
+mv suited-macos-arm64 /usr/local/bin/suited
+```
+
+On macOS, Gatekeeper may block the binary on first run. Right-click → Open, or run:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/suited
+```
+
+## Requirements
+
+- An API key from [Anthropic](https://console.anthropic.com/) or [OpenRouter](https://openrouter.ai/)
+- Chrome or Chromium installed (only needed for `suited import <url>` and PDF export)
+
+suited looks for Chrome in the default installation paths. To use a different binary, set `CHROME_PATH`:
+
+```bash
+export CHROME_PATH=/path/to/chrome
+```
+
+## Configuration
+
+Set your API key in the environment or in a `.env` file in the directory where you run suited:
 
 ```
 ANTHROPIC_API_KEY=your_key_here
 # or
 OPENROUTER_API_KEY=your_key_here
-```
-
-Then build:
-
-```bash
-pnpm build
-pnpm link --global   # makes the `suited` command available system-wide
 ```
 
 ## Usage
@@ -142,7 +163,10 @@ suited generate --profile-dir output/engineering
 ## Development
 
 ```bash
+pnpm install
 pnpm dev              # Run without building
 pnpm dev import       # Run a specific command
 pnpm build            # Compile TypeScript → dist/
+pnpm build:bundle     # Build esbuild CJS bundle (for testing)
+pnpm build:binary     # Build SEA binary for current platform → dist-bin/
 ```

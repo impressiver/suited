@@ -1,6 +1,10 @@
 node_modules/
 dist/
+dist-bin/
+build/
 output/
 .env
 *.pdf
 .DS_Store
+sea-prep.blob
+sea-config.json

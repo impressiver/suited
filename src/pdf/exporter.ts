@@ -1,7 +1,8 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import { mkdir } from 'fs/promises';
 import { dirname } from 'path';
 import { TemplateName } from '../profile/schema.js';
+import { findChromePath } from '../utils/chrome.js';
 
 interface PdfOptions {
   template: TemplateName;
@@ -30,12 +31,13 @@ function launchBrowser() {
   try {
     return puppeteer.launch({
       headless: true,
+      executablePath: findChromePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   } catch (err) {
     throw new Error(
       `Failed to launch Chrome: ${(err as Error).message}\n` +
-      `Make sure Chrome is installed: npx puppeteer browsers install chrome`,
+      `Make sure Chrome is installed, or set the CHROME_PATH environment variable.`,
     );
   }
 }

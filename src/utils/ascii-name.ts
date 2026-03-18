@@ -1,4 +1,5 @@
 import figlet from 'figlet';
+import ColossalFont from 'figlet/importable-fonts/Colossal.js';
 
 /**
  * Renders a name as ASCII block art using the Colossal figlet font,
@@ -7,6 +8,7 @@ import figlet from 'figlet';
  */
 export function generateAsciiName(name: string): string {
   try {
+    figlet.parseFont('Colossal', ColossalFont);
     const raw = figlet.textSync(name.toUpperCase(), { font: 'Colossal' });
     const lines = raw.split('\n');
     // Trim blank lines top and bottom

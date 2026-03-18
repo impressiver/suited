@@ -11,7 +11,8 @@
  * Use responsibly and only on your own profile.
  */
 
-import puppeteer, { type Browser, type Page, type CookieData } from 'puppeteer';
+import puppeteer, { type Browser, type Page, type CookieData } from 'puppeteer-core';
+import { findChromePath } from '../utils/chrome.js';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -446,11 +447,12 @@ export async function scrapeLinkedInProfile(
   try {
     browser = await puppeteer.launch({
       headless: !options.headed,
+      executablePath: findChromePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     }).catch(err => {
       throw new Error(
         `Failed to launch Chrome: ${(err as Error).message}\n` +
-        'Run: pnpm exec puppeteer browsers install chrome',
+        'Make sure Chrome is installed, or set the CHROME_PATH environment variable.',
       );
     });
 

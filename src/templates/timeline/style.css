@@ -9,7 +9,8 @@
   --color-muted:  #888888;
   --color-faint:  #aaaaaa;
   --color-rule:   #d0d7de;
-  --font: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body: 'Avenir Next Condensed', 'Avenir Next', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif;
+  --font-display: 'Rockwell', 'Rockwell Nova', 'Courier Bold', Georgia, serif;
   --body-pad: 22pt;
   --date-col: 44pt;
   --logo-col: 26pt;
@@ -20,7 +21,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: var(--font);
+  font-family: var(--font-body);
   font-size: 9pt;
   color: var(--color-body);
   background: #ffffff;
@@ -49,6 +50,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .header-left h1 {
+  font-family: var(--font-display);
   font-size: 26pt;
   font-weight: 700;
   color: var(--header-text);
@@ -58,6 +60,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .header-subtitle {
+  font-family: var(--font-display);
   font-size: 9pt;
   color: var(--header-muted);
   font-weight: 400;
@@ -107,9 +110,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 9pt;
   color: var(--color-body);
   line-height: 1.65;
-  padding-bottom: 12pt;
   margin-bottom: 14pt;
-  border-bottom: 1pt solid var(--color-rule);
 }
 
 /* ── Side column ─────────────────────────────────────────────── */
@@ -229,7 +230,7 @@ a { color: inherit; text-decoration: none; }
 
 /* Company: muted — role is the primary identifier here */
 .entry-company {
-  font-size: 8pt;
+  font-size: 7.5pt;
   color: var(--color-muted);
   font-weight: 400;
   margin-right: 5pt;
@@ -237,7 +238,7 @@ a { color: inherit; text-decoration: none; }
 
 /* Title: bold and dark — the thing that matters most */
 .entry-title {
-  font-size: 9pt;
+  font-size: 8.5pt;
   font-weight: 700;
   color: var(--color-text);
 }
@@ -247,10 +248,10 @@ a { color: inherit; text-decoration: none; }
 }
 
 .entry-body p {
-  font-size: 8pt;
+  font-size: 7.5pt;
   color: var(--color-body);
   line-height: 1.55;
-  margin-bottom: 5pt;
+  margin-bottom: 6pt;
 }
 
 .entry-url {
@@ -313,3 +314,26 @@ a { color: inherit; text-decoration: none; }
 }
 
 .side-muted { color: var(--color-muted); }
+
+/* ── Side column education ───────────────────────────────────── */
+
+.side-edu-entry { margin-bottom: 8pt; }
+
+.side-edu-institution {
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.side-edu-degree {
+  font-size: 8pt;
+  color: var(--color-body);
+  line-height: 1.4;
+}
+
+.side-edu-dates {
+  font-size: 7.5pt;
+  color: var(--color-faint);
+  margin-top: 1pt;
+}

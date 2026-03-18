@@ -112,7 +112,7 @@ Rules:
 - Each bullet should be specific and ideally quantified if the candidate provided numbers.
 - Keep bullets concise — one sentence, under 120 characters where possible.
 - If the candidate's answer does not improve a section, leave that section's bullets unchanged.
-- For skills: always review and clean up the existing skills list for resume use. LinkedIn skills are often poorly formatted — rename verbose technical terms to clean equivalents (e.g. "Amazon Web Services (AWS)" → "AWS"), consolidate overlapping entries, and drop low-value or redundant ones. Also add any skills the candidate mentioned in their answers. Use replacedSkills to provide the full cleaned list.
+- For skills: always review and clean up the existing skills list for resume use. LinkedIn skills are often poorly formatted — rename verbose technical terms to clean equivalents (e.g. "Amazon Web Services (AWS)" → "AWS"), consolidate overlapping entries, and drop low-value or redundant ones. Also add any skills the candidate mentioned in their answers. Use replacedSkills to provide the full cleaned list. IMPORTANT: each entry in replacedSkills must be a single skill — never group multiple skills into one string ("Python, Go" is wrong; output them as separate entries). Never use category labels like "Languages: ...".
 ${WRITING_RULES}`;
 
 export const refinementsToolSchema: Tool = {
@@ -149,7 +149,7 @@ export const refinementsToolSchema: Tool = {
       },
       replacedSkills: {
         type: 'array',
-        description: 'Complete replacement for the entire skills list — use this to clean up and reformat LinkedIn-imported skills for resume use. Omit if skills are not being changed.',
+        description: 'Complete replacement for the entire skills list — use this to clean up and reformat LinkedIn-imported skills for resume use. Omit if skills are not being changed. Each array entry must be a SINGLE skill name — never bundle multiple skills into one string and never use category labels (e.g. "Languages: Python, Go" is wrong; output "Python" and "Go" as separate entries).',
         items: { type: 'string' },
       },
       removeSections: {

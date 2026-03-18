@@ -44,6 +44,17 @@ interface RefinementsOutput {
 }
 
 // ---------------------------------------------------------------------------
+// Skill expansion — split bundled entries like "Languages: Python, Go"
+// ---------------------------------------------------------------------------
+
+function expandSkillEntry(s: string): string[] {
+  // Strip category prefix: "Languages: Python, Go" → "Python, Go"
+  const stripped = s.includes(': ') ? s.slice(s.indexOf(': ') + 2) : s;
+  // Split comma-separated bundles into individual skills
+  return stripped.split(',').map(x => x.trim()).filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
 // Apply refinements to a profile copy
 // ---------------------------------------------------------------------------
 
@@ -89,7 +100,9 @@ function applyRefinements(profile: Profile, refinements: RefinementsOutput): Pro
   }
 
   if (refinements.replacedSkills !== undefined) {
-    updated.skills = refinements.replacedSkills.map((s, i) => ({
+    // Expand any bundled entries Claude returned, e.g. "Languages: Python, Go" → ["Python", "Go"]
+    const expanded = refinements.replacedSkills.flatMap(expandSkillEntry);
+    updated.skills = expanded.map((s, i) => ({
       id: `skill-refined-${i}`,
       name: userEdit(s),
     }));
@@ -97,6 +110,7 @@ function applyRefinements(profile: Profile, refinements: RefinementsOutput): Pro
     const existingNames = new Set(updated.skills.map(s => s.name.value.toLowerCase()));
     const nextId = updated.skills.length;
     const newSkills = refinements.addedSkills
+      .flatMap(expandSkillEntry)
       .filter(s => !existingNames.has(s.toLowerCase()))
       .map((s, i) => ({
         id: `skill-${nextId + i}`,

@@ -18,6 +18,10 @@
     "build": "tsc && rm -rf dist/templates && cp -r src/templates dist/templates",
     "build:bundle": "node scripts/build-binary.mjs",
     "build:binary": "node scripts/build-binary.mjs && node scripts/package-sea.mjs",
+    "format": "biome format --write src/ scripts/",
+    "format:check": "biome format src/ scripts/",
+    "lint": "biome lint src/ scripts/",
+    "check": "biome check src/ scripts/",
     "version:bump": "node scripts/version.mjs",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js"
@@ -37,6 +41,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
     "@types/adm-zip": "^0.5.7",
     "@types/figlet": "^1.7.0",
     "@types/node": "^22.13.10",

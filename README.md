@@ -14,6 +14,13 @@ Your data stays on your machine. Nothing is sent anywhere except to the AI API y
 
 ## Installation
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap impressiver/suited
+brew install suited
+```
+
 ### npm (requires Node.js 20.12+)
 
 ```bash

@@ -57,3 +57,44 @@ jobs:
             artifacts/suited-macos-arm64/suited-macos-arm64
             artifacts/suited-linux-x64/suited-linux-x64
         env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+
+  update-tap:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts/ }
+
+      - name: Compute SHA256 checksums
+        id: sha
+        run: |
+          echo "macos=$(sha256sum artifacts/suited-macos-arm64/suited-macos-arm64 | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "linux=$(sha256sum artifacts/suited-linux-x64/suited-linux-x64 | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: impressiver/homebrew-suited
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        env:
+          VERSION: ${{ github.ref_name }}   # e.g. v1.0.1
+          SHA_MACOS: ${{ steps.sha.outputs.macos }}
+          SHA_LINUX: ${{ steps.sha.outputs.linux }}
+        run: |
+          VERSION="${VERSION#v}"  # strip leading 'v'
+          cp Formula/suited.rb tap/Formula/suited.rb
+          sed -i "s/version \".*\"/version \"$VERSION\"/" tap/Formula/suited.rb
+          sed -i "s/REPLACE_MACOS_ARM64_SHA256/$SHA_MACOS/" tap/Formula/suited.rb
+          sed -i "s/REPLACE_LINUX_X64_SHA256/$SHA_LINUX/" tap/Formula/suited.rb
+
+      - name: Commit and push
+        working-directory: tap
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/suited.rb
+          git commit -m "suited ${{ github.ref_name }}"
+          git push

@@ -367,7 +367,11 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
 
     // Section / experience selection always shown before the final generate confirm
-    resumeDoc = await selectSections(resumeDoc, inquirer);
+    {
+      const sectionResult = await selectSections(resumeDoc, inquirer, reuseConfig ? config.sectionSelection : undefined);
+      resumeDoc = sectionResult.doc;
+      config.sectionSelection = sectionResult.selected;
+    }
 
     // For JD-targeted resumes, confirm generation after sections are chosen.
     // "Generate PDF" is now the last interactive step before file I/O.
@@ -453,10 +457,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             resumeDoc = await autoTrimToFit(resumeDoc, fit.ratio);
           } catch (err) {
             console.log(c.muted(`  Auto-trim failed (${(err as Error).message}) — falling back to manual.`));
-            resumeDoc = await selectSections(resumeDoc, inquirer);
+            ({ doc: resumeDoc, selected: config.sectionSelection } = await selectSections(resumeDoc, inquirer));
           }
         } else {
-          resumeDoc = await selectSections(resumeDoc, inquirer);
+          ({ doc: resumeDoc, selected: config.sectionSelection } = await selectSections(resumeDoc, inquirer));
         }
         html = await renderResumeHtml(resumeDoc);
         html = await trySqueeze(html, resumeDoc);
@@ -716,26 +720,29 @@ async function selectSections(
   doc: ResumeDocument,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   inquirer: any,
-): Promise<ResumeDocument> {
+  savedSelection?: string[],
+): Promise<{ doc: ResumeDocument; selected: string[] }> {
+  const savedSet = savedSelection ? new Set(savedSelection) : null;
+
   // Build a merged list: individual position items + other sections
   type Choice = { name: string; value: string; checked: boolean };
   const choices: Choice[] = [
     ...(doc.summary
-      ? [{ name: 'Summary', value: 'summary', checked: true }]
+      ? [{ name: 'Summary', value: 'summary', checked: savedSet ? savedSet.has('summary') : true }]
       : []),
     // Individual position entries replace a single "Experience" item
     ...doc.positions.map((p, i) => ({
       name: `${p.title} @ ${p.company}  ${c.muted(`${p.startDate} – ${p.endDate ?? 'Present'} · ${p.bullets.length} bullet${p.bullets.length === 1 ? '' : 's'}`)}`,
       value: `pos:${i}`,
-      checked: true,
+      checked: savedSet ? savedSet.has(`pos:${i}`) : true,
     })),
-    ...(doc.education.length      ? [{ name: `Education  (${doc.education.length})`,           value: 'education',      checked: true }] : []),
-    ...(doc.skills.length         ? [{ name: `Skills  (${doc.skills.length})`,                  value: 'skills',         checked: true }] : []),
-    ...(doc.projects.length       ? [{ name: `Projects  (${doc.projects.length})`,              value: 'projects',       checked: true }] : []),
-    ...(doc.certifications.length ? [{ name: `Certifications  (${doc.certifications.length})`, value: 'certifications', checked: true }] : []),
-    ...(doc.languages.length      ? [{ name: `Languages  (${doc.languages.length})`,            value: 'languages',      checked: true }] : []),
-    ...(doc.volunteer.length      ? [{ name: `Volunteer  (${doc.volunteer.length})`,            value: 'volunteer',      checked: true }] : []),
-    ...(doc.awards.length         ? [{ name: `Awards  (${doc.awards.length})`,                  value: 'awards',         checked: true }] : []),
+    ...(doc.education.length      ? [{ name: `Education  (${doc.education.length})`,           value: 'education',      checked: savedSet ? savedSet.has('education')      : true }] : []),
+    ...(doc.skills.length         ? [{ name: `Skills  (${doc.skills.length})`,                  value: 'skills',         checked: savedSet ? savedSet.has('skills')         : true }] : []),
+    ...(doc.projects.length       ? [{ name: `Projects  (${doc.projects.length})`,              value: 'projects',       checked: savedSet ? savedSet.has('projects')       : true }] : []),
+    ...(doc.certifications.length ? [{ name: `Certifications  (${doc.certifications.length})`, value: 'certifications', checked: savedSet ? savedSet.has('certifications') : true }] : []),
+    ...(doc.languages.length      ? [{ name: `Languages  (${doc.languages.length})`,            value: 'languages',      checked: savedSet ? savedSet.has('languages')      : true }] : []),
+    ...(doc.volunteer.length      ? [{ name: `Volunteer  (${doc.volunteer.length})`,            value: 'volunteer',      checked: savedSet ? savedSet.has('volunteer')      : true }] : []),
+    ...(doc.awards.length         ? [{ name: `Awards  (${doc.awards.length})`,                  value: 'awards',         checked: savedSet ? savedSet.has('awards')         : true }] : []),
   ];
 
   const { selected } = await inquirer.prompt([
@@ -773,16 +780,19 @@ async function selectSections(
   }
 
   return {
-    ...doc,
-    summary:        enabled.has('summary')        ? doc.summary        : undefined,
-    positions:      selectedPositions,
-    education:      enabled.has('education')       ? doc.education      : [],
-    skills:         enabled.has('skills')          ? doc.skills         : [],
-    projects:       enabled.has('projects')        ? doc.projects       : [],
-    certifications: enabled.has('certifications')  ? doc.certifications : [],
-    languages:      enabled.has('languages')       ? doc.languages      : [],
-    volunteer:      enabled.has('volunteer')       ? doc.volunteer      : [],
-    awards:         enabled.has('awards')          ? doc.awards         : [],
+    doc: {
+      ...doc,
+      summary:        enabled.has('summary')        ? doc.summary        : undefined,
+      positions:      selectedPositions,
+      education:      enabled.has('education')       ? doc.education      : [],
+      skills:         enabled.has('skills')          ? doc.skills         : [],
+      projects:       enabled.has('projects')        ? doc.projects       : [],
+      certifications: enabled.has('certifications')  ? doc.certifications : [],
+      languages:      enabled.has('languages')       ? doc.languages      : [],
+      volunteer:      enabled.has('volunteer')       ? doc.volunteer      : [],
+      awards:         enabled.has('awards')          ? doc.awards         : [],
+    },
+    selected,
   };
 }
 
@@ -854,10 +864,10 @@ async function generateAllTemplates(
           currentBase = await autoTrimToFit(currentBase, fit.ratio);
         } catch (err) {
           console.log(c.muted(`  Auto-trim failed (${(err as Error).message}) — falling back to manual.`));
-          currentBase = await selectSections(currentBase, inquirer);
+          ({ doc: currentBase } = await selectSections(currentBase, inquirer));
         }
       } else {
-        currentBase = await selectSections(currentBase, inquirer);
+        ({ doc: currentBase } = await selectSections(currentBase, inquirer));
       }
       doc = { ...currentBase, template: tc.template, flair: tc.flair };
       html = await renderResumeHtml(doc);

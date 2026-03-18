@@ -432,4 +432,6 @@ export interface GenerationConfig {
   jobAnalysis?: JobAnalysis;
   /** profile.updatedAt at the time this config was saved — detects stale configs */
   profileUpdatedAt?: string;
+  /** Section/position selections from the last selectSections call — used to restore defaults on reuse */
+  sectionSelection?: string[];
 }

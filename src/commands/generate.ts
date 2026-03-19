@@ -445,13 +445,12 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const nowTs = new Date();
     const date = nowTs.toISOString().slice(0, 10);
     const hhmm = nowTs.toTimeString().slice(0, 5).replace(':', '');
-    const namePart = config.company
-      ? `${safeName(config.company)}-${safeName(config.jobTitle)}`
-      : safeName(config.jobTitle) || 'resume';
+
+    const personSlug = safeName(profile.contact.name.value);
+    const fileBaseName = `${personSlug}-resume`;
 
     const jobSlug = config.company ? makeJobSlug(config.company, config.jobTitle ?? '') : null;
     const resumeOutputDir = jobSlug ? `${resumesDir}/${jobSlug}` : resumesDir;
-    const fileBaseName = jobSlug ? 'resume' : namePart;
 
     if (config.allTemplates) {
       // Generate one PDF per template
@@ -464,7 +463,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       console.log(c.muted(`  Settings saved to ${generationConfigPath(profileDir)}`));
     } else {
       // Single template — render, fit-check, export
-      let outputPath = `${resumeOutputDir}/${fileBaseName}-${date}-${hhmm}.pdf`;
+      let outputPath = `${resumeOutputDir}/${fileBaseName}_${date}-${hhmm}.pdf`;
       let html = await renderResumeHtml(resumeDoc);
 
       let fitCancelled = false;
@@ -1031,7 +1030,7 @@ async function generateAllTemplates(
       continue;
     }
 
-    const outputPath = `${resumesDir}/${namePart}-${tc.label}-${date}-${hhmm}.pdf`;
+    const outputPath = `${resumesDir}/${namePart}-${tc.label}_${date}-${hhmm}.pdf`;
     await exportToPdf(html, { template: doc.template, outputPath });
     console.log(`  ${c.ok} ${c.path(outputPath)}`);
     paths.push(outputPath);

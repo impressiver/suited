@@ -1,8 +1,8 @@
+import { randomBytes } from 'node:crypto';
+import { mkdir, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import AdmZip from 'adm-zip';
-import { writeFile, mkdir, readdir } from 'fs/promises';
-import { join, basename } from 'path';
-import { tmpdir } from 'os';
-import { randomBytes } from 'crypto';
 
 export async function extractZip(zipPath: string): Promise<string> {
   const outDir = join(tmpdir(), `resume-${randomBytes(6).toString('hex')}`);

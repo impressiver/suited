@@ -76,7 +76,10 @@ function extractInlineSvgs(html: string): Array<{ svg: string; context: string }
     let depth = 0;
     let i = start;
     while (i < html.length) {
-      if (html.startsWith('<svg', i) && (html[i + 4] === ' ' || html[i + 4] === '\n' || html[i + 4] === '\t' || html[i + 4] === '>')) {
+      if (
+        html.startsWith('<svg', i) &&
+        (html[i + 4] === ' ' || html[i + 4] === '\n' || html[i + 4] === '\t' || html[i + 4] === '>')
+      ) {
         depth++;
         i += 4;
       } else if (html.startsWith('</svg>', i)) {
@@ -115,8 +118,8 @@ function isLogoContext(context: string): boolean {
 async function svgsFromHtml(html: string, origin: string): Promise<string[]> {
   // --- Inline SVGs (logo-context first, then rest) ---
   const inlineSvgs = extractInlineSvgs(html);
-  const inlineLogo  = inlineSvgs.filter(e => isLogoContext(e.context)).map(e => e.svg);
-  const inlineOther = inlineSvgs.filter(e => !isLogoContext(e.context)).map(e => e.svg);
+  const inlineLogo = inlineSvgs.filter((e) => isLogoContext(e.context)).map((e) => e.svg);
+  const inlineOther = inlineSvgs.filter((e) => !isLogoContext(e.context)).map((e) => e.svg);
 
   // --- Linked SVG files ---
   const linkedUrls = new Set<string>();
@@ -185,7 +188,7 @@ export async function fetchSvgsFromUrl(rawUrl: string): Promise<string[]> {
 
   // Scrape for SVGs — treat any non-SVG response as a page to scan,
   // regardless of content-type (handles wrong MIME types and brand pages)
-  if (mime.includes('html') || text.includes('<') ) {
+  if (mime.includes('html') || text.includes('<')) {
     const origin = new URL(url).origin;
 
     // /favicon.svg first — highest chance of being a clean logomark
@@ -216,5 +219,5 @@ export async function discoverLogoSvgs(name: string): Promise<string[]> {
 export function domainFor(name: string): string {
   const tldMatch = name.match(/(\S+)\.(ai|io|co|org|net|edu|dev|app|com)\b/i);
   if (tldMatch) return `${tldMatch[1]}.${tldMatch[2]}`.toLowerCase();
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+  return `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
 }

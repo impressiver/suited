@@ -1,7 +1,17 @@
-import { Profile, JobAnalysis, CurationPlan, CurationPlanSchema } from '../profile/schema.js';
-import { callWithTool } from '../claude/client.js';
-import { CURATE_SYSTEM, curateTool, buildRefList, RefEntry } from '../claude/prompts/curate.js';
 import { assertAccurate } from '../claude/accuracy-guard.js';
+import { callWithTool } from '../claude/client.js';
+import {
+  buildRefList,
+  CURATE_SYSTEM,
+  curateTool,
+  type RefEntry,
+} from '../claude/prompts/curate.js';
+import {
+  type CurationPlan,
+  CurationPlanSchema,
+  type JobAnalysis,
+  type Profile,
+} from '../profile/schema.js';
 
 export interface CuratorResult {
   plan: CurationPlan;
@@ -20,11 +30,11 @@ function ensureConsecutiveEmployment(plan: CurationPlan, profile: Profile): Cura
   if (profile.positions.length === 0) return plan;
 
   // Sort profile positions most-recent-first (YYYY-MM lexicographic sort is correct)
-  const sorted = [...profile.positions].sort(
-    (a, b) => b.startDate.value.localeCompare(a.startDate.value),
+  const sorted = [...profile.positions].sort((a, b) =>
+    b.startDate.value.localeCompare(a.startDate.value),
   );
 
-  const selectedIds = new Set(plan.selectedPositions.map(p => p.positionId));
+  const selectedIds = new Set(plan.selectedPositions.map((p) => p.positionId));
 
   // Always include the most recent position and its promotion chain
   const recentCompany = sorted[0].company.value.toLowerCase().trim();
@@ -41,8 +51,8 @@ function ensureConsecutiveEmployment(plan: CurationPlan, profile: Profile): Cura
   );
 
   // Every position from index 0 to lastIdx must be included to avoid gaps
-  const existingByPositionId = new Map(plan.selectedPositions.map(p => [p.positionId, p]));
-  const filledPositions = sorted.slice(0, lastIdx + 1).map(pos => {
+  const existingByPositionId = new Map(plan.selectedPositions.map((p) => [p.positionId, p]));
+  const filledPositions = sorted.slice(0, lastIdx + 1).map((pos) => {
     if (existingByPositionId.has(pos.id)) return existingByPositionId.get(pos.id)!;
     // Gap-fill: include the position with all its bullets
     return {
@@ -98,11 +108,7 @@ For projects and certifications: include all of them.
 summaryRef: "summary" if present, otherwise null.
 `.trim();
 
-  const rawPlan = await callWithTool<CurationPlan>(
-    CURATE_SYSTEM,
-    userMessage,
-    curateTool,
-  );
+  const rawPlan = await callWithTool<CurationPlan>(CURATE_SYSTEM, userMessage, curateTool);
 
   const parseResult = CurationPlanSchema.safeParse(rawPlan);
   if (!parseResult.success) {

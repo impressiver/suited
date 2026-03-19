@@ -10,40 +10,50 @@
 
 import 'dotenv/config';
 import { Command } from 'commander';
-import { runImport } from './commands/import.js';
-import { runRefine } from './commands/refine.js';
-import { runGenerate } from './commands/generate.js';
-import { runValidate } from './commands/validate.js';
-import { runFlow } from './commands/flow.js';
-import { runImprove } from './commands/improve.js';
 import { runContact } from './commands/contact.js';
+import { runFlow } from './commands/flow.js';
+import { runGenerate } from './commands/generate.js';
+import { runImport } from './commands/import.js';
+import { runImprove } from './commands/improve.js';
 import { runJobs } from './commands/jobs.js';
 import { runPrepare } from './commands/prepare.js';
+import { runRefine } from './commands/refine.js';
+import { runValidate } from './commands/validate.js';
+import { PACKAGE_VERSION } from './version.js';
 
 const program = new Command();
 
 program
   .name('suited')
   .description('Generate tailored, factually-accurate resumes from LinkedIn data')
-  .version('1.0.0');
+  .version(PACKAGE_VERSION);
 
 program
   .command('import [input]')
-  .description('Import a LinkedIn profile (URL, export ZIP/directory, or pasted text) → source data')
+  .description(
+    'Import a LinkedIn profile (URL, export ZIP/directory, or pasted text) → source data',
+  )
   .option('--profile-dir <dir>', 'Directory to store profile files', 'output')
   .option('--headed', 'Show browser window during scrape (use for 2FA or CAPTCHA)')
   .option('--clear-session', 'Clear saved LinkedIn session and re-authenticate')
-  .action(async (
-    input: string | undefined,
-    opts: { profileDir?: string; headed?: boolean; clearSession?: boolean },
-  ) => {
-    try {
-      await runImport({ input, profileDir: opts.profileDir, headed: opts.headed, clearSession: opts.clearSession });
-    } catch (err) {
-      console.error(`\n✗ Import failed: ${(err as Error).message}`);
-      process.exit(1);
-    }
-  });
+  .action(
+    async (
+      input: string | undefined,
+      opts: { profileDir?: string; headed?: boolean; clearSession?: boolean },
+    ) => {
+      try {
+        await runImport({
+          input,
+          profileDir: opts.profileDir,
+          headed: opts.headed,
+          clearSession: opts.clearSession,
+        });
+      } catch (err) {
+        console.error(`\n✗ Import failed: ${(err as Error).message}`);
+        process.exit(1);
+      }
+    },
+  );
 
 program
   .command('refine')
@@ -153,7 +163,7 @@ program.action(async (opts: { profileDir?: string; headed?: boolean; clearSessio
   }
 });
 
-program.parseAsync(process.argv).catch(err => {
+program.parseAsync(process.argv).catch((err) => {
   console.error(err.message);
   process.exit(1);
 });

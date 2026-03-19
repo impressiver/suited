@@ -83,6 +83,21 @@ suited
 
 That's it. suited walks you through each step interactively and skips anything already done.
 
+### Which command?
+
+| Goal | Command |
+|------|---------|
+| First structured pass: Q&A and AI-assisted edits from **source → refined** data | `suited refine` |
+| Ongoing **profile hub**: health view, re-run refine, edit summary/bullets, contact | `suited improve` |
+| **Curate** your profile for one **saved job** (before generating a PDF) | `suited prepare` |
+| Export a **PDF** for a job (paste or saved JD) | `suited generate` |
+
+Use **`refine`** when you are moving from raw import to a refined profile. Use **`improve`** when you already have data and want a menu of maintenance options. Use **`prepare`** after you have job descriptions saved (`suited jobs`) to tailor content to a specific role. **`generate`** produces the PDF.
+
+### Interactive UI (dashboard vs TUI)
+
+With no subcommand, suited runs an **interactive dashboard** (terminal menus). A **full-screen TUI** is [specified in `specs/tui.md`](specs/tui.md) as a future replacement for that layer; core pipeline behavior is the same. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit together.
+
 ### Import options
 
 ```bash
@@ -115,12 +130,12 @@ suited import https://www.linkedin.com/in/your-username --headed
 |---------|-------------|
 | `suited` | Run the full pipeline interactively |
 | `suited import` | Import your LinkedIn profile |
-| `suited refine` | Improve your profile with Claude Q&A |
-| `suited generate` | Generate a PDF resume |
-| `suited improve` | Edit profile bullets and contact info |
-| `suited jobs` | Manage saved job descriptions |
-| `suited prepare` | Curate a resume for a specific saved job |
-| `suited validate` | Check profile data integrity |
+| `suited refine` | Q&A and edits: **source → refined** profile (skips if already refined) |
+| `suited generate` | Build a PDF from refined data + job description |
+| `suited improve` | Interactive hub: refine again, bullets, summary, contact |
+| `suited jobs` | Add, list, delete saved job descriptions |
+| `suited prepare` | Curate profile for one saved job before PDF |
+| `suited validate` | Validate profile data and guardrails |
 
 ### Generate options
 
@@ -191,7 +206,15 @@ suited generate --profile-dir output/engineering
 pnpm install
 pnpm dev              # Run without building
 pnpm dev import       # Run a specific command
+pnpm check            # Lint + format (Biome)
+pnpm test             # Unit tests (Vitest)
 pnpm build            # Compile TypeScript → dist/
 pnpm build:bundle     # Build esbuild CJS bundle (for testing)
 pnpm build:binary     # Build SEA binary for current platform → dist-bin/
 ```
+
+Contributing notes: [`CONTRIBUTING.md`](CONTRIBUTING.md). Module layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Security: [`SECURITY.md`](SECURITY.md).
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).

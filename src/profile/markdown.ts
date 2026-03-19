@@ -10,12 +10,20 @@
  * skills (add/remove/rename), certifications, projects, languages, volunteer, awards.
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import {
-  Profile, Sourced, DataSource,
-  Position, Education, Skill, Certification, Project, Language, VolunteerRole,
-} from './schema.js';
+import { readFile, writeFile } from 'node:fs/promises';
 import { deduplicateSkills } from '../ingestion/normalizer.js';
+import type {
+  Certification,
+  DataSource,
+  Education,
+  Language,
+  Position,
+  Profile,
+  Project,
+  Skill,
+  Sourced,
+  VolunteerRole,
+} from './schema.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -177,9 +185,17 @@ export async function profileToMarkdown(profile: Profile, filePath: string): Pro
 // ---------------------------------------------------------------------------
 
 type Section =
-  | 'contact' | 'summary' | 'experience' | 'education'
-  | 'skills' | 'certifications' | 'projects' | 'languages'
-  | 'volunteer' | 'awards' | '';
+  | 'contact'
+  | 'summary'
+  | 'experience'
+  | 'education'
+  | 'skills'
+  | 'certifications'
+  | 'projects'
+  | 'languages'
+  | 'volunteer'
+  | 'awards'
+  | '';
 
 interface ParsedField {
   label: string;
@@ -215,7 +231,10 @@ function parseMetaComment(line: string, key: string): string | null {
   return m ? m[1] : null;
 }
 
-export async function markdownToProfile(mdPath: string, originalProfile: Profile): Promise<Profile> {
+export async function markdownToProfile(
+  mdPath: string,
+  originalProfile: Profile,
+): Promise<Profile> {
   const md = await readFile(mdPath, 'utf-8');
   const now = new Date().toISOString();
   const up = (v: string, orig: Sourced<string> | undefined) => upgradeIfChanged(v, orig, now);
@@ -273,16 +292,52 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
     const line = raw.trim();
 
     // Section detection
-    if (/^## Contact/.test(line)) { section = 'contact'; continue; }
-    if (/^## Summary/.test(line)) { section = 'summary'; continue; }
-    if (/^## Experience/.test(line)) { section = 'experience'; currentPosId = null; inBullets = false; continue; }
-    if (/^## Education/.test(line)) { section = 'education'; currentEduId = null; continue; }
-    if (/^## Skills/.test(line)) { section = 'skills'; continue; }
-    if (/^## Certifications/.test(line)) { section = 'certifications'; currentCertId = null; continue; }
-    if (/^## Projects/.test(line)) { section = 'projects'; currentProjId = null; continue; }
-    if (/^## Languages/.test(line)) { section = 'languages'; continue; }
-    if (/^## Volunteer/.test(line)) { section = 'volunteer'; currentVolId = null; continue; }
-    if (/^## Awards/.test(line)) { section = 'awards'; continue; }
+    if (/^## Contact/.test(line)) {
+      section = 'contact';
+      continue;
+    }
+    if (/^## Summary/.test(line)) {
+      section = 'summary';
+      continue;
+    }
+    if (/^## Experience/.test(line)) {
+      section = 'experience';
+      currentPosId = null;
+      inBullets = false;
+      continue;
+    }
+    if (/^## Education/.test(line)) {
+      section = 'education';
+      currentEduId = null;
+      continue;
+    }
+    if (/^## Skills/.test(line)) {
+      section = 'skills';
+      continue;
+    }
+    if (/^## Certifications/.test(line)) {
+      section = 'certifications';
+      currentCertId = null;
+      continue;
+    }
+    if (/^## Projects/.test(line)) {
+      section = 'projects';
+      currentProjId = null;
+      continue;
+    }
+    if (/^## Languages/.test(line)) {
+      section = 'languages';
+      continue;
+    }
+    if (/^## Volunteer/.test(line)) {
+      section = 'volunteer';
+      currentVolId = null;
+      continue;
+    }
+    if (/^## Awards/.test(line)) {
+      section = 'awards';
+      continue;
+    }
 
     // Skip blank lines
     if (!line) continue;
@@ -292,13 +347,39 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const f = parseField(line);
       if (!f) continue;
       switch (f.label) {
-        case 'Name':     contact.name = up(f.value, contact.name); break;
-        case 'Email':    contact.email = contact.email ? up(f.value, contact.email) : { value: f.value, source: f.source }; break;
-        case 'Phone':    contact.phone = contact.phone ? up(f.value, contact.phone) : { value: f.value, source: f.source }; break;
-        case 'Location': contact.location = contact.location ? up(f.value, contact.location) : { value: f.value, source: f.source }; break;
-        case 'LinkedIn': contact.linkedin = contact.linkedin ? up(f.value, contact.linkedin) : { value: f.value, source: f.source }; break;
-        case 'Website':  contact.website = contact.website ? up(f.value, contact.website) : { value: f.value, source: f.source }; break;
-        case 'GitHub':   contact.github = contact.github ? up(f.value, contact.github) : { value: f.value, source: f.source }; break;
+        case 'Name':
+          contact.name = up(f.value, contact.name);
+          break;
+        case 'Email':
+          contact.email = contact.email
+            ? up(f.value, contact.email)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Phone':
+          contact.phone = contact.phone
+            ? up(f.value, contact.phone)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Location':
+          contact.location = contact.location
+            ? up(f.value, contact.location)
+            : { value: f.value, source: f.source };
+          break;
+        case 'LinkedIn':
+          contact.linkedin = contact.linkedin
+            ? up(f.value, contact.linkedin)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Website':
+          contact.website = contact.website
+            ? up(f.value, contact.website)
+            : { value: f.value, source: f.source };
+          break;
+        case 'GitHub':
+          contact.github = contact.github
+            ? up(f.value, contact.github)
+            : { value: f.value, source: f.source };
+          break;
       }
       continue;
     }
@@ -322,13 +403,21 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
         bulletIdx = 0;
         // Ensure we have a clone in posMap
         if (!posMap.has(posId)) {
-          const orig = originalProfile.positions.find(p => p.id === posId);
+          const orig = originalProfile.positions.find((p) => p.id === posId);
           if (orig) posMap.set(posId, structuredClone(orig) as Position);
         }
         continue;
       }
-      if (line === '**Bullets:**') { inBullets = true; bulletIdx = 0; continue; }
-      if (line.startsWith('### ')) { inBullets = false; bulletIdx = 0; continue; }
+      if (line === '**Bullets:**') {
+        inBullets = true;
+        bulletIdx = 0;
+        continue;
+      }
+      if (line.startsWith('### ')) {
+        inBullets = false;
+        bulletIdx = 0;
+        continue;
+      }
 
       if (!currentPosId) continue;
       const pos = posMap.get(currentPosId);
@@ -348,11 +437,25 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const f = parseField(line);
       if (!f) continue;
       switch (f.label) {
-        case 'Title':      pos.title = up(f.value, pos.title); break;
-        case 'Company':    pos.company = up(f.value, pos.company); break;
-        case 'Location':   pos.location = pos.location ? up(f.value, pos.location) : { value: f.value, source: f.source }; break;
-        case 'Start Date': pos.startDate = up(f.value, pos.startDate); break;
-        case 'End Date':   pos.endDate = pos.endDate ? up(f.value, pos.endDate) : { value: f.value, source: f.source }; break;
+        case 'Title':
+          pos.title = up(f.value, pos.title);
+          break;
+        case 'Company':
+          pos.company = up(f.value, pos.company);
+          break;
+        case 'Location':
+          pos.location = pos.location
+            ? up(f.value, pos.location)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Start Date':
+          pos.startDate = up(f.value, pos.startDate);
+          break;
+        case 'End Date':
+          pos.endDate = pos.endDate
+            ? up(f.value, pos.endDate)
+            : { value: f.value, source: f.source };
+          break;
       }
       continue;
     }
@@ -363,7 +466,7 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       if (eduId) {
         currentEduId = eduId;
         if (!eduMap.has(eduId)) {
-          const orig = originalProfile.education.find(e => e.id === eduId);
+          const orig = originalProfile.education.find((e) => e.id === eduId);
           if (orig) eduMap.set(eduId, structuredClone(orig) as Education);
         }
         continue;
@@ -375,13 +478,35 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const f = parseField(line);
       if (!f) continue;
       switch (f.label) {
-        case 'Institution':    edu.institution = up(f.value, edu.institution); break;
-        case 'Degree':         edu.degree = edu.degree ? up(f.value, edu.degree) : { value: f.value, source: f.source }; break;
-        case 'Field of Study': edu.fieldOfStudy = edu.fieldOfStudy ? up(f.value, edu.fieldOfStudy) : { value: f.value, source: f.source }; break;
-        case 'Start Date':     edu.startDate = edu.startDate ? up(f.value, edu.startDate) : { value: f.value, source: f.source }; break;
-        case 'End Date':       edu.endDate = edu.endDate ? up(f.value, edu.endDate) : { value: f.value, source: f.source }; break;
-        case 'Activities':     edu.activities = edu.activities ? up(f.value, edu.activities) : { value: f.value, source: f.source }; break;
-        case 'Notes':          edu.notes = edu.notes ? up(f.value, edu.notes) : { value: f.value, source: f.source }; break;
+        case 'Institution':
+          edu.institution = up(f.value, edu.institution);
+          break;
+        case 'Degree':
+          edu.degree = edu.degree ? up(f.value, edu.degree) : { value: f.value, source: f.source };
+          break;
+        case 'Field of Study':
+          edu.fieldOfStudy = edu.fieldOfStudy
+            ? up(f.value, edu.fieldOfStudy)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Start Date':
+          edu.startDate = edu.startDate
+            ? up(f.value, edu.startDate)
+            : { value: f.value, source: f.source };
+          break;
+        case 'End Date':
+          edu.endDate = edu.endDate
+            ? up(f.value, edu.endDate)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Activities':
+          edu.activities = edu.activities
+            ? up(f.value, edu.activities)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Notes':
+          edu.notes = edu.notes ? up(f.value, edu.notes) : { value: f.value, source: f.source };
+          break;
       }
       continue;
     }
@@ -393,7 +518,7 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const item = parseInlineItem(line);
       if (item) {
         const origSkillId = idMatch?.[1];
-        const origSkill = originalProfile.skills.find(s => s.id === origSkillId);
+        const origSkill = originalProfile.skills.find((s) => s.id === origSkillId);
         const skillId = origSkillId ?? `skill-${skillCounter++}`;
         parsedSkills.push({
           id: skillId,
@@ -409,7 +534,7 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       if (certId) {
         currentCertId = certId;
         if (!certMap.has(certId)) {
-          const orig = originalProfile.certifications.find(c => c.id === certId);
+          const orig = originalProfile.certifications.find((c) => c.id === certId);
           if (orig) certMap.set(certId, structuredClone(orig) as Certification);
         }
         continue;
@@ -421,9 +546,19 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const f = parseField(line);
       if (!f) continue;
       switch (f.label) {
-        case 'Name':      cert.name = up(f.value, cert.name); break;
-        case 'Authority': cert.authority = cert.authority ? up(f.value, cert.authority) : { value: f.value, source: f.source }; break;
-        case 'Date':      cert.startDate = cert.startDate ? up(f.value, cert.startDate) : { value: f.value, source: f.source }; break;
+        case 'Name':
+          cert.name = up(f.value, cert.name);
+          break;
+        case 'Authority':
+          cert.authority = cert.authority
+            ? up(f.value, cert.authority)
+            : { value: f.value, source: f.source };
+          break;
+        case 'Date':
+          cert.startDate = cert.startDate
+            ? up(f.value, cert.startDate)
+            : { value: f.value, source: f.source };
+          break;
       }
       continue;
     }
@@ -434,7 +569,7 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       if (projId) {
         currentProjId = projId;
         if (!projMap.has(projId)) {
-          const orig = originalProfile.projects.find(p => p.id === projId);
+          const orig = originalProfile.projects.find((p) => p.id === projId);
           if (orig) projMap.set(projId, structuredClone(orig) as Project);
         }
         continue;
@@ -446,11 +581,27 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const f = parseField(line);
       if (!f) continue;
       switch (f.label) {
-        case 'Title':       proj.title = up(f.value, proj.title); break;
-        case 'Description': proj.description = proj.description ? up(f.value, proj.description) : { value: f.value, source: f.source }; break;
-        case 'URL':         proj.url = proj.url ? up(f.value, proj.url) : { value: f.value, source: f.source }; break;
-        case 'Start Date':  proj.startDate = proj.startDate ? up(f.value, proj.startDate) : { value: f.value, source: f.source }; break;
-        case 'End Date':    proj.endDate = proj.endDate ? up(f.value, proj.endDate) : { value: f.value, source: f.source }; break;
+        case 'Title':
+          proj.title = up(f.value, proj.title);
+          break;
+        case 'Description':
+          proj.description = proj.description
+            ? up(f.value, proj.description)
+            : { value: f.value, source: f.source };
+          break;
+        case 'URL':
+          proj.url = proj.url ? up(f.value, proj.url) : { value: f.value, source: f.source };
+          break;
+        case 'Start Date':
+          proj.startDate = proj.startDate
+            ? up(f.value, proj.startDate)
+            : { value: f.value, source: f.source };
+          break;
+        case 'End Date':
+          proj.endDate = proj.endDate
+            ? up(f.value, proj.endDate)
+            : { value: f.value, source: f.source };
+          break;
       }
       continue;
     }
@@ -462,7 +613,7 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const item = parseInlineItem(line);
       if (item) {
         const origLangId = idMatch?.[1];
-        const origLang = originalProfile.languages.find(l => l.id === origLangId);
+        const origLang = originalProfile.languages.find((l) => l.id === origLangId);
         // Split "(Proficiency)" if present
         const profMatch = item.value.match(/^(.*?)\s*\(([^)]+)\)$/);
         const nameVal = profMatch ? profMatch[1].trim() : item.value;
@@ -472,7 +623,9 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
           id: langId,
           name: up(nameVal, origLang?.name),
           proficiency: profVal
-            ? (origLang?.proficiency ? up(profVal, origLang.proficiency) : { value: profVal, source: item.source })
+            ? origLang?.proficiency
+              ? up(profVal, origLang.proficiency)
+              : { value: profVal, source: item.source }
             : undefined,
         };
         parsedLangs.push(lang);
@@ -486,7 +639,7 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       if (volId) {
         currentVolId = volId;
         if (!volMap.has(volId)) {
-          const orig = originalProfile.volunteer.find(v => v.id === volId);
+          const orig = originalProfile.volunteer.find((v) => v.id === volId);
           if (orig) volMap.set(volId, structuredClone(orig) as VolunteerRole);
         }
         continue;
@@ -498,11 +651,25 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
       const f = parseField(line);
       if (!f) continue;
       switch (f.label) {
-        case 'Organization': vol.organization = up(f.value, vol.organization); break;
-        case 'Role':         vol.role = vol.role ? up(f.value, vol.role) : { value: f.value, source: f.source }; break;
-        case 'Cause':        vol.cause = vol.cause ? up(f.value, vol.cause) : { value: f.value, source: f.source }; break;
-        case 'Start Date':   vol.startDate = vol.startDate ? up(f.value, vol.startDate) : { value: f.value, source: f.source }; break;
-        case 'End Date':     vol.endDate = vol.endDate ? up(f.value, vol.endDate) : { value: f.value, source: f.source }; break;
+        case 'Organization':
+          vol.organization = up(f.value, vol.organization);
+          break;
+        case 'Role':
+          vol.role = vol.role ? up(f.value, vol.role) : { value: f.value, source: f.source };
+          break;
+        case 'Cause':
+          vol.cause = vol.cause ? up(f.value, vol.cause) : { value: f.value, source: f.source };
+          break;
+        case 'Start Date':
+          vol.startDate = vol.startDate
+            ? up(f.value, vol.startDate)
+            : { value: f.value, source: f.source };
+          break;
+        case 'End Date':
+          vol.endDate = vol.endDate
+            ? up(f.value, vol.endDate)
+            : { value: f.value, source: f.source };
+          break;
       }
       continue;
     }
@@ -511,38 +678,35 @@ export async function markdownToProfile(mdPath: string, originalProfile: Profile
     if (section === 'awards') {
       const item = parseInlineItem(line);
       if (item) {
-        const origAward = originalProfile.awards.find(a => a.value === item.value);
+        const origAward = originalProfile.awards.find((a) => a.value === item.value);
         parsedAwards.push(origAward ?? { value: item.value, source: item.source });
       }
-      continue;
     }
   }
 
   // Reassemble in original order (preserves ordering even if parser doesn't re-order)
   const positions = originalProfile.positions
-    .filter(p => posMap.has(p.id))
-    .map(p => posMap.get(p.id)!);
+    .filter((p) => posMap.has(p.id))
+    .map((p) => posMap.get(p.id)!);
 
   const education = originalProfile.education
-    .filter(e => eduMap.has(e.id))
-    .map(e => eduMap.get(e.id)!);
+    .filter((e) => eduMap.has(e.id))
+    .map((e) => eduMap.get(e.id)!);
 
   const certifications = originalProfile.certifications
-    .filter(c => certMap.has(c.id))
-    .map(c => certMap.get(c.id)!);
+    .filter((c) => certMap.has(c.id))
+    .map((c) => certMap.get(c.id)!);
 
   const projects = originalProfile.projects
-    .filter(p => projMap.has(p.id))
-    .map(p => projMap.get(p.id)!);
+    .filter((p) => projMap.has(p.id))
+    .map((p) => projMap.get(p.id)!);
 
   const volunteer = originalProfile.volunteer
-    .filter(v => volMap.has(v.id))
-    .map(v => volMap.get(v.id)!);
+    .filter((v) => volMap.has(v.id))
+    .map((v) => volMap.get(v.id)!);
 
   // Skills: use parsed list if any were found, else keep originals
-  const skills = parsedSkills.length > 0
-    ? deduplicateSkills(parsedSkills)
-    : originalProfile.skills;
+  const skills = parsedSkills.length > 0 ? deduplicateSkills(parsedSkills) : originalProfile.skills;
 
   // Languages: use parsed if found, else keep originals
   const languages = parsedLangs.length > 0 ? parsedLangs : originalProfile.languages;

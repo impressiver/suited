@@ -1,12 +1,24 @@
-import {
-  loadActiveProfile, loadRefined, saveRefined, saveSource,
-  refinedJsonPath, refinedMdPath, sourceMdPath,
-} from '../profile/serializer.js';
-import { isUserExit } from '../utils/user-exit.js';
 import { profileToMarkdown } from '../profile/markdown.js';
-import { fileExists } from '../utils/fs.js';
+import type {
+  Certification,
+  Education,
+  Position,
+  Profile,
+  Project,
+  Sourced,
+} from '../profile/schema.js';
+import {
+  loadActiveProfile,
+  loadRefined,
+  refinedJsonPath,
+  refinedMdPath,
+  saveRefined,
+  saveSource,
+  sourceMdPath,
+} from '../profile/serializer.js';
 import { c } from '../utils/colors.js';
-import type { Profile, Position, Education, Certification, Project, Sourced } from '../profile/schema.js';
+import { fileExists } from '../utils/fs.js';
+import { isUserExit } from '../utils/user-exit.js';
 
 export interface ProfileEditorOptions {
   profileDir?: string;
@@ -49,14 +61,14 @@ async function runSummaryEditor(
   const current = profile.summary?.value ?? '(none)';
   console.log(`\n  Current summary: ${c.value(current)}\n`);
 
-  const { newText } = await inquirer.prompt([
+  const { newText } = (await inquirer.prompt([
     {
       type: 'input',
       name: 'newText',
       message: 'New summary (leave blank to keep current):',
       default: profile.summary?.value ?? '',
     },
-  ]) as { newText: string };
+  ])) as { newText: string };
 
   const trimmed = newText.trim();
   if (!trimmed || trimmed === (profile.summary?.value ?? '')) {
@@ -88,7 +100,7 @@ async function runBulletsEditor(
       console.log(`  ${c.muted('(no bullets yet)')}`);
     } else {
       pos.bullets.forEach((b, i) => {
-        const preview = b.value.length > 80 ? b.value.slice(0, 80) + '…' : b.value;
+        const preview = b.value.length > 80 ? `${b.value.slice(0, 80)}…` : b.value;
         console.log(`  ${c.muted(`[${i}]`)} ${preview}`);
       });
     }
@@ -98,7 +110,7 @@ async function runBulletsEditor(
       value: `edit:${i}`,
     }));
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -111,14 +123,14 @@ async function runBulletsEditor(
           { name: c.muted('← Back'), value: 'back' },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'add') {
-      const { text } = await inquirer.prompt([
+      const { text } = (await inquirer.prompt([
         { type: 'input', name: 'text', message: 'New bullet text:' },
-      ]) as { text: string };
+      ])) as { text: string };
       if (text.trim()) {
         const newPositions = [...profile.positions];
         newPositions[posIdx] = {
@@ -133,7 +145,7 @@ async function runBulletsEditor(
     }
 
     if (action === 'remove') {
-      const { toRemove } = await inquirer.prompt([
+      const { toRemove } = (await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'toRemove',
@@ -143,7 +155,7 @@ async function runBulletsEditor(
             value: i,
           })),
         },
-      ]) as { toRemove: number[] };
+      ])) as { toRemove: number[] };
 
       if (toRemove.length > 0) {
         const removeSet = new Set(toRemove);
@@ -162,14 +174,14 @@ async function runBulletsEditor(
     // edit:N
     const bulletIdx = parseInt(action.split(':')[1], 10);
     const currentBullet = pos.bullets[bulletIdx].value;
-    const { edited } = await inquirer.prompt([
+    const { edited } = (await inquirer.prompt([
       {
         type: 'input',
         name: 'edited',
         message: 'Edit bullet:',
         default: currentBullet,
       },
-    ]) as { edited: string };
+    ])) as { edited: string };
 
     if (edited.trim() && edited.trim() !== currentBullet) {
       const newPositions = [...profile.positions];
@@ -197,7 +209,7 @@ async function runPositionEditor(
     const pos = profile.positions[posIdx];
     console.log(`\n  ${c.value(`${pos.title.value} @ ${pos.company.value}`)}`);
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -210,19 +222,19 @@ async function runPositionEditor(
           { value: 'back', name: c.muted('← Back') },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'delete') {
-      const { confirm } = await inquirer.prompt([
+      const { confirm } = (await inquirer.prompt([
         {
           type: 'confirm',
           name: 'confirm',
           message: `Delete "${pos.title.value} @ ${pos.company.value}"?`,
           default: false,
         },
-      ]) as { confirm: boolean };
+      ])) as { confirm: boolean };
 
       if (confirm) {
         const newPositions = profile.positions.filter((_, i) => i !== posIdx);
@@ -240,21 +252,36 @@ async function runPositionEditor(
     }
 
     if (action === 'fields') {
-      const { title } = await inquirer.prompt([
+      const { title } = (await inquirer.prompt([
         { type: 'input', name: 'title', message: 'Title:', default: pos.title.value },
-      ]) as { title: string };
-      const { company } = await inquirer.prompt([
+      ])) as { title: string };
+      const { company } = (await inquirer.prompt([
         { type: 'input', name: 'company', message: 'Company:', default: pos.company.value },
-      ]) as { company: string };
-      const { location } = await inquirer.prompt([
-        { type: 'input', name: 'location', message: 'Location (optional):', default: pos.location?.value ?? '' },
-      ]) as { location: string };
-      const { startDate } = await inquirer.prompt([
-        { type: 'input', name: 'startDate', message: 'Start date (YYYY-MM):', default: pos.startDate.value },
-      ]) as { startDate: string };
-      const { endDate } = await inquirer.prompt([
-        { type: 'input', name: 'endDate', message: 'End date (YYYY-MM or blank for Present):', default: pos.endDate?.value ?? '' },
-      ]) as { endDate: string };
+      ])) as { company: string };
+      const { location } = (await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'location',
+          message: 'Location (optional):',
+          default: pos.location?.value ?? '',
+        },
+      ])) as { location: string };
+      const { startDate } = (await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'startDate',
+          message: 'Start date (YYYY-MM):',
+          default: pos.startDate.value,
+        },
+      ])) as { startDate: string };
+      const { endDate } = (await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'endDate',
+          message: 'End date (YYYY-MM or blank for Present):',
+          default: pos.endDate?.value ?? '',
+        },
+      ])) as { endDate: string };
 
       const newPositions = [...profile.positions];
       newPositions[posIdx] = {
@@ -290,7 +317,7 @@ async function runExperienceEditor(
       return { name: label, value: `pos:${i}` };
     });
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -302,38 +329,48 @@ async function runExperienceEditor(
           { name: c.muted('← Back'), value: 'back' },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'add') {
-      const { title } = await inquirer.prompt([
+      const { title } = (await inquirer.prompt([
         { type: 'input', name: 'title', message: 'Title (required):' },
-      ]) as { title: string };
-      if (!title.trim()) { console.log(c.muted('Title is required.')); continue; }
+      ])) as { title: string };
+      if (!title.trim()) {
+        console.log(c.muted('Title is required.'));
+        continue;
+      }
 
-      const { company } = await inquirer.prompt([
+      const { company } = (await inquirer.prompt([
         { type: 'input', name: 'company', message: 'Company (required):' },
-      ]) as { company: string };
-      if (!company.trim()) { console.log(c.muted('Company is required.')); continue; }
+      ])) as { company: string };
+      if (!company.trim()) {
+        console.log(c.muted('Company is required.'));
+        continue;
+      }
 
-      const { location } = await inquirer.prompt([
+      const { location } = (await inquirer.prompt([
         { type: 'input', name: 'location', message: 'Location (optional):' },
-      ]) as { location: string };
-      const { startDate } = await inquirer.prompt([
+      ])) as { location: string };
+      const { startDate } = (await inquirer.prompt([
         { type: 'input', name: 'startDate', message: 'Start date (YYYY-MM):' },
-      ]) as { startDate: string };
-      const { endDate } = await inquirer.prompt([
+      ])) as { startDate: string };
+      const { endDate } = (await inquirer.prompt([
         { type: 'input', name: 'endDate', message: 'End date (YYYY-MM or blank for Present):' },
-      ]) as { endDate: string };
+      ])) as { endDate: string };
 
       // Collect bullets one at a time
       const bullets: Sourced<string>[] = [];
       console.log(c.muted('  Enter bullets one at a time. Press Enter with blank to finish.'));
       while (true) {
-        const { bullet } = await inquirer.prompt([
-          { type: 'input', name: 'bullet', message: `Bullet ${bullets.length + 1} (blank to finish):` },
-        ]) as { bullet: string };
+        const { bullet } = (await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'bullet',
+            message: `Bullet ${bullets.length + 1} (blank to finish):`,
+          },
+        ])) as { bullet: string };
         if (!bullet.trim()) break;
         bullets.push(userEdit(bullet.trim()));
       }
@@ -373,19 +410,28 @@ async function runSkillsEditor(
     console.log(`\n  ${c.header('── Skills ──')}\n`);
 
     // Show skills in a grid (4 per row)
-    const skillNames = profile.skills.map(s => s.name.value);
+    const skillNames = profile.skills.map((s) => s.name.value);
     if (skillNames.length === 0) {
       console.log(`  ${c.muted('(no skills yet)')}`);
     } else {
       const rows: string[] = [];
       for (let i = 0; i < skillNames.length; i += 4) {
-        rows.push('  ' + skillNames.slice(i, i + 4).map(s => s.padEnd(20)).join('  ').trimEnd());
+        rows.push(
+          '  ' +
+            skillNames
+              .slice(i, i + 4)
+              .map((s) => s.padEnd(20))
+              .join('  ')
+              .trimEnd(),
+        );
       }
-      rows.forEach(r => console.log(r));
+      for (const r of rows) {
+        console.log(r);
+      }
     }
     console.log();
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -397,19 +443,22 @@ async function runSkillsEditor(
           { value: 'back', name: c.muted('← Back') },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'add') {
-      const { skillInput } = await inquirer.prompt([
+      const { skillInput } = (await inquirer.prompt([
         { type: 'input', name: 'skillInput', message: 'Skills to add (comma-separated):' },
-      ]) as { skillInput: string };
-      const newSkillNames = skillInput.split(',').map(s => s.trim()).filter(Boolean);
-      const existingNames = new Set(profile.skills.map(s => s.name.value.toLowerCase()));
+      ])) as { skillInput: string };
+      const newSkillNames = skillInput
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const existingNames = new Set(profile.skills.map((s) => s.name.value.toLowerCase()));
       const nextId = profile.skills.length;
       const newSkills = newSkillNames
-        .filter(s => !existingNames.has(s.toLowerCase()))
+        .filter((s) => !existingNames.has(s.toLowerCase()))
         .map((s, i) => ({ id: `skill-${nextId + i}`, name: userEdit(s) }));
       if (newSkills.length > 0) {
         profile = { ...profile, skills: [...profile.skills, ...newSkills] };
@@ -422,17 +471,17 @@ async function runSkillsEditor(
     }
 
     if (action === 'remove') {
-      const { toRemove } = await inquirer.prompt([
+      const { toRemove } = (await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'toRemove',
           message: 'Select skills to remove:',
-          choices: profile.skills.map(s => ({ name: s.name.value, value: s.id })),
+          choices: profile.skills.map((s) => ({ name: s.name.value, value: s.id })),
         },
-      ]) as { toRemove: string[] };
+      ])) as { toRemove: string[] };
       if (toRemove.length > 0) {
         const removeSet = new Set(toRemove);
-        profile = { ...profile, skills: profile.skills.filter(s => !removeSet.has(s.id)) };
+        profile = { ...profile, skills: profile.skills.filter((s) => !removeSet.has(s.id)) };
         await persistProfile(profile, profileDir);
         console.log(`${c.ok} ${c.success(`Removed ${toRemove.length} skill(s).`)}`);
       }
@@ -453,15 +502,13 @@ async function runEducationEditor(
     console.log(`\n  ${c.header('── Education ──')}\n`);
 
     const choices = profile.education.map((edu, i) => {
-      const label = [
-        edu.degree?.value,
-        edu.fieldOfStudy?.value,
-        edu.institution.value,
-      ].filter(Boolean).join(' — ');
+      const label = [edu.degree?.value, edu.fieldOfStudy?.value, edu.institution.value]
+        .filter(Boolean)
+        .join(' — ');
       return { name: label, value: `edu:${i}` };
     });
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -474,28 +521,31 @@ async function runEducationEditor(
           { name: c.muted('← Back'), value: 'back' },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'add') {
-      const { institution } = await inquirer.prompt([
+      const { institution } = (await inquirer.prompt([
         { type: 'input', name: 'institution', message: 'Institution (required):' },
-      ]) as { institution: string };
-      if (!institution.trim()) { console.log(c.muted('Institution is required.')); continue; }
+      ])) as { institution: string };
+      if (!institution.trim()) {
+        console.log(c.muted('Institution is required.'));
+        continue;
+      }
 
-      const { degree } = await inquirer.prompt([
+      const { degree } = (await inquirer.prompt([
         { type: 'input', name: 'degree', message: 'Degree (optional):' },
-      ]) as { degree: string };
-      const { fieldOfStudy } = await inquirer.prompt([
+      ])) as { degree: string };
+      const { fieldOfStudy } = (await inquirer.prompt([
         { type: 'input', name: 'fieldOfStudy', message: 'Field of study (optional):' },
-      ]) as { fieldOfStudy: string };
-      const { startDate } = await inquirer.prompt([
+      ])) as { fieldOfStudy: string };
+      const { startDate } = (await inquirer.prompt([
         { type: 'input', name: 'startDate', message: 'Start date (YYYY-MM, optional):' },
-      ]) as { startDate: string };
-      const { endDate } = await inquirer.prompt([
+      ])) as { startDate: string };
+      const { endDate } = (await inquirer.prompt([
         { type: 'input', name: 'endDate', message: 'End date (YYYY-MM, optional):' },
-      ]) as { endDate: string };
+      ])) as { endDate: string };
 
       const newEdu: Education = {
         id: `edu-${Date.now()}`,
@@ -513,7 +563,7 @@ async function runEducationEditor(
     }
 
     if (action === 'remove') {
-      const { toRemove } = await inquirer.prompt([
+      const { toRemove } = (await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'toRemove',
@@ -523,7 +573,7 @@ async function runEducationEditor(
             value: i,
           })),
         },
-      ]) as { toRemove: number[] };
+      ])) as { toRemove: number[] };
       if (toRemove.length > 0) {
         const removeSet = new Set(toRemove);
         profile = { ...profile, education: profile.education.filter((_, i) => !removeSet.has(i)) };
@@ -537,21 +587,41 @@ async function runEducationEditor(
     const eduIdx = parseInt(action.split(':')[1], 10);
     const edu = profile.education[eduIdx];
 
-    const { institution } = await inquirer.prompt([
-      { type: 'input', name: 'institution', message: 'Institution:', default: edu.institution.value },
-    ]) as { institution: string };
-    const { degree } = await inquirer.prompt([
+    const { institution } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'institution',
+        message: 'Institution:',
+        default: edu.institution.value,
+      },
+    ])) as { institution: string };
+    const { degree } = (await inquirer.prompt([
       { type: 'input', name: 'degree', message: 'Degree:', default: edu.degree?.value ?? '' },
-    ]) as { degree: string };
-    const { fieldOfStudy } = await inquirer.prompt([
-      { type: 'input', name: 'fieldOfStudy', message: 'Field of study:', default: edu.fieldOfStudy?.value ?? '' },
-    ]) as { fieldOfStudy: string };
-    const { startDate } = await inquirer.prompt([
-      { type: 'input', name: 'startDate', message: 'Start date (YYYY-MM):', default: edu.startDate?.value ?? '' },
-    ]) as { startDate: string };
-    const { endDate } = await inquirer.prompt([
-      { type: 'input', name: 'endDate', message: 'End date (YYYY-MM):', default: edu.endDate?.value ?? '' },
-    ]) as { endDate: string };
+    ])) as { degree: string };
+    const { fieldOfStudy } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'fieldOfStudy',
+        message: 'Field of study:',
+        default: edu.fieldOfStudy?.value ?? '',
+      },
+    ])) as { fieldOfStudy: string };
+    const { startDate } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'startDate',
+        message: 'Start date (YYYY-MM):',
+        default: edu.startDate?.value ?? '',
+      },
+    ])) as { startDate: string };
+    const { endDate } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'endDate',
+        message: 'End date (YYYY-MM):',
+        default: edu.endDate?.value ?? '',
+      },
+    ])) as { endDate: string };
 
     const newEdu: Education = {
       ...edu,
@@ -589,7 +659,7 @@ async function runCertificationsEditor(
       return { name: label, value: `cert:${i}` };
     });
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -598,26 +668,31 @@ async function runCertificationsEditor(
         choices: [
           ...choices,
           { name: '+ Add entry', value: 'add' },
-          ...(profile.certifications.length > 0 ? [{ name: '− Remove entry', value: 'remove' }] : []),
+          ...(profile.certifications.length > 0
+            ? [{ name: '− Remove entry', value: 'remove' }]
+            : []),
           { name: c.muted('← Back'), value: 'back' },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'add') {
-      const { name } = await inquirer.prompt([
+      const { name } = (await inquirer.prompt([
         { type: 'input', name: 'name', message: 'Certification name (required):' },
-      ]) as { name: string };
-      if (!name.trim()) { console.log(c.muted('Name is required.')); continue; }
+      ])) as { name: string };
+      if (!name.trim()) {
+        console.log(c.muted('Name is required.'));
+        continue;
+      }
 
-      const { authority } = await inquirer.prompt([
+      const { authority } = (await inquirer.prompt([
         { type: 'input', name: 'authority', message: 'Issuing authority (optional):' },
-      ]) as { authority: string };
-      const { startDate } = await inquirer.prompt([
+      ])) as { authority: string };
+      const { startDate } = (await inquirer.prompt([
         { type: 'input', name: 'startDate', message: 'Date (YYYY-MM, optional):' },
-      ]) as { startDate: string };
+      ])) as { startDate: string };
 
       const newCert: Certification = {
         id: `cert-${Date.now()}`,
@@ -633,7 +708,7 @@ async function runCertificationsEditor(
     }
 
     if (action === 'remove') {
-      const { toRemove } = await inquirer.prompt([
+      const { toRemove } = (await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'toRemove',
@@ -643,7 +718,7 @@ async function runCertificationsEditor(
             value: i,
           })),
         },
-      ]) as { toRemove: number[] };
+      ])) as { toRemove: number[] };
       if (toRemove.length > 0) {
         const removeSet = new Set(toRemove);
         profile = {
@@ -660,15 +735,25 @@ async function runCertificationsEditor(
     const certIdx = parseInt(action.split(':')[1], 10);
     const cert = profile.certifications[certIdx];
 
-    const { name } = await inquirer.prompt([
+    const { name } = (await inquirer.prompt([
       { type: 'input', name: 'name', message: 'Name:', default: cert.name.value },
-    ]) as { name: string };
-    const { authority } = await inquirer.prompt([
-      { type: 'input', name: 'authority', message: 'Authority:', default: cert.authority?.value ?? '' },
-    ]) as { authority: string };
-    const { startDate } = await inquirer.prompt([
-      { type: 'input', name: 'startDate', message: 'Date (YYYY-MM):', default: cert.startDate?.value ?? '' },
-    ]) as { startDate: string };
+    ])) as { name: string };
+    const { authority } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'authority',
+        message: 'Authority:',
+        default: cert.authority?.value ?? '',
+      },
+    ])) as { authority: string };
+    const { startDate } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'startDate',
+        message: 'Date (YYYY-MM):',
+        default: cert.startDate?.value ?? '',
+      },
+    ])) as { startDate: string };
 
     const newCert: Certification = {
       ...cert,
@@ -702,7 +787,7 @@ async function runProjectsEditor(
       value: `proj:${i}`,
     }));
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
@@ -715,28 +800,31 @@ async function runProjectsEditor(
           { name: c.muted('← Back'), value: 'back' },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') return profile;
 
     if (action === 'add') {
-      const { title } = await inquirer.prompt([
+      const { title } = (await inquirer.prompt([
         { type: 'input', name: 'title', message: 'Project title (required):' },
-      ]) as { title: string };
-      if (!title.trim()) { console.log(c.muted('Title is required.')); continue; }
+      ])) as { title: string };
+      if (!title.trim()) {
+        console.log(c.muted('Title is required.'));
+        continue;
+      }
 
-      const { description } = await inquirer.prompt([
+      const { description } = (await inquirer.prompt([
         { type: 'input', name: 'description', message: 'Description (optional):' },
-      ]) as { description: string };
-      const { url } = await inquirer.prompt([
+      ])) as { description: string };
+      const { url } = (await inquirer.prompt([
         { type: 'input', name: 'url', message: 'URL (optional):' },
-      ]) as { url: string };
-      const { startDate } = await inquirer.prompt([
+      ])) as { url: string };
+      const { startDate } = (await inquirer.prompt([
         { type: 'input', name: 'startDate', message: 'Start date (YYYY-MM, optional):' },
-      ]) as { startDate: string };
-      const { endDate } = await inquirer.prompt([
+      ])) as { startDate: string };
+      const { endDate } = (await inquirer.prompt([
         { type: 'input', name: 'endDate', message: 'End date (YYYY-MM, optional):' },
-      ]) as { endDate: string };
+      ])) as { endDate: string };
 
       const newProj: Project = {
         id: `proj-${Date.now()}`,
@@ -754,7 +842,7 @@ async function runProjectsEditor(
     }
 
     if (action === 'remove') {
-      const { toRemove } = await inquirer.prompt([
+      const { toRemove } = (await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'toRemove',
@@ -764,7 +852,7 @@ async function runProjectsEditor(
             value: i,
           })),
         },
-      ]) as { toRemove: number[] };
+      ])) as { toRemove: number[] };
       if (toRemove.length > 0) {
         const removeSet = new Set(toRemove);
         profile = {
@@ -781,21 +869,36 @@ async function runProjectsEditor(
     const projIdx = parseInt(action.split(':')[1], 10);
     const proj = profile.projects[projIdx];
 
-    const { title } = await inquirer.prompt([
+    const { title } = (await inquirer.prompt([
       { type: 'input', name: 'title', message: 'Title:', default: proj.title.value },
-    ]) as { title: string };
-    const { description } = await inquirer.prompt([
-      { type: 'input', name: 'description', message: 'Description:', default: proj.description?.value ?? '' },
-    ]) as { description: string };
-    const { url } = await inquirer.prompt([
+    ])) as { title: string };
+    const { description } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'description',
+        message: 'Description:',
+        default: proj.description?.value ?? '',
+      },
+    ])) as { description: string };
+    const { url } = (await inquirer.prompt([
       { type: 'input', name: 'url', message: 'URL:', default: proj.url?.value ?? '' },
-    ]) as { url: string };
-    const { startDate } = await inquirer.prompt([
-      { type: 'input', name: 'startDate', message: 'Start date (YYYY-MM):', default: proj.startDate?.value ?? '' },
-    ]) as { startDate: string };
-    const { endDate } = await inquirer.prompt([
-      { type: 'input', name: 'endDate', message: 'End date (YYYY-MM):', default: proj.endDate?.value ?? '' },
-    ]) as { endDate: string };
+    ])) as { url: string };
+    const { startDate } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'startDate',
+        message: 'Start date (YYYY-MM):',
+        default: proj.startDate?.value ?? '',
+      },
+    ])) as { startDate: string };
+    const { endDate } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'endDate',
+        message: 'End date (YYYY-MM):',
+        default: proj.endDate?.value ?? '',
+      },
+    ])) as { endDate: string };
 
     const newProj: Project = {
       ...proj,
@@ -830,10 +933,10 @@ export async function runProfileEditor(options: ProfileEditorOptions): Promise<v
     console.log();
 
     const choices = [
-      { value: 'summary',    name: `Summary` },
+      { value: 'summary', name: `Summary` },
       { value: 'experience', name: `Experience  (${profile.positions.length} positions)` },
-      { value: 'skills',     name: `Skills  (${profile.skills.length})` },
-      { value: 'education',  name: `Education  (${profile.education.length})` },
+      { value: 'skills', name: `Skills  (${profile.skills.length})` },
+      { value: 'education', name: `Education  (${profile.education.length})` },
       ...(profile.certifications.length > 0
         ? [{ value: 'certifications', name: `Certifications  (${profile.certifications.length})` }]
         : []),
@@ -845,7 +948,7 @@ export async function runProfileEditor(options: ProfileEditorOptions): Promise<v
 
     let section: string;
     try {
-      const ans = await inquirer.prompt([
+      const ans = (await inquirer.prompt([
         {
           type: 'list',
           loop: false,
@@ -853,7 +956,7 @@ export async function runProfileEditor(options: ProfileEditorOptions): Promise<v
           message: 'Edit section:',
           choices,
         },
-      ]) as { section: string };
+      ])) as { section: string };
       section = ans.section;
     } catch (err) {
       if (isUserExit(err)) return;

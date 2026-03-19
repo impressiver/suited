@@ -1,12 +1,10 @@
-import { createHash } from 'crypto';
-import { readFile } from 'fs/promises';
-import {
-  loadJobs, saveJob, deleteJob, loadJobRefinement,
-} from '../profile/serializer.js';
-import { fileExists } from '../utils/fs.js';
-import { c } from '../utils/colors.js';
-import { isUserExit } from '../utils/user-exit.js';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import type { SavedJob } from '../profile/schema.js';
+import { deleteJob, loadJobRefinement, loadJobs, saveJob } from '../profile/serializer.js';
+import { c } from '../utils/colors.js';
+import { fileExists } from '../utils/fs.js';
+import { isUserExit } from '../utils/user-exit.js';
 
 export interface JobsOptions {
   profileDir?: string;
@@ -19,7 +17,7 @@ async function viewJob(
 ): Promise<boolean> {
   const refinement = await loadJobRefinement(profileDir, job.id);
   const savedDate = new Date(job.savedAt).toLocaleDateString();
-  const preview = job.text.length > 300 ? job.text.slice(0, 300) + '…' : job.text;
+  const preview = job.text.length > 300 ? `${job.text.slice(0, 300)}…` : job.text;
 
   console.log(`\n  ${c.value(`${job.title} @ ${job.company}`)}`);
   console.log(`  ${c.label('Saved:')} ${savedDate}`);
@@ -30,7 +28,7 @@ async function viewJob(
   }
   console.log(`\n${c.muted(preview)}\n`);
 
-  const { action } = await inquirer.prompt([
+  const { action } = (await inquirer.prompt([
     {
       type: 'list',
       loop: false,
@@ -38,20 +36,20 @@ async function viewJob(
       message: 'Job options:',
       choices: [
         { value: 'delete', name: c.error('Delete this job') },
-        { value: 'back',   name: c.muted('← Back') },
+        { value: 'back', name: c.muted('← Back') },
       ],
     },
-  ]) as { action: string };
+  ])) as { action: string };
 
   if (action === 'delete') {
-    const { confirm } = await inquirer.prompt([
+    const { confirm } = (await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
         message: `Delete "${job.title} @ ${job.company}"?`,
         default: false,
       },
-    ]) as { confirm: boolean };
+    ])) as { confirm: boolean };
 
     if (confirm) {
       await deleteJob(job.id, profileDir);
@@ -78,7 +76,7 @@ export async function runJobs(options: JobsOptions): Promise<void> {
 
     // Build list with preparation status
     const refinementStatuses = await Promise.all(
-      jobs.map(async j => {
+      jobs.map(async (j) => {
         const r = await loadJobRefinement(profileDir, j.id);
         return { job: j, hasPrepared: !!r, preparedDate: r?.createdAt };
       }),
@@ -86,7 +84,7 @@ export async function runJobs(options: JobsOptions): Promise<void> {
 
     const jobChoices = refinementStatuses.map(({ job, hasPrepared, preparedDate }) => {
       const status = hasPrepared
-        ? c.ok + ' ' + c.muted(`prepared ${new Date(preparedDate!).toLocaleDateString()}`)
+        ? `${c.ok} ${c.muted(`prepared ${new Date(preparedDate!).toLocaleDateString()}`)}`
         : c.muted('not prepared');
       return {
         name: `${job.title} @ ${job.company}  ${status}`,
@@ -96,7 +94,7 @@ export async function runJobs(options: JobsOptions): Promise<void> {
 
     let action: string;
     try {
-      const ans = await inquirer.prompt([
+      const ans = (await inquirer.prompt([
         {
           type: 'list',
           loop: false,
@@ -109,7 +107,7 @@ export async function runJobs(options: JobsOptions): Promise<void> {
             { name: c.muted('← Back'), value: '__back__' },
           ],
         },
-      ]) as { action: string };
+      ])) as { action: string };
       action = ans.action;
     } catch (err) {
       if (isUserExit(err)) return;
@@ -120,7 +118,7 @@ export async function runJobs(options: JobsOptions): Promise<void> {
 
     if (action === '__add__') {
       // Ask for source type
-      const { source } = await inquirer.prompt([
+      const { source } = (await inquirer.prompt([
         {
           type: 'list',
           loop: false,
@@ -128,29 +126,33 @@ export async function runJobs(options: JobsOptions): Promise<void> {
           message: 'How would you like to provide the job description?',
           choices: [
             { value: 'paste', name: 'Paste / type text' },
-            { value: 'file',  name: 'File path' },
+            { value: 'file', name: 'File path' },
           ],
         },
-      ]) as { source: string };
+      ])) as { source: string };
 
       let text = '';
 
       if (source === 'file') {
-        const { filePath } = await inquirer.prompt([
+        const { filePath } = (await inquirer.prompt([
           { type: 'input', name: 'filePath', message: 'File path:' },
-        ]) as { filePath: string };
-        if (!await fileExists(filePath.trim())) {
+        ])) as { filePath: string };
+        if (!(await fileExists(filePath.trim()))) {
           console.log(c.error(`File not found: ${filePath}`));
           continue;
         }
         text = await readFile(filePath.trim(), 'utf-8');
       } else {
-        console.log(c.muted('  Paste the job description below. Enter a blank line followed by END to finish.'));
+        console.log(
+          c.muted(
+            '  Paste the job description below. Enter a blank line followed by END to finish.',
+          ),
+        );
         const lines: string[] = [];
         while (true) {
-          const { line } = await inquirer.prompt([
+          const { line } = (await inquirer.prompt([
             { type: 'input', name: 'line', message: '>' },
-          ]) as { line: string };
+          ])) as { line: string };
           if (line.trim() === 'END') break;
           lines.push(line);
         }
@@ -162,12 +164,22 @@ export async function runJobs(options: JobsOptions): Promise<void> {
         continue;
       }
 
-      const { company } = await inquirer.prompt([
-        { type: 'input', name: 'company', message: 'Company name (or leave blank to use placeholder):', default: 'Unknown Company' },
-      ]) as { company: string };
-      const { title } = await inquirer.prompt([
-        { type: 'input', name: 'title', message: 'Job title (or leave blank to use placeholder):', default: 'Unknown Role' },
-      ]) as { title: string };
+      const { company } = (await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'company',
+          message: 'Company name (or leave blank to use placeholder):',
+          default: 'Unknown Company',
+        },
+      ])) as { company: string };
+      const { title } = (await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'title',
+          message: 'Job title (or leave blank to use placeholder):',
+          default: 'Unknown Role',
+        },
+      ])) as { title: string };
 
       const textHash = createHash('sha256').update(text).digest('hex');
       const newJob: SavedJob = {
@@ -186,17 +198,17 @@ export async function runJobs(options: JobsOptions): Promise<void> {
 
     if (action === '__delete__') {
       const currentJobs = await loadJobs(profileDir);
-      const { toDelete } = await inquirer.prompt([
+      const { toDelete } = (await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'toDelete',
           message: 'Select jobs to delete:',
-          choices: currentJobs.map(j => ({
+          choices: currentJobs.map((j) => ({
             name: `${j.title} @ ${j.company}`,
             value: j.id,
           })),
         },
-      ]) as { toDelete: string[] };
+      ])) as { toDelete: string[] };
 
       if (toDelete.length > 0) {
         for (const id of toDelete) {
@@ -208,7 +220,7 @@ export async function runJobs(options: JobsOptions): Promise<void> {
     }
 
     // Viewing a specific job
-    const job = jobs.find(j => j.id === action);
+    const job = jobs.find((j) => j.id === action);
     if (job) {
       await viewJob(inquirer, job, profileDir);
     }

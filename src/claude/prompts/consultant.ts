@@ -1,13 +1,13 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { ResumeDocument, JobAnalysis } from '../../profile/schema.js';
+import type { JobAnalysis, ResumeDocument } from '../../profile/schema.js';
 
 // ---------------------------------------------------------------------------
 // Shared types
 // ---------------------------------------------------------------------------
 
 export interface ConsultantFinding {
-  area: string;       // e.g. "Summary", "Experience bullets", "Skills section"
-  issue: string;      // what's wrong
+  area: string; // e.g. "Summary", "Experience bullets", "Skills section"
+  issue: string; // what's wrong
   suggestion: string; // concrete fix
 }
 
@@ -44,12 +44,14 @@ export const profileEvalTool: Tool = {
     properties: {
       overallScore: {
         type: 'number',
-        description: 'Overall score 1–10. 7 = solid but improvable. 8+ = genuinely strong. Below 6 = significant work needed.',
+        description:
+          'Overall score 1–10. 7 = solid but improvable. 8+ = genuinely strong. Below 6 = significant work needed.',
       },
       strengths: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Specific things that are working well. Be concrete — not just "good experience".',
+        description:
+          'Specific things that are working well. Be concrete — not just "good experience".',
       },
       improvements: {
         type: 'array',
@@ -57,8 +59,11 @@ export const profileEvalTool: Tool = {
           type: 'object',
           required: ['area', 'issue', 'suggestion'],
           properties: {
-            area:       { type: 'string', description: 'Section or element (e.g. "Summary", "Bullet #3 at Acme Corp")' },
-            issue:      { type: 'string', description: 'Specific problem — what is weak or missing' },
+            area: {
+              type: 'string',
+              description: 'Section or element (e.g. "Summary", "Bullet #3 at Acme Corp")',
+            },
+            issue: { type: 'string', description: 'Specific problem — what is weak or missing' },
             suggestion: { type: 'string', description: 'Concrete actionable fix' },
           },
         },
@@ -98,7 +103,8 @@ export const jobEvalTool: Tool = {
     properties: {
       alignmentScore: {
         type: 'number',
-        description: 'Alignment score 1–10. How likely is a recruiter to advance this candidate based on the resume alone.',
+        description:
+          'Alignment score 1–10. How likely is a recruiter to advance this candidate based on the resume alone.',
       },
       strengths: {
         type: 'array',
@@ -111,8 +117,12 @@ export const jobEvalTool: Tool = {
           type: 'object',
           required: ['area', 'issue', 'suggestion'],
           properties: {
-            area:       { type: 'string', description: 'Area of concern (e.g. "Missing skill", "Summary positioning", "Seniority signals")' },
-            issue:      { type: 'string', description: 'What is missing or misaligned' },
+            area: {
+              type: 'string',
+              description:
+                'Area of concern (e.g. "Missing skill", "Summary positioning", "Seniority signals")',
+            },
+            issue: { type: 'string', description: 'What is missing or misaligned' },
             suggestion: { type: 'string', description: 'How to address it' },
           },
         },
@@ -144,8 +154,8 @@ Do NOT generate questions for findings that:
 Be precise: ask for the specific fact needed, not a vague "more details."`;
 
 export interface FeedbackQuestion {
-  findingIndex: number;  // 0-based index into the findings array
-  question: string;      // specific question to ask the candidate
+  findingIndex: number; // 0-based index into the findings array
+  question: string; // specific question to ask the candidate
 }
 
 export interface FeedbackQuestionsOutput {
@@ -154,7 +164,8 @@ export interface FeedbackQuestionsOutput {
 
 export const feedbackQuestionsTool: Tool = {
   name: 'identify_needed_info',
-  description: 'Identify which findings need additional factual info from the candidate, and what to ask',
+  description:
+    'Identify which findings need additional factual info from the candidate, and what to ask',
   input_schema: {
     type: 'object' as const,
     required: ['questions'],
@@ -165,8 +176,14 @@ export const feedbackQuestionsTool: Tool = {
           type: 'object',
           required: ['findingIndex', 'question'],
           properties: {
-            findingIndex: { type: 'number', description: '0-based index of the finding that needs more info' },
-            question:     { type: 'string', description: 'Specific question to ask the candidate — what fact is needed' },
+            findingIndex: {
+              type: 'number',
+              description: '0-based index of the finding that needs more info',
+            },
+            question: {
+              type: 'string',
+              description: 'Specific question to ask the candidate — what fact is needed',
+            },
           },
         },
         description: 'Empty array if no findings need additional information',
@@ -175,14 +192,19 @@ export const feedbackQuestionsTool: Tool = {
   },
 };
 
-export function buildFeedbackQuestionsPrompt(findings: ConsultantFinding[], profileContext: string): string {
+export function buildFeedbackQuestionsPrompt(
+  findings: ConsultantFinding[],
+  profileContext: string,
+): string {
   const lines = [profileContext, '\n## Consultant Findings to Apply'];
   findings.forEach((f, i) => {
     lines.push(`\n[${i}] **${f.area}**`);
     lines.push(`  Issue: ${f.issue}`);
     lines.push(`  Suggestion: ${f.suggestion}`);
   });
-  lines.push('\nFor each finding above, determine if you need a specific fact from the candidate to implement it. Return questions only for findings that genuinely require new information.');
+  lines.push(
+    '\nFor each finding above, determine if you need a specific fact from the candidate to implement it. Return questions only for findings that genuinely require new information.',
+  );
   return lines.join('\n');
 }
 
@@ -196,7 +218,10 @@ Apply ONLY the changes described in the consultant's findings below. Do not make
 Do not add any fact, metric, or technology not already present in the original profile.
 Match the candidate's voice — write how a person writes, not a press release.`;
 
-export function buildProfileFeedbackPrompt(profileText: string, findings: ConsultantFinding[]): string {
+export function buildProfileFeedbackPrompt(
+  profileText: string,
+  findings: ConsultantFinding[],
+): string {
   const lines = [profileText, '\n## Consultant Findings to Apply'];
   findings.forEach((f, i) => {
     lines.push(`\n${i + 1}. **${f.area}**`);
@@ -225,7 +250,8 @@ export interface JobFeedbackOutput {
 
 export const applyJobFeedbackTool: Tool = {
   name: 'apply_job_feedback',
-  description: 'Apply consultant gap findings to improve job alignment. Only return fields that changed.',
+  description:
+    'Apply consultant gap findings to improve job alignment. Only return fields that changed.',
   input_schema: {
     type: 'object' as const,
     required: ['positions'],
@@ -236,19 +262,31 @@ export const applyJobFeedbackTool: Tool = {
           type: 'object',
           required: ['index', 'bullets'],
           properties: {
-            index:   { type: 'number', description: 'Zero-based position index' },
-            bullets: { type: 'array', items: { type: 'string' }, description: 'Full updated bullet list' },
+            index: { type: 'number', description: 'Zero-based position index' },
+            bullets: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Full updated bullet list',
+            },
           },
         },
         description: 'Only include positions where bullets changed',
       },
       summary: { type: 'string', description: 'Updated summary if it changed, omit if unchanged' },
-      skills:  { type: 'array', items: { type: 'string' }, description: 'Full updated skills list if it changed, omit if unchanged' },
+      skills: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Full updated skills list if it changed, omit if unchanged',
+      },
     },
   },
 };
 
-export function buildJobFeedbackPrompt(doc: ResumeDocument, jobAnalysis: JobAnalysis, gaps: ConsultantFinding[]): string {
+export function buildJobFeedbackPrompt(
+  doc: ResumeDocument,
+  jobAnalysis: JobAnalysis,
+  gaps: ConsultantFinding[],
+): string {
   const lines: string[] = [];
 
   lines.push('## Gap Findings to Address');
@@ -258,12 +296,16 @@ export function buildJobFeedbackPrompt(doc: ResumeDocument, jobAnalysis: JobAnal
   });
 
   lines.push('\n## Resume');
-  if (doc.summary) { lines.push(`\nSummary:\n${doc.summary}`); }
+  if (doc.summary) {
+    lines.push(`\nSummary:\n${doc.summary}`);
+  }
 
   lines.push('\n## Experience (indexed from 0)');
   doc.positions.forEach((pos, i) => {
     lines.push(`\n[${i}] ${pos.title} at ${pos.company}`);
-    pos.bullets.forEach(b => lines.push(`  • ${b}`));
+    for (const b of pos.bullets) {
+      lines.push(`  • ${b}`);
+    }
   });
 
   if (doc.skills.length > 0) {

@@ -1,8 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Eta } from 'eta';
-import { readFile } from 'fs/promises';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { ResumeDocument } from '../profile/schema.js';
+import type { ResumeDocument } from '../profile/schema.js';
 import { generateAsciiName } from '../utils/ascii-name.js';
 
 // TEMPLATES_DIR is only used in dev/npm mode (non-SEA). When bundled to CJS
@@ -29,7 +29,10 @@ async function loadTemplateFile(template: string, filename: string): Promise<str
   return readFile(join(TEMPLATES_DIR, template, filename), 'utf-8');
 }
 
-export async function renderResumeHtml(doc: ResumeDocument, fitOverrideCss?: string): Promise<string> {
+export async function renderResumeHtml(
+  doc: ResumeDocument,
+  fitOverrideCss?: string,
+): Promise<string> {
   const templateDir = join(TEMPLATES_DIR, doc.template);
 
   const [templateSrc, css] = await Promise.all([

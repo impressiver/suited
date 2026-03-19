@@ -1,5 +1,5 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { Profile, RefinementQuestion } from '../../profile/schema.js';
+import type { Profile, RefinementQuestion } from '../../profile/schema.js';
 
 // ---------------------------------------------------------------------------
 // Profile serialisation for the prompt
@@ -14,7 +14,9 @@ export function profileToRefineText(profile: Profile): string {
   lines.push('\n## Experience');
   for (const pos of profile.positions) {
     const end = pos.endDate?.value ?? 'Present';
-    lines.push(`\n### ${pos.id}: ${pos.title.value} at ${pos.company.value} (${pos.startDate.value} – ${end})`);
+    lines.push(
+      `\n### ${pos.id}: ${pos.title.value} at ${pos.company.value} (${pos.startDate.value} – ${end})`,
+    );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');
     } else {
@@ -24,7 +26,7 @@ export function profileToRefineText(profile: Profile): string {
 
   if (profile.skills.length > 0) {
     lines.push('\n## Skills');
-    lines.push(profile.skills.map(s => s.name.value).join(', '));
+    lines.push(profile.skills.map((s) => s.name.value).join(', '));
   }
 
   if (profile.education.length > 0) {
@@ -88,8 +90,14 @@ export const questionsToolSchema: Tool = {
           required: ['id', 'targetId', 'context', 'question', 'optional'],
           properties: {
             id: { type: 'string', description: 'Unique ID, e.g. "q-0"' },
-            targetId: { type: 'string', description: 'Profile section: a position id (e.g. "pos-0"), "summary", or "skills"' },
-            context: { type: 'string', description: 'Brief framing, e.g. "Senior Engineer at Acme Corp (2020–2022)"' },
+            targetId: {
+              type: 'string',
+              description: 'Profile section: a position id (e.g. "pos-0"), "summary", or "skills"',
+            },
+            context: {
+              type: 'string',
+              description: 'Brief framing, e.g. "Senior Engineer at Acme Corp (2020–2022)"',
+            },
             question: { type: 'string' },
             optional: { type: 'boolean' },
           },
@@ -124,7 +132,8 @@ export const refinementsToolSchema: Tool = {
     properties: {
       positionRefinements: {
         type: 'array',
-        description: 'Positions whose bullet points need to change. Only include if bullets themselves are being edited — NOT for removing positions or sections.',
+        description:
+          'Positions whose bullet points need to change. Only include if bullets themselves are being edited — NOT for removing positions or sections.',
         items: {
           type: 'object',
           required: ['positionId', 'bullets'],
@@ -144,22 +153,26 @@ export const refinementsToolSchema: Tool = {
       },
       addedSkills: {
         type: 'array',
-        description: 'New skills to add on top of existing ones. Omit if using replacedSkills or not adding skills.',
+        description:
+          'New skills to add on top of existing ones. Omit if using replacedSkills or not adding skills.',
         items: { type: 'string' },
       },
       replacedSkills: {
         type: 'array',
-        description: 'Complete replacement for the entire skills list — use this to clean up and reformat LinkedIn-imported skills for resume use. Omit if skills are not being changed. Each array entry must be a SINGLE skill name — never bundle multiple skills into one string and never use category labels (e.g. "Languages: Python, Go" is wrong; output "Python" and "Go" as separate entries).',
+        description:
+          'Complete replacement for the entire skills list — use this to clean up and reformat LinkedIn-imported skills for resume use. Omit if skills are not being changed. Each array entry must be a SINGLE skill name — never bundle multiple skills into one string and never use category labels (e.g. "Languages: Python, Go" is wrong; output "Python" and "Go" as separate entries).',
         items: { type: 'string' },
       },
       removeSections: {
         type: 'array',
-        description: 'Sections to remove entirely. Use this — not positionRefinements — when the instruction is to remove a whole section. Valid values: "projects", "certifications", "languages", "volunteer", "awards", "skills", "education", "summary".',
+        description:
+          'Sections to remove entirely. Use this — not positionRefinements — when the instruction is to remove a whole section. Valid values: "projects", "certifications", "languages", "volunteer", "awards", "skills", "education", "summary".',
         items: { type: 'string' },
       },
       removePositionIds: {
         type: 'array',
-        description: 'IDs of positions to remove from the experience section entirely (e.g. ["pos-2"]). Use this when the instruction is to remove a specific role — do not use positionRefinements for this.',
+        description:
+          'IDs of positions to remove from the experience section entirely (e.g. ["pos-2"]). Use this when the instruction is to remove a specific role — do not use positionRefinements for this.',
         items: { type: 'string' },
       },
     },

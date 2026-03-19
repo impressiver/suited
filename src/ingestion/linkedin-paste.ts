@@ -1,12 +1,12 @@
-import { createHash } from 'crypto';
-import { Profile, Sourced, DataSource } from '../profile/schema.js';
+import { createHash } from 'node:crypto';
 import { callWithTool } from '../claude/client.js';
 import {
   PARSE_LINKEDIN_SYSTEM,
+  type ParsedLinkedInProfile,
   parseLinkedInTool,
-  ParsedLinkedInProfile,
 } from '../claude/prompts/parse-linkedin.js';
-import { normalizeDate, splitBullets, deduplicateSkills } from './normalizer.js';
+import type { DataSource, Profile, Sourced } from '../profile/schema.js';
+import { deduplicateSkills, normalizeDate, splitBullets } from './normalizer.js';
 
 function makeSource(inputHash: string): DataSource {
   return { kind: 'linkedin-paste', extractedBy: 'claude', inputHash };

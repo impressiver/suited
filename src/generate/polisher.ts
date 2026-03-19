@@ -1,7 +1,7 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { JobAnalysis, ResumeDocument } from '../profile/schema.js';
 import { callWithTool } from '../claude/client.js';
-import { JOB_TAILORED_POLISH_SYSTEM, CONTENT_TWEAK_SYSTEM } from '../claude/prompts/refine.js';
+import { CONTENT_TWEAK_SYSTEM, JOB_TAILORED_POLISH_SYSTEM } from '../claude/prompts/refine.js';
+import type { JobAnalysis, ResumeDocument } from '../profile/schema.js';
 
 // ---------------------------------------------------------------------------
 // Tool schema
@@ -14,7 +14,8 @@ interface PolishOutput {
 
 const polishTool: Tool = {
   name: 'polish_resume',
-  description: 'Return polished bullets for positions that were improved. Only include positions where at least one bullet changed.',
+  description:
+    'Return polished bullets for positions that were improved. Only include positions where at least one bullet changed.',
   input_schema: {
     type: 'object' as const,
     required: ['positions'],
@@ -25,11 +26,15 @@ const polishTool: Tool = {
           type: 'object',
           required: ['index', 'bullets'],
           properties: {
-            index: { type: 'number', description: 'Zero-based index of the position in the positions array' },
+            index: {
+              type: 'number',
+              description: 'Zero-based index of the position in the positions array',
+            },
             bullets: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Complete polished bullet list for this position (same length as original)',
+              description:
+                'Complete polished bullet list for this position (same length as original)',
             },
           },
         },
@@ -67,18 +72,26 @@ function buildPolishPrompt(doc: ResumeDocument, jobAnalysis: JobAnalysis): strin
 
   lines.push('## Experience (positions indexed from 0)');
   doc.positions.forEach((pos, i) => {
-    lines.push(`\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`);
+    lines.push(
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+    );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');
     } else {
-      pos.bullets.forEach(b => lines.push(`  • ${b}`));
+      for (const b of pos.bullets) {
+        lines.push(`  • ${b}`);
+      }
     }
   });
 
   lines.push('');
   lines.push(`## Instructions`);
-  lines.push(`Polish the experience bullets to better position the candidate for ${jobAnalysis.title} at ${jobAnalysis.company}.`);
-  lines.push('- Bring forward relevance to the must-have qualifications where it exists in the original text.');
+  lines.push(
+    `Polish the experience bullets to better position the candidate for ${jobAnalysis.title} at ${jobAnalysis.company}.`,
+  );
+  lines.push(
+    '- Bring forward relevance to the must-have qualifications where it exists in the original text.',
+  );
   lines.push('- Do not add any fact, technology, or metric not in the original.');
   lines.push('- Only return positions where you actually improved a bullet.');
 
@@ -137,11 +150,15 @@ function buildTweakPrompt(doc: ResumeDocument, instruction: string): string {
 
   lines.push('## Experience (positions indexed from 0)');
   doc.positions.forEach((pos, i) => {
-    lines.push(`\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`);
+    lines.push(
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+    );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');
     } else {
-      pos.bullets.forEach(b => lines.push(`  • ${b}`));
+      for (const b of pos.bullets) {
+        lines.push(`  • ${b}`);
+      }
     }
   });
 

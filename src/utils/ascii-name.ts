@@ -15,7 +15,7 @@ export function generateAsciiName(name: string): string {
     while (lines.length > 0 && lines[0].trim() === '') lines.shift();
     while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
     return lines
-      .map((line: string) => line.replace(/\S+/g, (m: string) => '░' + '█'.repeat(m.length - 1)))
+      .map((line: string) => line.replace(/\S+/g, (m: string) => `░${'█'.repeat(m.length - 1)}`))
       .join('\n');
   } catch {
     return name.toUpperCase();

@@ -8,7 +8,7 @@ const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ---------------------------------------------------------------------------
@@ -20,9 +20,7 @@ type Backend = 'anthropic' | 'openrouter';
 function getBackend(): Backend {
   if (process.env.OPENROUTER_API_KEY) return 'openrouter';
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
-  throw new Error(
-    'No API key found. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env',
-  );
+  throw new Error('No API key found. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env');
 }
 
 let _anthropic: Anthropic | null = null;
@@ -70,11 +68,9 @@ function isRetryable(err: unknown): boolean {
 }
 
 function retryDelay(attempt: number, err: unknown): number {
-  const base = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+  const base = BASE_DELAY_MS * 2 ** (attempt - 1);
   const status =
-    err instanceof APIError || err instanceof OpenAI.APIError
-      ? ` (HTTP ${err.status})`
-      : '';
+    err instanceof APIError || err instanceof OpenAI.APIError ? ` (HTTP ${err.status})` : '';
   console.error(
     `API call failed${status}, retrying in ${base}ms (attempt ${attempt}/${MAX_RETRIES})`,
   );
@@ -101,7 +97,7 @@ async function callAnthropicTool<T>(
     messages: [{ role: 'user', content: userMessage }],
   });
 
-  const toolUse = response.content.find(b => b.type === 'tool_use');
+  const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
     throw new Error('Claude did not return a tool_use block');
   }

@@ -1,12 +1,18 @@
-import {
-  loadActiveProfile, loadRefined, saveRefined, saveSource, saveContactMeta,
-  refinedJsonPath, refinedMdPath, sourceMdPath,
-} from '../profile/serializer.js';
-import { isUserExit } from '../utils/user-exit.js';
 import { profileToMarkdown } from '../profile/markdown.js';
-import { fileExists } from '../utils/fs.js';
+import type { ContactMeta, Profile, Sourced } from '../profile/schema.js';
+import {
+  loadActiveProfile,
+  loadRefined,
+  refinedJsonPath,
+  refinedMdPath,
+  saveContactMeta,
+  saveRefined,
+  saveSource,
+  sourceMdPath,
+} from '../profile/serializer.js';
 import { c } from '../utils/colors.js';
-import type { Profile, Sourced, ContactMeta } from '../profile/schema.js';
+import { fileExists } from '../utils/fs.js';
+import { isUserExit } from '../utils/user-exit.js';
 
 export interface ContactOptions {
   profileDir?: string;
@@ -16,10 +22,7 @@ function userEdit(value: string): Sourced<string> {
   return { value, source: { kind: 'user-edit' as const, editedAt: new Date().toISOString() } };
 }
 
-async function persistProfileAndContact(
-  profile: Profile,
-  profileDir: string,
-): Promise<void> {
+async function persistProfileAndContact(profile: Profile, profileDir: string): Promise<void> {
   // Save to active profile (refined or source)
   if (await fileExists(refinedJsonPath(profileDir))) {
     const refined = await loadRefined(profileDir);
@@ -45,7 +48,7 @@ async function persistProfileAndContact(
 
 function displayContactFields(profile: Profile): void {
   const contact = profile.contact;
-  const val = (v: Sourced<string> | undefined) => v ? c.value(v.value) : c.muted('(blank)');
+  const val = (v: Sourced<string> | undefined) => (v ? c.value(v.value) : c.muted('(blank)'));
 
   console.log();
   console.log(`  ${c.label('Name:')}      ${val(contact.name)}`);
@@ -71,7 +74,7 @@ export async function runContact(options: ContactOptions): Promise<void> {
 
     let action: string;
     try {
-      const ans = await inquirer.prompt([
+      const ans = (await inquirer.prompt([
         {
           type: 'list',
           loop: false,
@@ -82,7 +85,7 @@ export async function runContact(options: ContactOptions): Promise<void> {
             { value: 'back', name: c.muted('← Back') },
           ],
         },
-      ]) as { action: string };
+      ])) as { action: string };
       action = ans.action;
     } catch (err) {
       if (isUserExit(err)) return;
@@ -92,50 +95,59 @@ export async function runContact(options: ContactOptions): Promise<void> {
     if (action === 'back') return;
 
     // Pick which field
-    const { field } = await inquirer.prompt([
+    const { field } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
         name: 'field',
         message: 'Which field?',
         choices: [
-          { value: 'name',     name: `Name       ${profile.contact.name.value}` },
+          { value: 'name', name: `Name       ${profile.contact.name.value}` },
           { value: 'headline', name: `Headline   ${profile.contact.headline?.value ?? '(blank)'}` },
-          { value: 'email',    name: `Email      ${profile.contact.email?.value ?? '(blank)'}` },
-          { value: 'phone',    name: `Phone      ${profile.contact.phone?.value ?? '(blank)'}` },
+          { value: 'email', name: `Email      ${profile.contact.email?.value ?? '(blank)'}` },
+          { value: 'phone', name: `Phone      ${profile.contact.phone?.value ?? '(blank)'}` },
           { value: 'location', name: `Location   ${profile.contact.location?.value ?? '(blank)'}` },
           { value: 'linkedin', name: `LinkedIn   ${profile.contact.linkedin?.value ?? '(blank)'}` },
-          { value: 'website',  name: `Website    ${profile.contact.website?.value ?? '(blank)'}` },
-          { value: 'github',   name: `GitHub     ${profile.contact.github?.value ?? '(blank)'}` },
-          { value: 'cancel',   name: c.muted('← Cancel') },
+          { value: 'website', name: `Website    ${profile.contact.website?.value ?? '(blank)'}` },
+          { value: 'github', name: `GitHub     ${profile.contact.github?.value ?? '(blank)'}` },
+          { value: 'cancel', name: c.muted('← Cancel') },
         ],
       },
-    ]) as { field: string };
+    ])) as { field: string };
 
     if (field === 'cancel') continue;
 
     const currentValue = (() => {
       switch (field) {
-        case 'name':     return profile.contact.name.value;
-        case 'headline': return profile.contact.headline?.value ?? '';
-        case 'email':    return profile.contact.email?.value ?? '';
-        case 'phone':    return profile.contact.phone?.value ?? '';
-        case 'location': return profile.contact.location?.value ?? '';
-        case 'linkedin': return profile.contact.linkedin?.value ?? '';
-        case 'website':  return profile.contact.website?.value ?? '';
-        case 'github':   return profile.contact.github?.value ?? '';
-        default:         return '';
+        case 'name':
+          return profile.contact.name.value;
+        case 'headline':
+          return profile.contact.headline?.value ?? '';
+        case 'email':
+          return profile.contact.email?.value ?? '';
+        case 'phone':
+          return profile.contact.phone?.value ?? '';
+        case 'location':
+          return profile.contact.location?.value ?? '';
+        case 'linkedin':
+          return profile.contact.linkedin?.value ?? '';
+        case 'website':
+          return profile.contact.website?.value ?? '';
+        case 'github':
+          return profile.contact.github?.value ?? '';
+        default:
+          return '';
       }
     })();
 
-    const { newValue } = await inquirer.prompt([
+    const { newValue } = (await inquirer.prompt([
       {
         type: 'input',
         name: 'newValue',
         message: `New value for ${field}:`,
         default: currentValue,
       },
-    ]) as { newValue: string };
+    ])) as { newValue: string };
 
     const trimmed = newValue.trim();
     if (trimmed === currentValue) {
@@ -145,14 +157,30 @@ export async function runContact(options: ContactOptions): Promise<void> {
 
     const contact = { ...profile.contact };
     switch (field) {
-      case 'name':     contact.name     = userEdit(trimmed || contact.name.value); break;
-      case 'headline': contact.headline = trimmed ? userEdit(trimmed) : undefined; break;
-      case 'email':    contact.email    = trimmed ? userEdit(trimmed) : undefined; break;
-      case 'phone':    contact.phone    = trimmed ? userEdit(trimmed) : undefined; break;
-      case 'location': contact.location = trimmed ? userEdit(trimmed) : undefined; break;
-      case 'linkedin': contact.linkedin = trimmed ? userEdit(trimmed) : undefined; break;
-      case 'website':  contact.website  = trimmed ? userEdit(trimmed) : undefined; break;
-      case 'github':   contact.github   = trimmed ? userEdit(trimmed) : undefined; break;
+      case 'name':
+        contact.name = userEdit(trimmed || contact.name.value);
+        break;
+      case 'headline':
+        contact.headline = trimmed ? userEdit(trimmed) : undefined;
+        break;
+      case 'email':
+        contact.email = trimmed ? userEdit(trimmed) : undefined;
+        break;
+      case 'phone':
+        contact.phone = trimmed ? userEdit(trimmed) : undefined;
+        break;
+      case 'location':
+        contact.location = trimmed ? userEdit(trimmed) : undefined;
+        break;
+      case 'linkedin':
+        contact.linkedin = trimmed ? userEdit(trimmed) : undefined;
+        break;
+      case 'website':
+        contact.website = trimmed ? userEdit(trimmed) : undefined;
+        break;
+      case 'github':
+        contact.github = trimmed ? userEdit(trimmed) : undefined;
+        break;
     }
 
     profile = { ...profile, contact };

@@ -11,11 +11,11 @@
  * Use responsibly and only on your own profile.
  */
 
-import puppeteer, { type Browser, type Page, type CookieData } from 'puppeteer-core';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import puppeteer, { type Browser, type CookieData, type Page } from 'puppeteer-core';
 import { findChromePath } from '../utils/chrome.js';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { homedir } from 'os';
 import { fileExists } from '../utils/fs.js';
 
 const SESSION_DIR = join(homedir(), '.suited');
@@ -45,8 +45,8 @@ async function loadSession(): Promise<CookieData[]> {
 
 async function saveSession(cookies: CookieData[]): Promise<void> {
   // Only persist LinkedIn cookies — don't bleed third-party cookies from the session
-  const linkedInCookies = cookies.filter(c =>
-    typeof c.domain === 'string' && c.domain.includes('linkedin.com'),
+  const linkedInCookies = cookies.filter(
+    (c) => typeof c.domain === 'string' && c.domain.includes('linkedin.com'),
   );
   try {
     await mkdir(SESSION_DIR, { recursive: true });
@@ -97,10 +97,7 @@ async function isLoggedIn(page: Page): Promise<boolean> {
 // Login flow
 // ---------------------------------------------------------------------------
 
-async function login(
-  page: Page,
-  credentials: { email: string; password: string },
-): Promise<void> {
+async function login(page: Page, credentials: { email: string; password: string }): Promise<void> {
   console.log('  Logging in to LinkedIn...');
 
   await page.goto('https://www.linkedin.com/login', { waitUntil: 'networkidle2' });
@@ -137,7 +134,7 @@ async function login(
     if ((err as Error).message?.includes('timeout')) {
       throw new Error(
         'LinkedIn did not redirect after login — the credentials may be wrong, ' +
-        'or LinkedIn is showing a CAPTCHA. Re-run with --headed to complete it manually.',
+          'or LinkedIn is showing a CAPTCHA. Re-run with --headed to complete it manually.',
       );
     }
     throw err;
@@ -148,14 +145,14 @@ async function login(
   if (url.includes('checkpoint') || url.includes('challenge')) {
     throw new Error(
       'LinkedIn requires a security verification step (2FA / CAPTCHA). ' +
-      'Re-run with --headed to complete it manually.',
+        'Re-run with --headed to complete it manually.',
     );
   }
 
   if (isAuthWall(url)) {
     throw new Error(
       'Login failed — incorrect credentials or LinkedIn is blocking the login. ' +
-      'Double-check your email and password.',
+        'Double-check your email and password.',
     );
   }
 
@@ -168,7 +165,7 @@ async function login(
 
 async function scrollAndWait(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       let totalScrolled = 0;
       const step = 600;
       const interval = setInterval(() => {
@@ -182,7 +179,7 @@ async function scrollAndWait(page: Page): Promise<void> {
     });
   });
   await page.evaluate(() => window.scrollTo(0, 0));
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise((r) => setTimeout(r, 800));
 }
 
 /**
@@ -206,8 +203,10 @@ async function expandInlineContent(page: Page): Promise<void> {
     try {
       const els = await page.$$(sel);
       for (const el of els) {
-        await el.click().catch(() => {/* detached or obscured — skip */});
-        await new Promise(r => setTimeout(r, 300));
+        await el.click().catch(() => {
+          /* detached or obscured — skip */
+        });
+        await new Promise((r) => setTimeout(r, 300));
       }
     } catch {
       // Selector absent on this profile — fine
@@ -228,7 +227,9 @@ async function collectDetailUrls(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const seen = new Set<string>();
     const urls: string[] = [];
-    for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/details/"]'))) {
+    for (const a of Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('a[href*="/details/"]'),
+    )) {
       // Normalize: strip query-string and fragment, ensure trailing slash
       const normalized = a.href.split('?')[0].split('#')[0].replace(/\/*$/, '/');
       if (!seen.has(normalized)) {
@@ -260,11 +261,13 @@ async function loadAllOnDetailPage(page: Page): Promise<void> {
         const btn = await page.$(sel);
         if (btn) {
           await btn.click();
-          await new Promise(r => setTimeout(r, 1_200));
+          await new Promise((r) => setTimeout(r, 1_200));
           clicked = true;
           break;
         }
-      } catch { /* gone — fine */ }
+      } catch {
+        /* gone — fine */
+      }
     }
     if (!clicked) break;
   }
@@ -309,20 +312,20 @@ function assertLooksLikeProfile(text: string, originalUrl: string): void {
     if (lower.includes(signal)) {
       throw new Error(
         `The extracted page text looks like a login or redirect page, not a profile.\n` +
-        `Matched phrase: "${signal}"\n` +
-        `The session may have expired. Re-run with --clear-session to re-authenticate.`,
+          `Matched phrase: "${signal}"\n` +
+          `The session may have expired. Re-run with --clear-session to re-authenticate.`,
       );
     }
   }
 
   const profileSignals = ['experience', 'education', 'skills', 'about'];
-  const hasProfileContent = profileSignals.some(s => lower.includes(s));
+  const hasProfileContent = profileSignals.some((s) => lower.includes(s));
   if (!hasProfileContent) {
     throw new Error(
       `The extracted page text does not contain recognisable profile sections ` +
-      `(experience, education, skills, about).\n` +
-      `URL: ${originalUrl}\n` +
-      `Check that the URL points to a public LinkedIn profile.`,
+        `(experience, education, skills, about).\n` +
+        `URL: ${originalUrl}\n` +
+        `Check that the URL points to a public LinkedIn profile.`,
     );
   }
 }
@@ -346,7 +349,9 @@ async function extractProfileText(page: Page): Promise<string> {
   });
 
   if (!text || text.length < 100) {
-    throw new Error('Extracted profile text is too short — the page may not have loaded correctly.');
+    throw new Error(
+      'Extracted profile text is too short — the page may not have loaded correctly.',
+    );
   }
 
   return text;
@@ -365,7 +370,7 @@ function validateAndNormaliseUrl(raw: string): string {
   if (!m || !m[1]) {
     throw new Error(
       `"${raw}" does not look like a LinkedIn profile URL.\n` +
-      'Expected format: https://www.linkedin.com/in/your-username',
+        'Expected format: https://www.linkedin.com/in/your-username',
     );
   }
   // Strip query-string and fragments — use only the canonical profile URL
@@ -413,11 +418,11 @@ async function waitForManualLogin(page: Page): Promise<void> {
   const deadline = Date.now() + TIMEOUT_MS;
 
   while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, POLL_MS));
+    await new Promise((r) => setTimeout(r, POLL_MS));
     // li_at is LinkedIn's primary session cookie — present immediately after
     // a successful login regardless of which page the browser has landed on.
     const cookies = await page.cookies('https://www.linkedin.com');
-    if (cookies.some(c => c.name === 'li_at')) {
+    if (cookies.some((c) => c.name === 'li_at')) {
       console.log('  ✓ Logged in');
       return;
     }
@@ -445,16 +450,18 @@ export async function scrapeLinkedInProfile(
   let browser: Browser | undefined;
 
   try {
-    browser = await puppeteer.launch({
-      headless: !options.headed,
-      executablePath: findChromePath(),
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    }).catch(err => {
-      throw new Error(
-        `Failed to launch Chrome: ${(err as Error).message}\n` +
-        'Make sure Chrome is installed, or set the CHROME_PATH environment variable.',
-      );
-    });
+    browser = await puppeteer
+      .launch({
+        headless: !options.headed,
+        executablePath: findChromePath(),
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      })
+      .catch((err) => {
+        throw new Error(
+          `Failed to launch Chrome: ${(err as Error).message}\n` +
+            'Make sure Chrome is installed, or set the CHROME_PATH environment variable.',
+        );
+      });
 
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
@@ -503,7 +510,7 @@ export async function scrapeLinkedInProfile(
       await gotoProfile(page, url);
 
       // Save session after confirmed successful navigation to the profile
-      await saveSession(await page.cookies() as CookieData[]);
+      await saveSession((await page.cookies()) as CookieData[]);
       console.log(`  Session saved to ${SESSION_FILE}`);
     }
 
@@ -511,7 +518,7 @@ export async function scrapeLinkedInProfile(
     if (isAuthWall(page.url())) {
       throw new Error(
         'Landed on an auth wall after navigating to the profile. ' +
-        'Run with --clear-session to force re-authentication.',
+          'Run with --clear-session to force re-authentication.',
       );
     }
 
@@ -524,9 +531,11 @@ export async function scrapeLinkedInProfile(
 
     // Step 2: collect all "Show all {section}" detail sub-page links
     const detailUrls = await collectDetailUrls(page);
-    console.log(`  Found ${detailUrls.length} detail section(s): ${
-      detailUrls.map(u => u.match(/\/details\/([^/]+)/)?.[1] ?? u).join(', ')
-    }`);
+    console.log(
+      `  Found ${detailUrls.length} detail section(s): ${detailUrls
+        .map((u) => u.match(/\/details\/([^/]+)/)?.[1] ?? u)
+        .join(', ')}`,
+    );
 
     // Step 3: visit each detail page and extract its full content
     const sectionTexts: string[] = [profileText];
@@ -555,7 +564,7 @@ export async function scrapeLinkedInProfile(
     console.log(`  ✓ Extracted ~${Math.round(text.length / 1000)}KB of profile text`);
 
     // Refresh cookies once — after a fully successful scrape
-    await saveSession(await page.cookies() as CookieData[]);
+    await saveSession((await page.cookies()) as CookieData[]);
 
     return text;
   } finally {

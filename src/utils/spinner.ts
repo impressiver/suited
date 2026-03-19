@@ -5,10 +5,12 @@ import chalk from 'chalk';
  */
 export function createSpinner(text: string) {
   if (!process.stdout.isTTY) {
-    process.stdout.write(text + '\n');
+    process.stdout.write(`${text}\n`);
     return {
-      stop:    () => {},
-      succeed: (msg?: string) => { if (msg) console.log(msg); },
+      stop: () => {},
+      succeed: (msg?: string) => {
+        if (msg) console.log(msg);
+      },
     };
   }
 

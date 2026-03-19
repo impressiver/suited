@@ -20,7 +20,7 @@ export interface Sourced<T> {
 
 export interface ContactInfo {
   name: Sourced<string>;
-  headline?: Sourced<string>;  // current professional title / tagline
+  headline?: Sourced<string>; // current professional title / tagline
   email?: Sourced<string>;
   phone?: Sourced<string>;
   location?: Sourced<string>;
@@ -30,14 +30,14 @@ export interface ContactInfo {
 }
 
 export interface Position {
-  id: string;                          // e.g. "pos-0", "pos-1"
+  id: string; // e.g. "pos-0", "pos-1"
   title: Sourced<string>;
   company: Sourced<string>;
   location?: Sourced<string>;
-  startDate: Sourced<string>;          // normalized to YYYY-MM or YYYY
-  endDate?: Sourced<string>;           // undefined = present
-  description?: Sourced<string>;       // raw description from LinkedIn
-  bullets: Sourced<string>[];          // split from description
+  startDate: Sourced<string>; // normalized to YYYY-MM or YYYY
+  endDate?: Sourced<string>; // undefined = present
+  description?: Sourced<string>; // raw description from LinkedIn
+  bullets: Sourced<string>[]; // split from description
 }
 
 export interface Education {
@@ -171,7 +171,7 @@ export type TemplateName = 'classic' | 'modern' | 'bold' | 'retro' | 'timeline';
 
 export interface CuratedPosition {
   positionId: string;
-  bulletRefs: string[];  // stable IDs like "b:pos-0:2" — validated by accuracy guard
+  bulletRefs: string[]; // stable IDs like "b:pos-0:2" — validated by accuracy guard
 }
 
 export interface CurationPlan {
@@ -180,7 +180,7 @@ export interface CurationPlan {
   selectedProjectIds: string[];
   selectedEducationIds: string[];
   selectedCertificationIds: string[];
-  summaryRef: string | null;   // "summary" or null
+  summaryRef: string | null; // "summary" or null
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ export interface ResumeEducation {
 export interface ResumeDocument {
   contact: {
     name: string;
-    headline?: string;  // current professional title / tagline
+    headline?: string; // current professional title / tagline
     email?: string;
     phone?: string;
     location?: string;
@@ -239,7 +239,11 @@ export interface ResumeDocument {
 
 const DataSourceSchema = z.union([
   z.object({ kind: z.literal('linkedin-export'), file: z.string(), field: z.string() }),
-  z.object({ kind: z.literal('linkedin-paste'), extractedBy: z.literal('claude'), inputHash: z.string() }),
+  z.object({
+    kind: z.literal('linkedin-paste'),
+    extractedBy: z.literal('claude'),
+    inputHash: z.string(),
+  }),
   z.object({ kind: z.literal('user-edit'), editedAt: z.string() }),
 ]);
 
@@ -287,53 +291,65 @@ export const ProfileSchema: z.ZodType<Profile> = z.object({
   positions: z.array(PositionSchema),
   education: z.array(EducationSchema),
   skills: z.array(z.object({ id: z.string(), name: sourced(z.string()) })),
-  certifications: z.array(z.object({
-    id: z.string(),
-    name: sourced(z.string()),
-    authority: sourced(z.string()).optional(),
-    startDate: sourced(z.string()).optional(),
-    endDate: sourced(z.string()).optional(),
-    licenseNumber: sourced(z.string()).optional(),
-    url: sourced(z.string()).optional(),
-  })),
-  projects: z.array(z.object({
-    id: z.string(),
-    title: sourced(z.string()),
-    description: sourced(z.string()).optional(),
-    url: sourced(z.string()).optional(),
-    startDate: sourced(z.string()).optional(),
-    endDate: sourced(z.string()).optional(),
-  })),
-  publications: z.array(z.object({
-    id: z.string(),
-    title: sourced(z.string()),
-    publisher: sourced(z.string()).optional(),
-    publishedOn: sourced(z.string()).optional(),
-    description: sourced(z.string()).optional(),
-    url: sourced(z.string()).optional(),
-  })),
-  languages: z.array(z.object({
-    id: z.string(),
-    name: sourced(z.string()),
-    proficiency: sourced(z.string()).optional(),
-  })),
-  volunteer: z.array(z.object({
-    id: z.string(),
-    organization: sourced(z.string()),
-    role: sourced(z.string()).optional(),
-    cause: sourced(z.string()).optional(),
-    startDate: sourced(z.string()).optional(),
-    endDate: sourced(z.string()).optional(),
-    description: sourced(z.string()).optional(),
-  })),
+  certifications: z.array(
+    z.object({
+      id: z.string(),
+      name: sourced(z.string()),
+      authority: sourced(z.string()).optional(),
+      startDate: sourced(z.string()).optional(),
+      endDate: sourced(z.string()).optional(),
+      licenseNumber: sourced(z.string()).optional(),
+      url: sourced(z.string()).optional(),
+    }),
+  ),
+  projects: z.array(
+    z.object({
+      id: z.string(),
+      title: sourced(z.string()),
+      description: sourced(z.string()).optional(),
+      url: sourced(z.string()).optional(),
+      startDate: sourced(z.string()).optional(),
+      endDate: sourced(z.string()).optional(),
+    }),
+  ),
+  publications: z.array(
+    z.object({
+      id: z.string(),
+      title: sourced(z.string()),
+      publisher: sourced(z.string()).optional(),
+      publishedOn: sourced(z.string()).optional(),
+      description: sourced(z.string()).optional(),
+      url: sourced(z.string()).optional(),
+    }),
+  ),
+  languages: z.array(
+    z.object({
+      id: z.string(),
+      name: sourced(z.string()),
+      proficiency: sourced(z.string()).optional(),
+    }),
+  ),
+  volunteer: z.array(
+    z.object({
+      id: z.string(),
+      organization: sourced(z.string()),
+      role: sourced(z.string()).optional(),
+      cause: sourced(z.string()).optional(),
+      startDate: sourced(z.string()).optional(),
+      endDate: sourced(z.string()).optional(),
+      description: sourced(z.string()).optional(),
+    }),
+  ),
   awards: z.array(sourced(z.string())),
 });
 
 export const CurationPlanSchema: z.ZodType<CurationPlan> = z.object({
-  selectedPositions: z.array(z.object({
-    positionId: z.string(),
-    bulletRefs: z.array(z.string()),
-  })),
+  selectedPositions: z.array(
+    z.object({
+      positionId: z.string(),
+      bulletRefs: z.array(z.string()),
+    }),
+  ),
   selectedSkillIds: z.array(z.string()),
   selectedProjectIds: z.array(z.string()),
   selectedEducationIds: z.array(z.string()),
@@ -375,7 +391,7 @@ export interface RefinedData {
 
 /** Plain-string contact fields entered by the user, persisted in contact.json. */
 export interface ContactMeta {
-  headline?: string;  // current professional title / tagline
+  headline?: string; // current professional title / tagline
   email?: string;
   phone?: string;
   location?: string;

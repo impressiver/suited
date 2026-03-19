@@ -1,5 +1,5 @@
-import { stat } from 'fs/promises';
-import { extname } from 'path';
+import { stat } from 'node:fs/promises';
+import { extname } from 'node:path';
 import { findCsvDir } from '../utils/zip.js';
 
 export type InputKind = 'linkedin-url' | 'export-zip' | 'export-dir' | 'paste-text';

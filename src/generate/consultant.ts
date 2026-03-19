@@ -1,17 +1,26 @@
-import { callWithTool } from '../claude/client.js';
-import { profileToRefineText } from '../claude/prompts/refine.js';
-import {
-  PROFILE_CONSULTANT_SYSTEM, profileEvalTool, ProfileEvaluation,
-  JOB_CONSULTANT_SYSTEM, jobEvalTool, JobEvaluation,
-  resumeDocToConsultantText,
-  APPLY_JOB_FEEDBACK_SYSTEM, applyJobFeedbackTool, JobFeedbackOutput,
-  buildJobFeedbackPrompt, ConsultantFinding,
-  FEEDBACK_QUESTIONS_SYSTEM, feedbackQuestionsTool, FeedbackQuestionsOutput,
-  buildFeedbackQuestionsPrompt,
-} from '../claude/prompts/consultant.js';
-import { Profile, ResumeDocument, JobAnalysis } from '../profile/schema.js';
-import { c } from '../utils/colors.js';
 import chalk from 'chalk';
+import { callWithTool } from '../claude/client.js';
+import {
+  APPLY_JOB_FEEDBACK_SYSTEM,
+  applyJobFeedbackTool,
+  buildFeedbackQuestionsPrompt,
+  buildJobFeedbackPrompt,
+  type ConsultantFinding,
+  FEEDBACK_QUESTIONS_SYSTEM,
+  type FeedbackQuestionsOutput,
+  feedbackQuestionsTool,
+  JOB_CONSULTANT_SYSTEM,
+  type JobEvaluation,
+  type JobFeedbackOutput,
+  jobEvalTool,
+  PROFILE_CONSULTANT_SYSTEM,
+  type ProfileEvaluation,
+  profileEvalTool,
+  resumeDocToConsultantText,
+} from '../claude/prompts/consultant.js';
+import { profileToRefineText } from '../claude/prompts/refine.js';
+import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.js';
+import { c } from '../utils/colors.js';
 
 /** Run the hiring consultant evaluation on a general (non-tailored) profile. */
 export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluation> {
@@ -23,7 +32,10 @@ export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluati
 }
 
 /** Run the hiring consultant evaluation on a resume tailored for a specific job. */
-export async function evaluateForJob(doc: ResumeDocument, jobAnalysis: JobAnalysis): Promise<JobEvaluation> {
+export async function evaluateForJob(
+  doc: ResumeDocument,
+  jobAnalysis: JobAnalysis,
+): Promise<JobEvaluation> {
   return callWithTool<JobEvaluation>(
     JOB_CONSULTANT_SYSTEM,
     `Please evaluate how well this resume is tailored for the role:\n\n${resumeDocToConsultantText(doc, jobAnalysis)}`,
@@ -42,7 +54,11 @@ export async function evaluateForJob(doc: ResumeDocument, jobAnalysis: JobAnalys
  * then returns findings enriched with the answers.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function enrichFindingsWithUserInput(findings: ConsultantFinding[], inquirer: any, profileContext: string): Promise<ConsultantFinding[]> {
+export async function enrichFindingsWithUserInput(
+  findings: ConsultantFinding[],
+  inquirer: any,
+  profileContext: string,
+): Promise<ConsultantFinding[]> {
   let questionsOutput: FeedbackQuestionsOutput;
   try {
     questionsOutput = await callWithTool<FeedbackQuestionsOutput>(
@@ -68,20 +84,20 @@ export async function enrichFindingsWithUserInput(findings: ConsultantFinding[],
     console.log(`\n  ${chalk.bold(finding.area)}`);
     console.log(`  ${c.muted(finding.suggestion)}`);
 
-    const { answer } = await inquirer.prompt([{
-      type: 'input',
-      name: 'answer',
-      message: `  ${q.question}`,
-    }]) as { answer: string };
+    const { answer } = (await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'answer',
+        message: `  ${q.question}`,
+      },
+    ])) as { answer: string };
 
     if (answer.trim()) answers.set(q.findingIndex, answer.trim());
   }
 
   return findings.map((f, i) => {
     const answer = answers.get(i);
-    return answer
-      ? { ...f, suggestion: `${f.suggestion}\n  Candidate's details: ${answer}` }
-      : f;
+    return answer ? { ...f, suggestion: `${f.suggestion}\n  Candidate's details: ${answer}` } : f;
   });
 }
 
@@ -105,7 +121,11 @@ export async function applyJobFeedback(
   gaps: ConsultantFinding[],
 ): Promise<ResumeDocument> {
   const prompt = buildJobFeedbackPrompt(doc, jobAnalysis, gaps);
-  const output = await callWithTool<JobFeedbackOutput>(APPLY_JOB_FEEDBACK_SYSTEM, prompt, applyJobFeedbackTool);
+  const output = await callWithTool<JobFeedbackOutput>(
+    APPLY_JOB_FEEDBACK_SYSTEM,
+    prompt,
+    applyJobFeedbackTool,
+  );
 
   const updatedPositions = [...doc.positions];
   for (const change of output.positions ?? []) {
@@ -133,7 +153,7 @@ function scoreColor(score: number): string {
 }
 
 export function printProfileEvaluation(ev: ProfileEvaluation): void {
-  console.log(`\n${chalk.bold.cyan('─── Hiring Consultant Review ' + '─'.repeat(40))}`);
+  console.log(`\n${chalk.bold.cyan(`─── Hiring Consultant Review ${'─'.repeat(40)}`)}`);
   console.log(`  ${c.label('Score:')} ${scoreColor(ev.overallScore)}${c.muted('/10')}`);
 
   if (ev.strengths.length > 0) {
@@ -157,7 +177,7 @@ export function printProfileEvaluation(ev: ProfileEvaluation): void {
 }
 
 export function printJobEvaluation(ev: JobEvaluation): void {
-  console.log(`\n${chalk.bold.cyan('─── Job Fit Review ' + '─'.repeat(49))}`);
+  console.log(`\n${chalk.bold.cyan(`─── Job Fit Review ${'─'.repeat(49)}`)}`);
   console.log(`  ${c.label('Alignment Score:')} ${scoreColor(ev.alignmentScore)}${c.muted('/10')}`);
 
   if (ev.strengths.length > 0) {

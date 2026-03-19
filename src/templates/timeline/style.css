@@ -1,24 +1,32 @@
 /* Timeline template — dark header band, two-column body, prose experience entries */
 :root {
-  --header-bg:    #1c2b3a;
-  --header-text:  #f1f5f9;
+  --header-bg: #1c2b3a;
+  --header-text: #f1f5f9;
   --header-muted: #94a3b8;
-  --accent:       #06b6d4;
-  --color-text:   #1a1a1a;
-  --color-body:   #444444;
-  --color-muted:  #888888;
-  --color-faint:  #aaaaaa;
-  --color-rule:   #d0d7de;
-  --font-body: 'Avenir Next Condensed', 'Avenir Next', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif;
-  --font-display: 'Rockwell', 'Rockwell Nova', 'Courier Bold', Georgia, serif;
+  --accent: #06b6d4;
+  --color-text: #1a1a1a;
+  --color-body: #444444;
+  --color-muted: #888888;
+  --color-faint: #aaaaaa;
+  --color-rule: #d0d7de;
+  --font-body:
+    "Avenir Next Condensed", "Avenir Next", "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
+  --font-display: "Rockwell", "Rockwell Nova", "Courier Bold", Georgia, serif;
   --body-pad: 22pt;
   --date-col: 44pt;
   --logo-col: 26pt;
 }
 
-@page { size: Letter; margin: 0; }
+@page {
+  size: Letter;
+  margin: 0;
+}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
   font-family: var(--font-body);
@@ -35,7 +43,10 @@ body {
   print-color-adjust: exact;
 }
 
-a { color: inherit; text-decoration: none; }
+a {
+  color: inherit;
+  text-decoration: none;
+}
 
 /* ── Header ──────────────────────────────────────────────────── */
 
@@ -66,7 +77,10 @@ a { color: inherit; text-decoration: none; }
   font-weight: 400;
 }
 
-.header-sep { color: var(--accent); margin: 0 4pt; }
+.header-sep {
+  color: var(--accent);
+  margin: 0 4pt;
+}
 
 .header-right {
   text-align: right;
@@ -121,7 +135,9 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Sections ────────────────────────────────────────────────── */
 
-.section { margin-bottom: 10pt; }
+.section {
+  margin-bottom: 10pt;
+}
 
 /* Experience grows to fill available main-column height */
 .section-experience {
@@ -155,7 +171,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .timeline-list.positions-list::before {
-  content: '';
+  content: "";
   position: absolute;
   left: calc(var(--date-col) + var(--logo-col) / 2 - 0.75pt);
   top: 0;
@@ -181,7 +197,9 @@ a { color: inherit; text-decoration: none; }
   flex-shrink: 0;
 }
 
-.date-present { color: var(--accent); }
+.date-present {
+  color: var(--accent);
+}
 
 /* ── Company logos ───────────────────────────────────────────── */
 
@@ -274,7 +292,9 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Side column sections get extra top margin after the first */
-.side-column .section + .section { margin-top: 6pt; }
+.side-column .section + .section {
+  margin-top: 6pt;
+}
 
 /* ── Side column items ───────────────────────────────────────── */
 
@@ -299,7 +319,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .side-skill-list li::before {
-  content: '·';
+  content: "·";
   position: absolute;
   left: 0;
   color: var(--accent);
@@ -312,11 +332,15 @@ a { color: inherit; text-decoration: none; }
   margin-bottom: 3pt;
 }
 
-.side-muted { color: var(--color-muted); }
+.side-muted {
+  color: var(--color-muted);
+}
 
 /* ── Side column education ───────────────────────────────────── */
 
-.side-edu-entry { margin-bottom: 8pt; }
+.side-edu-entry {
+  margin-bottom: 8pt;
+}
 
 .side-edu-institution {
   font-size: 8.5pt;

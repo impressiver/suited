@@ -9,8 +9,8 @@
  * Throws AccuracyGuardError on any mismatch. Pipeline halts before assembly.
  */
 
-import { Profile, CurationPlan } from '../profile/schema.js';
-import { RefEntry } from './prompts/curate.js';
+import type { CurationPlan, Profile } from '../profile/schema.js';
+import type { RefEntry } from './prompts/curate.js';
 
 export interface AccuracyError {
   ref: string;
@@ -21,7 +21,7 @@ export class AccuracyGuardError extends Error {
   constructor(public readonly errors: AccuracyError[]) {
     super(
       `Accuracy guard failed with ${errors.length} error(s):\n` +
-      errors.map(e => `  - [${e.ref}]: ${e.reason}`).join('\n'),
+        errors.map((e) => `  - [${e.ref}]: ${e.reason}`).join('\n'),
     );
     this.name = 'AccuracyGuardError';
   }
@@ -53,12 +53,15 @@ export function validateCurationPlan(
   // -------------------------------------------------------------------------
   for (const selPos of plan.selectedPositions) {
     // Verify the position ID exists in profile
-    const posIdx = profile.positions.findIndex(p => p.id === selPos.positionId);
+    const posIdx = profile.positions.findIndex((p) => p.id === selPos.positionId);
     if (posIdx === -1) {
-      errors.push({ ref: selPos.positionId, reason: `Position "${selPos.positionId}" not found in profile` });
+      errors.push({
+        ref: selPos.positionId,
+        reason: `Position "${selPos.positionId}" not found in profile`,
+      });
       continue;
     }
-    const pos = profile.positions[posIdx];
+    const _pos = profile.positions[posIdx];
 
     for (const bulletRef of selPos.bulletRefs) {
       const entry = refMap.get(bulletRef);
@@ -69,7 +72,10 @@ export function validateCurationPlan(
 
       // Type check: must be a bullet
       if (entry.kind !== 'bullet') {
-        errors.push({ ref: bulletRef, reason: `Ref "${bulletRef}" has kind "${entry.kind}", expected "bullet"` });
+        errors.push({
+          ref: bulletRef,
+          reason: `Ref "${bulletRef}" has kind "${entry.kind}", expected "bullet"`,
+        });
         continue;
       }
 
@@ -102,7 +108,10 @@ export function validateCurationPlan(
   // -------------------------------------------------------------------------
   if (plan.summaryRef !== null) {
     if (plan.summaryRef !== 'summary') {
-      errors.push({ ref: plan.summaryRef, reason: `summaryRef must be "summary" or null, got "${plan.summaryRef}"` });
+      errors.push({
+        ref: plan.summaryRef,
+        reason: `summaryRef must be "summary" or null, got "${plan.summaryRef}"`,
+      });
     } else if (!profile.summary) {
       errors.push({ ref: 'summary', reason: 'summaryRef is "summary" but profile has no summary' });
     } else {
@@ -123,7 +132,7 @@ export function validateCurationPlan(
   // Skill IDs
   // -------------------------------------------------------------------------
   for (const skillId of plan.selectedSkillIds) {
-    if (!profile.skills.some(s => s.id === skillId)) {
+    if (!profile.skills.some((s) => s.id === skillId)) {
       errors.push({ ref: skillId, reason: `Skill ID "${skillId}" not found in profile` });
     }
   }
@@ -132,7 +141,7 @@ export function validateCurationPlan(
   // Project IDs
   // -------------------------------------------------------------------------
   for (const projId of plan.selectedProjectIds) {
-    if (!profile.projects.some(p => p.id === projId)) {
+    if (!profile.projects.some((p) => p.id === projId)) {
       errors.push({ ref: projId, reason: `Project ID "${projId}" not found in profile` });
     }
   }
@@ -141,7 +150,7 @@ export function validateCurationPlan(
   // Education IDs
   // -------------------------------------------------------------------------
   for (const eduId of plan.selectedEducationIds) {
-    if (!profile.education.some(e => e.id === eduId)) {
+    if (!profile.education.some((e) => e.id === eduId)) {
       errors.push({ ref: eduId, reason: `Education ID "${eduId}" not found in profile` });
     }
   }
@@ -150,7 +159,7 @@ export function validateCurationPlan(
   // Certification IDs
   // -------------------------------------------------------------------------
   for (const certId of plan.selectedCertificationIds) {
-    if (!profile.certifications.some(c => c.id === certId)) {
+    if (!profile.certifications.some((c) => c.id === certId)) {
       errors.push({ ref: certId, reason: `Certification ID "${certId}" not found in profile` });
     }
   }

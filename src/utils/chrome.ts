@@ -1,6 +1,6 @@
-import { execSync } from 'child_process';
-import { existsSync } from 'fs';
-import { homedir } from 'os';
+import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 
 const MAC_PATHS = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -19,14 +19,16 @@ const LINUX_PATHS = [
 
 function which(bin: string): string | null {
   try {
-    return execSync(`which ${bin}`, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
+    return execSync(`which ${bin}`, { stdio: ['pipe', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
   } catch {
     return null;
   }
 }
 
 export function findChromePath(): string {
-  const env = process.env['CHROME_PATH'];
+  const env = process.env.CHROME_PATH;
   if (env) return env;
 
   if (process.platform === 'darwin') {
@@ -39,7 +41,11 @@ export function findChromePath(): string {
     for (const p of LINUX_PATHS) {
       if (existsSync(p)) return p;
     }
-    const found = which('google-chrome-stable') ?? which('google-chrome') ?? which('chromium-browser') ?? which('chromium');
+    const found =
+      which('google-chrome-stable') ??
+      which('google-chrome') ??
+      which('chromium-browser') ??
+      which('chromium');
     if (found) return found;
   }
 

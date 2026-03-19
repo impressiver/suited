@@ -22,9 +22,9 @@
  * If there are no commits since the last tag the script exits with a warning.
  */
 
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
-import { createInterface } from 'readline';
+import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createInterface } from 'node:readline';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,7 +36,12 @@ function run(cmd, opts = {}) {
 
 function ask(question) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => rl.question(question, ans => { rl.close(); resolve(ans); }));
+  return new Promise((resolve) =>
+    rl.question(question, (ans) => {
+      rl.close();
+      resolve(ans);
+    }),
+  );
 }
 
 function bump(version, level) {
@@ -87,10 +92,17 @@ function commitsSince(ref) {
   const range = ref ? `${ref}..HEAD` : 'HEAD';
   const raw = run(`git log ${range} --format=%H%x00%s%x00%b%x03`);
   if (!raw) return [];
-  return raw.split('\x03').flatMap(chunk => {
+  return raw.split('\x03').flatMap((chunk) => {
     const [hash, subject, body] = chunk.trim().split('\x00');
     if (!hash) return [];
-    return [{ hash: hash.trim(), subject: subject?.trim() ?? '', body: body?.trim() ?? '', message: `${subject ?? ''}\n${body ?? ''}` }];
+    return [
+      {
+        hash: hash.trim(),
+        subject: subject?.trim() ?? '',
+        body: body?.trim() ?? '',
+        message: `${subject ?? ''}\n${body ?? ''}`,
+      },
+    ];
   });
 }
 
@@ -99,12 +111,15 @@ function commitsSince(ref) {
 // ---------------------------------------------------------------------------
 
 const args = new Set(process.argv.slice(2));
-const dryRun  = args.has('--dry-run');
+const dryRun = args.has('--dry-run');
 const pushAfter = args.has('--push');
-const forceLevel = args.has('--major') ? 'major'
-                 : args.has('--minor') ? 'minor'
-                 : args.has('--patch') ? 'patch'
-                 : null;
+const forceLevel = args.has('--major')
+  ? 'major'
+  : args.has('--minor')
+    ? 'minor'
+    : args.has('--patch')
+      ? 'patch'
+      : null;
 
 // Read current version
 const pkgPath = new URL('../package.json', import.meta.url).pathname;
@@ -140,9 +155,12 @@ console.log();
 if (commits.length > 0) {
   console.log('  Changes:');
   for (const c of commits) {
-    const mark = classifyCommit(c.message) === 'major' ? '  [major]'
-               : classifyCommit(c.message) === 'minor' ? '  [minor]'
-               : '  [patch]';
+    const mark =
+      classifyCommit(c.message) === 'major'
+        ? '  [major]'
+        : classifyCommit(c.message) === 'minor'
+          ? '  [minor]'
+          : '  [patch]';
     console.log(`    ${mark}  ${c.subject}`);
   }
   console.log();
@@ -166,7 +184,7 @@ if (!answer.trim().toLowerCase().startsWith('y')) {
 
 // 1. Update package.json
 pkg.version = nextVersion;
-writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 console.log(`  Updated package.json → ${nextVersion}`);
 
 // 2. Commit and tag

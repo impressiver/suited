@@ -1,5 +1,5 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { Profile } from '../../profile/schema.js';
+import type { Profile } from '../../profile/schema.js';
 
 // ---------------------------------------------------------------------------
 // Prompts
@@ -29,8 +29,12 @@ export const curateTool: Tool = {
   input_schema: {
     type: 'object' as const,
     required: [
-      'selectedPositions', 'selectedSkillIds', 'selectedProjectIds',
-      'selectedEducationIds', 'selectedCertificationIds', 'summaryRef',
+      'selectedPositions',
+      'selectedSkillIds',
+      'selectedProjectIds',
+      'selectedEducationIds',
+      'selectedCertificationIds',
+      'summaryRef',
     ],
     properties: {
       selectedPositions: {
@@ -47,7 +51,8 @@ export const curateTool: Tool = {
             bulletRefs: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Bullet IDs to include. Must be from the position\'s own bullet list (e.g. ["b:pos-0:0", "b:pos-0:2"])',
+              description:
+                'Bullet IDs to include. Must be from the position\'s own bullet list (e.g. ["b:pos-0:0", "b:pos-0:2"])',
             },
           },
         },
@@ -135,7 +140,7 @@ export function buildRefList(profile: Profile): { refText: string; refMap: Map<s
     }
   }
 
-  const refMap = new Map(entries.map(e => [e.id, e]));
+  const refMap = new Map(entries.map((e) => [e.id, e]));
 
   // Build prompt text: group bullets by position for clarity
   const lines: string[] = [];

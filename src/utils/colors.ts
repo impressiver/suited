@@ -1,14 +1,14 @@
 import chalk from 'chalk';
 
 const TAGLINES = [
-  "Making you look good, one bullet point at a time.",
-  "Your career highlights, professionally packaged.",
-  "Where LinkedIn data becomes interview gold.",
-  "Land the job. Ship the resume.",
+  'Making you look good, one bullet point at a time.',
+  'Your career highlights, professionally packaged.',
+  'Where LinkedIn data becomes interview gold.',
+  'Land the job. Ship the resume.',
   "Because your 2009 internship shouldn't define you.",
-  "Turning experience into opportunity, one PDF at a time.",
-  "Polishing your career story to a mirror shine.",
-  "Stand out. Get the interview. Repeat.",
+  'Turning experience into opportunity, one PDF at a time.',
+  'Polishing your career story to a mirror shine.',
+  'Stand out. Get the interview. Repeat.',
 ];
 
 export function randomTagline(): string {
@@ -17,10 +17,10 @@ export function randomTagline(): string {
 
 export function banner(title: string, subtitle?: string): string {
   const titleLine = `  ✦  ${title}  ✦  `;
-  const subLine   = subtitle ? `  ${subtitle}  ` : '';
-  const width     = Math.max(titleLine.length, subLine.length);
-  const pad       = (s: string) => s + ' '.repeat(width - s.length);
-  const rule      = '─'.repeat(width + 2);
+  const subLine = subtitle ? `  ${subtitle}  ` : '';
+  const width = Math.max(titleLine.length, subLine.length);
+  const pad = (s: string) => s + ' '.repeat(width - s.length);
+  const rule = '─'.repeat(width + 2);
 
   const lines = [
     chalk.dim.cyan(`╭${rule}╮`),
@@ -35,7 +35,7 @@ export function banner(title: string, subtitle?: string): string {
 
 export function healthStars(score: number, total = 5): string {
   const filled = chalk.yellow('★').repeat(score);
-  const empty  = chalk.dim('☆').repeat(total - score);
+  const empty = chalk.dim('☆').repeat(total - score);
   return filled + empty;
 }
 
@@ -54,28 +54,28 @@ export function healthQuip(score: number): string {
 
 export const c = {
   // Icons
-  ok:   chalk.green('✓'),
+  ok: chalk.green('✓'),
   warn: chalk.yellow('⚠'),
   fail: chalk.red('✗'),
-  arr:  chalk.dim('→'),
+  arr: chalk.dim('→'),
   star: chalk.yellow('✦'),
 
   // Text styles
-  header:    (s: string) => chalk.bold.cyan(s),
-  step:      (s: string) => chalk.bold(s),
-  success:   (s: string) => chalk.green(s),
-  warning:   (s: string) => chalk.yellow(s),
-  error:     (s: string) => chalk.red(s),
-  label:     (s: string) => chalk.dim(s),
-  value:     (s: string) => chalk.white.bold(s),
-  muted:     (s: string) => chalk.dim(s),
-  path:      (s: string) => chalk.cyan(s),
-  tip:       (s: string) => chalk.dim.italic(s),
-  accent:    (s: string) => chalk.magenta(s),
+  header: (s: string) => chalk.bold.cyan(s),
+  step: (s: string) => chalk.bold(s),
+  success: (s: string) => chalk.green(s),
+  warning: (s: string) => chalk.yellow(s),
+  error: (s: string) => chalk.red(s),
+  label: (s: string) => chalk.dim(s),
+  value: (s: string) => chalk.white.bold(s),
+  muted: (s: string) => chalk.dim(s),
+  path: (s: string) => chalk.cyan(s),
+  tip: (s: string) => chalk.dim.italic(s),
+  accent: (s: string) => chalk.magenta(s),
   highlight: (s: string) => chalk.yellow.bold(s),
-  cheeky:    (s: string) => chalk.italic.dim(s),
+  cheeky: (s: string) => chalk.italic.dim(s),
 
   // Diff
-  added:   (s: string) => chalk.green(s),
+  added: (s: string) => chalk.green(s),
   removed: (s: string) => chalk.red(s),
 };

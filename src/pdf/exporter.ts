@@ -1,7 +1,7 @@
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import puppeteer from 'puppeteer-core';
-import { mkdir } from 'fs/promises';
-import { dirname } from 'path';
-import { TemplateName } from '../profile/schema.js';
+import type { TemplateName } from '../profile/schema.js';
 import { findChromePath } from '../utils/chrome.js';
 
 interface PdfOptions {
@@ -19,13 +19,14 @@ export interface PageFitResult {
 
 // Margins are controlled entirely by CSS (body padding / @page rules).
 // Setting Puppeteer margins to zero prevents double-application.
-const MARGINS: Record<TemplateName, { top: string; right: string; bottom: string; left: string }> = {
-  classic:  { top: '0', right: '0', bottom: '0', left: '0' },
-  modern:   { top: '0', right: '0', bottom: '0', left: '0' },
-  bold:     { top: '0', right: '0', bottom: '0', left: '0' },
-  retro:    { top: '0', right: '0', bottom: '0', left: '0' },
-  timeline: { top: '0', right: '0', bottom: '0', left: '0' },
-};
+const MARGINS: Record<TemplateName, { top: string; right: string; bottom: string; left: string }> =
+  {
+    classic: { top: '0', right: '0', bottom: '0', left: '0' },
+    modern: { top: '0', right: '0', bottom: '0', left: '0' },
+    bold: { top: '0', right: '0', bottom: '0', left: '0' },
+    retro: { top: '0', right: '0', bottom: '0', left: '0' },
+    timeline: { top: '0', right: '0', bottom: '0', left: '0' },
+  };
 
 function launchBrowser() {
   try {
@@ -37,7 +38,7 @@ function launchBrowser() {
   } catch (err) {
     throw new Error(
       `Failed to launch Chrome: ${(err as Error).message}\n` +
-      `Make sure Chrome is installed, or set the CHROME_PATH environment variable.`,
+        `Make sure Chrome is installed, or set the CHROME_PATH environment variable.`,
     );
   }
 }

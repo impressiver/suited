@@ -21,7 +21,10 @@ export const parseLinkedInTool: Tool = {
         required: ['name'],
         properties: {
           name: { type: 'string', description: 'Full name exactly as in profile' },
-          headline: { type: 'string', description: 'Professional headline / current title tagline shown under the name' },
+          headline: {
+            type: 'string',
+            description: 'Professional headline / current title tagline shown under the name',
+          },
           email: { type: 'string' },
           phone: { type: 'string' },
           location: { type: 'string' },

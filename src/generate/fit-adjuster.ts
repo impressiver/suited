@@ -13,9 +13,9 @@ export type SqueezeLevel = 1 | 2 | 3;
 
 // Thresholds: if overflow ratio exceeds these, try the next level
 export const SQUEEZE_THRESHOLDS: Record<SqueezeLevel, number> = {
-  1: 1.02,  // apply level 1 if overflow > 2%
-  2: 1.09,  // escalate to level 2 if still overflowing after level 1
-  3: 1.16,  // escalate to level 3 if still overflowing after level 2
+  1: 1.02, // apply level 1 if overflow > 2%
+  2: 1.09, // escalate to level 2 if still overflowing after level 1
+  3: 1.16, // escalate to level 3 if still overflowing after level 2
 };
 
 // If overflow exceeds this after level 3, we can't fix it with CSS alone
@@ -30,8 +30,8 @@ body {
 
 /* Header — biggest single contributor to height */
 .resume-header {
-  padding-top:    ${level === 1 ? 11 : level === 2 ? 8  : 6 }pt !important;
-  padding-bottom: ${level === 1 ? 11 : level === 2 ? 8  : 6 }pt !important;
+  padding-top:    ${level === 1 ? 11 : level === 2 ? 8 : 6}pt !important;
+  padding-bottom: ${level === 1 ? 11 : level === 2 ? 8 : 6}pt !important;
 }
 .resume-header h1 {
   font-size:    ${level === 1 ? 22 : level === 2 ? 20 : 17}pt !important;

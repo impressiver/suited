@@ -1,15 +1,34 @@
-import {
-  Profile, CurationPlan, ResumeDocument, ResumePosition, FlairLevel, TemplateName, IndustryVertical,
-  GenerationConfig,
-} from '../profile/schema.js';
 import { resolvePath } from '../claude/accuracy-guard.js';
-import { RefEntry } from '../claude/prompts/curate.js';
+import type { RefEntry } from '../claude/prompts/curate.js';
+import type {
+  CurationPlan,
+  FlairLevel,
+  GenerationConfig,
+  IndustryVertical,
+  Profile,
+  ResumeDocument,
+  ResumePosition,
+  TemplateName,
+} from '../profile/schema.js';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_ABBR = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 /** Converts "YYYY-MM" → "Mon YYYY". Passes through "YYYY" or other formats unchanged. */
 function formatDate(date: string | undefined): string | undefined {
@@ -31,7 +50,8 @@ function normalizeUrl(url: string | undefined): string | undefined {
 /** Strips country-only location strings (e.g. "United States") that add no useful context. */
 function filterLocation(location: string | undefined): string | undefined {
   if (!location) return undefined;
-  const COUNTRY_ONLY = /^(United States|USA|US|United Kingdom|UK|Canada|Australia|Germany|France|India|China|Japan|Brazil|Mexico|Netherlands|Sweden|Norway|Denmark|Switzerland|New Zealand|Ireland|Singapore|South Korea|Spain|Italy|Portugal|Poland|Austria|Belgium|Finland|Israel|UAE|United Arab Emirates)$/i;
+  const COUNTRY_ONLY =
+    /^(United States|USA|US|United Kingdom|UK|Canada|Australia|Germany|France|India|China|Japan|Brazil|Mexico|Netherlands|Sweden|Norway|Denmark|Switzerland|New Zealand|Ireland|Singapore|South Korea|Spain|Italy|Portugal|Poland|Austria|Belgium|Finland|Israel|UAE|United Arab Emirates)$/i;
   return COUNTRY_ONLY.test(location.trim()) ? undefined : location;
 }
 
@@ -60,7 +80,7 @@ function mergeConsecutiveRoles(positions: ResumePosition[]): ResumePosition[] {
         location: run[0].location,
         startDate: run[run.length - 1].startDate,
         endDate: run[0].endDate,
-        bullets: run.flatMap(p => p.bullets),
+        bullets: run.flatMap((p) => p.bullets),
       });
     }
   };
@@ -121,11 +141,7 @@ export function getFlairInfo(
 // Resolver helpers
 // ---------------------------------------------------------------------------
 
-function resolveRef(
-  profile: Profile,
-  refMap: Map<string, RefEntry>,
-  refId: string,
-): string {
+function resolveRef(profile: Profile, refMap: Map<string, RefEntry>, refId: string): string {
   const entry = refMap.get(refId);
   if (!entry) throw new Error(`Cannot resolve ref "${refId}" — not in refMap`);
   const val = resolvePath(profile, entry.path);
@@ -162,10 +178,10 @@ export function assembleResumeDocument(
   const summary = plan.summaryRef ? resolveRef(profile, refMap, plan.summaryRef) : undefined;
 
   const positions = mergeConsecutiveRoles(
-    plan.selectedPositions.map(selPos => {
-      const pos = profile.positions.find(p => p.id === selPos.positionId);
+    plan.selectedPositions.map((selPos) => {
+      const pos = profile.positions.find((p) => p.id === selPos.positionId);
       if (!pos) throw new Error(`Position "${selPos.positionId}" not found`);
-      const bullets = selPos.bulletRefs.map(ref => resolveRef(profile, refMap, ref));
+      const bullets = selPos.bulletRefs.map((ref) => resolveRef(profile, refMap, ref));
       return {
         title: pos.title.value,
         company: pos.company.value,
@@ -177,8 +193,8 @@ export function assembleResumeDocument(
     }),
   );
 
-  const education = plan.selectedEducationIds.map(eduId => {
-    const edu = profile.education.find(e => e.id === eduId);
+  const education = plan.selectedEducationIds.map((eduId) => {
+    const edu = profile.education.find((e) => e.id === eduId);
     if (!edu) throw new Error(`Education "${eduId}" not found`);
     return {
       institution: edu.institution.value,
@@ -191,12 +207,14 @@ export function assembleResumeDocument(
 
   // Filter out stale skill IDs (e.g. after replacedSkills renames them to skill-refined-*)
   const resolvedSkills = plan.selectedSkillIds
-    .map(skillId => profile.skills.find(s => s.id === skillId))
+    .map((skillId) => profile.skills.find((s) => s.id === skillId))
     .filter((s): s is NonNullable<typeof s> => s !== undefined);
-  const skills = (resolvedSkills.length > 0 ? resolvedSkills : profile.skills).map(s => s.name.value);
+  const skills = (resolvedSkills.length > 0 ? resolvedSkills : profile.skills).map(
+    (s) => s.name.value,
+  );
 
-  const projects = plan.selectedProjectIds.map(projId => {
-    const proj = profile.projects.find(p => p.id === projId);
+  const projects = plan.selectedProjectIds.map((projId) => {
+    const proj = profile.projects.find((p) => p.id === projId);
     if (!proj) throw new Error(`Project "${projId}" not found`);
     return {
       title: proj.title.value,
@@ -206,8 +224,8 @@ export function assembleResumeDocument(
   });
 
   // Certifications — curated by selectedCertificationIds
-  const certifications = plan.selectedCertificationIds.map(certId => {
-    const cert = profile.certifications.find(c => c.id === certId);
+  const certifications = plan.selectedCertificationIds.map((certId) => {
+    const cert = profile.certifications.find((c) => c.id === certId);
     if (!cert) throw new Error(`Certification "${certId}" not found`);
     return {
       name: cert.name.value,
@@ -217,13 +235,13 @@ export function assembleResumeDocument(
   });
 
   // Languages — always include all (not curated; short list, always relevant)
-  const languages = profile.languages.map(l => ({
+  const languages = profile.languages.map((l) => ({
     name: l.name.value,
     proficiency: l.proficiency?.value,
   }));
 
   // Volunteer — always include all
-  const volunteer = profile.volunteer.map(v => ({
+  const volunteer = profile.volunteer.map((v) => ({
     organization: v.organization.value,
     role: v.role?.value,
     startDate: v.startDate?.value,
@@ -231,7 +249,7 @@ export function assembleResumeDocument(
   }));
 
   // Awards — always include all
-  const awards = profile.awards.map(a => a.value);
+  const awards = profile.awards.map((a) => a.value);
 
   return {
     contact,
@@ -279,50 +297,53 @@ export function assembleFullResumeDocument(
   return {
     contact,
     summary: profile.summary?.value,
-    positions: mergeConsecutiveRoles(profile.positions.map(pos => ({
-      title: pos.title.value,
-      company: pos.company.value,
-      location: filterLocation(pos.location?.value),
-      startDate: formatDate(pos.startDate.value)!,
-      endDate: formatDate(pos.endDate?.value),
-      bullets: pos.bullets.map(b => b.value),
-    }))),
-    education: profile.education.map(edu => ({
+    positions: mergeConsecutiveRoles(
+      profile.positions.map((pos) => ({
+        title: pos.title.value,
+        company: pos.company.value,
+        location: filterLocation(pos.location?.value),
+        startDate: formatDate(pos.startDate.value)!,
+        endDate: formatDate(pos.endDate?.value),
+        bullets: pos.bullets.map((b) => b.value),
+      })),
+    ),
+    education: profile.education.map((edu) => ({
       institution: edu.institution.value,
       degree: edu.degree?.value,
       fieldOfStudy: edu.fieldOfStudy?.value,
       startDate: formatDate(edu.startDate?.value),
       endDate: formatDate(edu.endDate?.value),
     })),
-    skills: profile.skills.map(s => s.name.value),
-    projects: profile.projects.map(p => ({
+    skills: profile.skills.map((s) => s.name.value),
+    projects: profile.projects.map((p) => ({
       title: p.title.value,
       description: p.description?.value,
       url: p.url?.value,
     })),
-    certifications: profile.certifications.map(c => ({
+    certifications: profile.certifications.map((c) => ({
       name: c.name.value,
       authority: c.authority?.value,
       date: c.startDate?.value,
     })),
-    languages: profile.languages.map(l => ({
+    languages: profile.languages.map((l) => ({
       name: l.name.value,
       proficiency: l.proficiency?.value,
     })),
-    volunteer: profile.volunteer.map(v => ({
+    volunteer: profile.volunteer.map((v) => ({
       organization: v.organization.value,
       role: v.role?.value,
       startDate: v.startDate?.value,
       endDate: v.endDate?.value,
     })),
-    awards: profile.awards.map(a => a.value),
+    awards: profile.awards.map((a) => a.value),
     flair: effectiveFlair,
     template: effectiveTemplate,
     // When no JD is provided and the user left the title as the default "Resume",
     // fall back to the contact headline, then the most recent position title.
-    jobTitle: (config.jobTitle === 'Resume' || !config.jobTitle)
-      ? (profile.contact.headline?.value ?? profile.positions[0]?.title.value ?? config.jobTitle)
-      : config.jobTitle,
+    jobTitle:
+      config.jobTitle === 'Resume' || !config.jobTitle
+        ? (profile.contact.headline?.value ?? profile.positions[0]?.title.value ?? config.jobTitle)
+        : config.jobTitle,
     company: config.company,
     generatedAt: new Date().toISOString(),
   };

@@ -1,6 +1,6 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { ResumeDocument } from '../profile/schema.js';
 import { callWithTool } from '../claude/client.js';
+import type { ResumeDocument } from '../profile/schema.js';
 
 // ---------------------------------------------------------------------------
 // Tool schema
@@ -21,7 +21,8 @@ const trimTool: Tool = {
     properties: {
       removedBulletsByPosition: {
         type: 'array',
-        description: 'Bullets to remove from specific positions. Only include positions where at least one bullet is removed.',
+        description:
+          'Bullets to remove from specific positions. Only include positions where at least one bullet is removed.',
         items: {
           type: 'object',
           required: ['positionIndex', 'bulletIndicesToRemove'],
@@ -37,7 +38,8 @@ const trimTool: Tool = {
       },
       removedSections: {
         type: 'array',
-        description: 'Entire sections to remove. Valid values: "summary", "education", "skills", "projects", "certifications", "languages", "volunteer", "awards".',
+        description:
+          'Entire sections to remove. Valid values: "summary", "education", "skills", "projects", "certifications", "languages", "volunteer", "awards".',
         items: { type: 'string' },
       },
       removedPositionIndices: {
@@ -72,7 +74,9 @@ Rules:
 function buildTrimPrompt(doc: ResumeDocument, overflowPct: number): string {
   const lines: string[] = [];
 
-  lines.push(`The resume is ~${overflowPct}% of one page height and must fit in 100%. Target cutting roughly ${overflowPct - 94}% of content (a little extra to avoid re-overflow after rendering).`);
+  lines.push(
+    `The resume is ~${overflowPct}% of one page height and must fit in 100%. Target cutting roughly ${overflowPct - 94}% of content (a little extra to avoid re-overflow after rendering).`,
+  );
   lines.push('');
 
   if (doc.summary) {
@@ -83,22 +87,26 @@ function buildTrimPrompt(doc: ResumeDocument, overflowPct: number): string {
 
   lines.push('## Experience (positions indexed from 0, newest first)');
   doc.positions.forEach((pos, i) => {
-    lines.push(`\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`);
+    lines.push(
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+    );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');
     } else {
-      pos.bullets.forEach((b, bi) => lines.push(`  [${bi}] ${b}`));
+      pos.bullets.forEach((b, bi) => {
+        lines.push(`  [${bi}] ${b}`);
+      });
     }
   });
 
   const sections: string[] = [];
-  if (doc.education.length)      sections.push(`education (${doc.education.length} entries)`);
-  if (doc.skills.length)         sections.push(`skills (${doc.skills.length} items)`);
-  if (doc.projects.length)       sections.push(`projects (${doc.projects.length})`);
+  if (doc.education.length) sections.push(`education (${doc.education.length} entries)`);
+  if (doc.skills.length) sections.push(`skills (${doc.skills.length} items)`);
+  if (doc.projects.length) sections.push(`projects (${doc.projects.length})`);
   if (doc.certifications.length) sections.push(`certifications (${doc.certifications.length})`);
-  if (doc.languages.length)      sections.push(`languages (${doc.languages.length})`);
-  if (doc.volunteer.length)      sections.push(`volunteer (${doc.volunteer.length})`);
-  if (doc.awards.length)         sections.push(`awards (${doc.awards.length})`);
+  if (doc.languages.length) sections.push(`languages (${doc.languages.length})`);
+  if (doc.volunteer.length) sections.push(`volunteer (${doc.volunteer.length})`);
+  if (doc.awards.length) sections.push(`awards (${doc.awards.length})`);
 
   if (sections.length > 0) {
     lines.push('\n## Other sections present');
@@ -112,7 +120,10 @@ function buildTrimPrompt(doc: ResumeDocument, overflowPct: number): string {
 // Main export
 // ---------------------------------------------------------------------------
 
-export async function autoTrimToFit(doc: ResumeDocument, overflowRatio: number): Promise<ResumeDocument> {
+export async function autoTrimToFit(
+  doc: ResumeDocument,
+  overflowRatio: number,
+): Promise<ResumeDocument> {
   const overflowPct = Math.round(overflowRatio * 100);
   const prompt = buildTrimPrompt(doc, overflowPct);
   const output = await callWithTool<TrimOutput>(TRIM_SYSTEM, prompt, trimTool);
@@ -121,14 +132,14 @@ export async function autoTrimToFit(doc: ResumeDocument, overflowRatio: number):
 
   // Remove entire sections
   const removed = new Set(output.removedSections ?? []);
-  if (removed.has('summary'))        result = { ...result, summary: undefined };
-  if (removed.has('education'))      result = { ...result, education: [] };
-  if (removed.has('skills'))         result = { ...result, skills: [] };
-  if (removed.has('projects'))       result = { ...result, projects: [] };
+  if (removed.has('summary')) result = { ...result, summary: undefined };
+  if (removed.has('education')) result = { ...result, education: [] };
+  if (removed.has('skills')) result = { ...result, skills: [] };
+  if (removed.has('projects')) result = { ...result, projects: [] };
   if (removed.has('certifications')) result = { ...result, certifications: [] };
-  if (removed.has('languages'))      result = { ...result, languages: [] };
-  if (removed.has('volunteer'))      result = { ...result, volunteer: [] };
-  if (removed.has('awards'))         result = { ...result, awards: [] };
+  if (removed.has('languages')) result = { ...result, languages: [] };
+  if (removed.has('volunteer')) result = { ...result, volunteer: [] };
+  if (removed.has('awards')) result = { ...result, awards: [] };
 
   // Remove entire positions
   const removedPosIdxs = new Set(output.removedPositionIndices ?? []);

@@ -1,14 +1,19 @@
-import {
-  sourceJsonPath, refinedJsonPath, refinedMdPath,
-  loadSource, loadRefined, saveRefined, saveSource,
-} from '../profile/serializer.js';
-import { runRefine } from './refine.js';
-import { ensureContactDetails } from '../utils/contact.js';
-import { openInEditor } from '../utils/interactive.js';
 import { markdownToProfile, profileToMarkdown } from '../profile/markdown.js';
-import { fileExists } from '../utils/fs.js';
-import { c, healthStars, healthQuip } from '../utils/colors.js';
 import type { Profile } from '../profile/schema.js';
+import {
+  loadRefined,
+  loadSource,
+  refinedJsonPath,
+  refinedMdPath,
+  saveRefined,
+  saveSource,
+  sourceJsonPath,
+} from '../profile/serializer.js';
+import { c, healthQuip, healthStars } from '../utils/colors.js';
+import { ensureContactDetails } from '../utils/contact.js';
+import { fileExists } from '../utils/fs.js';
+import { openInEditor } from '../utils/interactive.js';
+import { runRefine } from './refine.js';
 
 export interface ImproveOptions {
   profileDir?: string;
@@ -27,8 +32,11 @@ export async function runImprove(options: ImproveOptions): Promise<void> {
   let profile = await loadActiveProfile(profileDir);
 
   // Collect any missing contact details upfront
-  const anyMissing = !profile.contact.headline || !profile.contact.email ||
-    !profile.contact.phone || !profile.contact.linkedin;
+  const anyMissing =
+    !profile.contact.headline ||
+    !profile.contact.email ||
+    !profile.contact.phone ||
+    !profile.contact.linkedin;
   if (anyMissing) {
     profile = await ensureContactDetails(profile, profileDir, inquirer);
   }
@@ -38,20 +46,23 @@ export async function runImprove(options: ImproveOptions): Promise<void> {
     const isRefined = await fileExists(refinedJsonPath(profileDir));
     printHealthScore(profile, isRefined);
 
-    const { action } = await inquirer.prompt([
+    const { action } = (await inquirer.prompt([
       {
         type: 'list',
         loop: false,
         name: 'action',
         message: 'What would you like to do?',
         choices: [
-          { value: 'refine', name: 'Run Q&A refinement  (Claude asks targeted questions to improve content)' },
+          {
+            value: 'refine',
+            name: 'Run Q&A refinement  (Claude asks targeted questions to improve content)',
+          },
           { value: 'summary', name: 'Edit professional summary' },
           { value: 'edit', name: 'Edit profile in $EDITOR' },
           { value: 'back', name: 'Back' },
         ],
       },
-    ]) as { action: string };
+    ])) as { action: string };
 
     if (action === 'back') {
       keepGoing = false;
@@ -60,14 +71,14 @@ export async function runImprove(options: ImproveOptions): Promise<void> {
       // Reload after refine
       profile = await loadActiveProfile(profileDir);
     } else if (action === 'summary') {
-      const { summary } = await inquirer.prompt([
+      const { summary } = (await inquirer.prompt([
         {
           type: 'input',
           name: 'summary',
           message: 'Professional summary:',
           default: profile.summary?.value ?? '',
         },
-      ]) as { summary: string };
+      ])) as { summary: string };
       if (summary.trim()) {
         const now = new Date().toISOString();
         const updatedProfile: Profile = {
@@ -87,7 +98,9 @@ export async function runImprove(options: ImproveOptions): Promise<void> {
     } else if (action === 'edit') {
       const mdPath = refinedMdPath(profileDir);
       if (!(await fileExists(mdPath))) {
-        console.log(`  ${c.warn} ${c.warning("No refined.md found — run Q&A refinement first to create an editable profile.")}`);
+        console.log(
+          `  ${c.warn} ${c.warning('No refined.md found — run Q&A refinement first to create an editable profile.')}`,
+        );
         continue;
       }
       await openInEditor(mdPath);
@@ -117,8 +130,11 @@ function printHealthScore(profile: Profile, isRefined: boolean): void {
   let score = 0;
 
   // 1. Contact complete: name + at least 2 of (email, phone, LinkedIn)
-  const contactFieldCount = [profile.contact.email, profile.contact.phone, profile.contact.linkedin]
-    .filter(Boolean).length;
+  const contactFieldCount = [
+    profile.contact.email,
+    profile.contact.phone,
+    profile.contact.linkedin,
+  ].filter(Boolean).length;
   const contactOk = !!profile.contact.name && contactFieldCount >= 2;
   if (contactOk) score++;
 
@@ -130,50 +146,58 @@ function printHealthScore(profile: Profile, isRefined: boolean): void {
   if (isRefined) score++;
 
   // 4. Has professional summary
-  const hasSummary = !!(profile.summary?.value?.trim());
+  const hasSummary = !!profile.summary?.value?.trim();
   if (hasSummary) score++;
 
   // 5. All positions with content have >= 1 bullet
   const contentPositions = profile.positions.filter(
-    p => p.bullets.length > 0 || (p.description?.value ?? '').trim().length > 0,
+    (p) => p.bullets.length > 0 || (p.description?.value ?? '').trim().length > 0,
   );
-  const noBulletsPositions = contentPositions.filter(p => p.bullets.length === 0);
+  const noBulletsPositions = contentPositions.filter((p) => p.bullets.length === 0);
   const positionsOk = noBulletsPositions.length === 0;
   if (positionsOk) score++;
 
   const stars = healthStars(score);
   console.log(`\nProfile Health: ${stars}  ${healthQuip(score)}\n`);
 
-  const ok   = (msg: string) => `  ${c.ok}  ${msg}`;
+  const ok = (msg: string) => `  ${c.ok}  ${msg}`;
   const warn = (msg: string) => `  ${c.warn}  ${c.warning(msg)}`;
 
   if (contactOk) {
     console.log(ok('Contact info complete'));
   } else {
     const missingFields = [
-      !profile.contact.email    && 'email',
-      !profile.contact.phone    && 'phone',
+      !profile.contact.email && 'email',
+      !profile.contact.phone && 'phone',
       !profile.contact.linkedin && 'LinkedIn URL',
-    ].filter(Boolean).join(', ');
+    ]
+      .filter(Boolean)
+      .join(', ');
     console.log(warn(`Contact info incomplete — missing: ${missingFields}`));
   }
 
-  console.log(skillsOk
-    ? ok(`${profile.skills.length} skills documented`)
-    : warn(`Only ${profile.skills.length} skills documented (10+ recommended)`));
+  console.log(
+    skillsOk
+      ? ok(`${profile.skills.length} skills documented`)
+      : warn(`Only ${profile.skills.length} skills documented (10+ recommended)`),
+  );
 
-  console.log(isRefined
-    ? ok('Refined with Claude Q&A')
-    : warn('Not yet refined — run Q&A refinement for better results'));
+  console.log(
+    isRefined
+      ? ok('Refined with Claude Q&A')
+      : warn('Not yet refined — run Q&A refinement for better results'),
+  );
 
-  console.log(hasSummary
-    ? ok('Professional summary present')
-    : warn('No professional summary — recommended for most roles'));
+  console.log(
+    hasSummary
+      ? ok('Professional summary present')
+      : warn('No professional summary — recommended for most roles'),
+  );
 
   if (positionsOk) {
     console.log(ok('All positions have content'));
   } else {
-    const names = noBulletsPositions.map(p => p.company.value).join(', ');
+    const names = noBulletsPositions.map((p) => p.company.value).join(', ');
     console.log(warn(`${noBulletsPositions.length} position(s) have no bullets (${names})`));
   }
 

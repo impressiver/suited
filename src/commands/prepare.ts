@@ -1,14 +1,23 @@
+import type { JobEvaluation } from '../claude/prompts/consultant.js';
 import {
-  loadActiveProfile, loadJobs, loadJobRefinement, saveJobRefinement,
-} from '../profile/serializer.js';
-import { isUserExit } from '../utils/user-exit.js';
+  applyJobFeedback,
+  enrichFindingsWithUserInput,
+  evaluateForJob,
+  printJobEvaluation,
+} from '../generate/consultant.js';
+import { buildRefMapForProfile, type CuratorResult, curateForJob } from '../generate/curator.js';
 import { analyzeJobDescription } from '../generate/job-analyzer.js';
-import { curateForJob, buildRefMapForProfile } from '../generate/curator.js';
 import { assembleResumeDocument, getFlairInfo } from '../generate/resume-builder.js';
-import { evaluateForJob, printJobEvaluation, applyJobFeedback, enrichFindingsWithUserInput } from '../generate/consultant.js';
-import { createSpinner } from '../utils/spinner.js';
+import type { CurationPlan, JobRefinement, Profile, ResumeDocument } from '../profile/schema.js';
+import {
+  loadActiveProfile,
+  loadJobRefinement,
+  loadJobs,
+  saveJobRefinement,
+} from '../profile/serializer.js';
 import { c } from '../utils/colors.js';
-import type { Profile, JobRefinement, CurationPlan } from '../profile/schema.js';
+import { createSpinner } from '../utils/spinner.js';
+import { isUserExit } from '../utils/user-exit.js';
 
 export interface PrepareOptions {
   profileDir?: string;
@@ -18,8 +27,13 @@ export interface PrepareOptions {
 // Bullet preview
 // ---------------------------------------------------------------------------
 
-function printCurationPreview(profile: Profile, plan: CurationPlan, company: string, title: string): void {
-  const selectedSet = new Set(plan.selectedPositions.map(p => p.positionId));
+function printCurationPreview(
+  profile: Profile,
+  plan: CurationPlan,
+  company: string,
+  title: string,
+): void {
+  const _selectedSet = new Set(plan.selectedPositions.map((p) => p.positionId));
   const allPositions = profile.positions;
 
   console.log(`\n  ${c.header(`Curated for: ${title} @ ${company}`)}\n`);
@@ -27,16 +41,20 @@ function printCurationPreview(profile: Profile, plan: CurationPlan, company: str
   // Experience section
   const totalPositions = allPositions.length;
   const selectedPositions = plan.selectedPositions.length;
-  console.log(`  ${c.label('Experience')}  ${c.value(`(${selectedPositions} of ${totalPositions} selected)`)}`);
+  console.log(
+    `  ${c.label('Experience')}  ${c.value(`(${selectedPositions} of ${totalPositions} selected)`)}`,
+  );
 
   for (const pos of allPositions) {
-    const selected = plan.selectedPositions.find(sp => sp.positionId === pos.id);
+    const selected = plan.selectedPositions.find((sp) => sp.positionId === pos.id);
     const start = pos.startDate.value.slice(0, 4);
     const end = pos.endDate ? pos.endDate.value.slice(0, 4) : 'Present';
     const dateRange = `${start}–${end}`;
 
     if (selected) {
-      console.log(`    ${c.ok} ${c.value(pos.title.value)} @ ${pos.company.value}  ${c.muted(dateRange)}`);
+      console.log(
+        `    ${c.ok} ${c.value(pos.title.value)} @ ${pos.company.value}  ${c.muted(dateRange)}`,
+      );
       // Show bullet text for selected bullets
       for (const bulletRef of selected.bulletRefs) {
         // bulletRef is like "b:pos-0:2"
@@ -45,21 +63,24 @@ function printCurationPreview(profile: Profile, plan: CurationPlan, company: str
           const idx = parseInt(parts[2], 10);
           const bullet = pos.bullets[idx];
           if (bullet) {
-            const preview = bullet.value.length > 90 ? bullet.value.slice(0, 90) + '…' : bullet.value;
+            const preview =
+              bullet.value.length > 90 ? `${bullet.value.slice(0, 90)}…` : bullet.value;
             console.log(`        ${c.muted('·')} ${preview}`);
           }
         }
       }
     } else {
-      console.log(`    ${c.muted('–')} ${c.muted(`${pos.title.value} @ ${pos.company.value}  ${dateRange}  (excluded)`)}`);
+      console.log(
+        `    ${c.muted('–')} ${c.muted(`${pos.title.value} @ ${pos.company.value}  ${dateRange}  (excluded)`)}`,
+      );
     }
   }
 
   // Skills
   const selectedSkills = plan.selectedSkillIds
-    .map(id => profile.skills.find(s => s.id === id))
+    .map((id) => profile.skills.find((s) => s.id === id))
     .filter(Boolean)
-    .map(s => s!.name.value);
+    .map((s) => s?.name.value);
   console.log(`\n  ${c.label('Skills')}  ${c.value(`(${selectedSkills.length})`)}`);
   if (selectedSkills.length > 0) {
     console.log(`    ${selectedSkills.join(', ')}`);
@@ -67,12 +88,15 @@ function printCurationPreview(profile: Profile, plan: CurationPlan, company: str
 
   // Education
   const selectedEdu = plan.selectedEducationIds
-    .map(id => profile.education.find(e => e.id === id))
+    .map((id) => profile.education.find((e) => e.id === id))
     .filter(Boolean);
   console.log(`\n  ${c.label('Education')}  ${c.value(`(${selectedEdu.length})`)}`);
   for (const edu of selectedEdu) {
-    const parts = [edu!.degree?.value, edu!.fieldOfStudy?.value].filter(Boolean);
-    const label = parts.length > 0 ? `${parts.join(' in ')} — ${edu!.institution.value}` : edu!.institution.value;
+    const parts = [edu?.degree?.value, edu?.fieldOfStudy?.value].filter(Boolean);
+    const label =
+      parts.length > 0
+        ? `${parts.join(' in ')} — ${edu?.institution.value}`
+        : edu?.institution.value;
     console.log(`    ${label}`);
   }
 
@@ -96,7 +120,9 @@ async function runCuration(
     const analyzeSpinner = createSpinner('Analyzing job description...');
     try {
       jobAnalysis = await analyzeJobDescription(job.text);
-      analyzeSpinner.succeed(`${c.ok} Job analyzed: ${jobAnalysis.industry}, ${jobAnalysis.seniority}`);
+      analyzeSpinner.succeed(
+        `${c.ok} Job analyzed: ${jobAnalysis.industry}, ${jobAnalysis.seniority}`,
+      );
     } catch (err) {
       analyzeSpinner.stop();
       console.log(c.muted(`  Could not analyze JD: ${(err as Error).message}. Using defaults.`));
@@ -115,7 +141,7 @@ async function runCuration(
 
   // Step 2: curate
   const curateSpinner = createSpinner('Curating profile for this role...');
-  let curatorResult;
+  let curatorResult: CuratorResult;
   try {
     curatorResult = await curateForJob(profile, jobAnalysis);
     curateSpinner.succeed(`${c.ok} Curation complete.`);
@@ -146,7 +172,9 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
   const jobs = await loadJobs(profileDir);
 
   if (jobs.length === 0) {
-    console.log(`\n  ${c.muted('No saved job descriptions. Use "Manage jobs" to add some first.')}`);
+    console.log(
+      `\n  ${c.muted('No saved job descriptions. Use "Manage jobs" to add some first.')}`,
+    );
     return;
   }
 
@@ -154,7 +182,7 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
 
   // Build list with preparation status
   const refinementStatuses = await Promise.all(
-    jobs.map(async j => {
+    jobs.map(async (j) => {
       const r = await loadJobRefinement(profileDir, j.id);
       return { job: j, refinement: r };
     }),
@@ -175,18 +203,15 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
 
     let jobId: string;
     try {
-      const ans = await inquirer.prompt([
+      const ans = (await inquirer.prompt([
         {
           type: 'list',
           loop: false,
           name: 'jobId',
           message: 'Select a job to prepare for:',
-          choices: [
-            ...jobChoices,
-            { name: c.muted('← Back'), value: '__back__' },
-          ],
+          choices: [...jobChoices, { name: c.muted('← Back'), value: '__back__' }],
         },
-      ]) as { jobId: string };
+      ])) as { jobId: string };
       jobId = ans.jobId;
     } catch (err) {
       if (isUserExit(err)) return;
@@ -195,7 +220,7 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
 
     if (jobId === '__back__') return;
 
-    const statusEntry = refinementStatuses.find(s => s.job.id === jobId)!;
+    const statusEntry = refinementStatuses.find((s) => s.job.id === jobId)!;
     const job = statusEntry.job;
     let refinement = statusEntry.refinement;
 
@@ -218,20 +243,20 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
     while (true) {
       let action: string;
       try {
-        const ans = await inquirer.prompt([
+        const ans = (await inquirer.prompt([
           {
             type: 'list',
             loop: false,
             name: 'action',
             message: `${job.title} @ ${job.company}:`,
             choices: [
-              { value: 'view',     name: 'View preparation' },
+              { value: 'view', name: 'View preparation' },
               { value: 'recurate', name: '↻ Re-run curation' },
               { value: 'feedback', name: 'Run professional feedback' },
-              { value: 'back',     name: c.muted('← Back') },
+              { value: 'back', name: c.muted('← Back') },
             ],
           },
-        ]) as { action: string };
+        ])) as { action: string };
         action = ans.action;
       } catch (err) {
         if (isUserExit(err)) break;
@@ -264,7 +289,7 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
         const refMap = buildRefMapForProfile(profile);
         const { effectiveFlair } = getFlairInfo(3, refinement.jobAnalysis.industry);
 
-        let doc;
+        let doc: ResumeDocument;
         try {
           doc = assembleResumeDocument(
             profile,
@@ -276,13 +301,15 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
             job.company,
           );
         } catch (err) {
-          console.error(`\n${c.fail} ${c.error(`Could not build resume document: ${(err as Error).message}`)}`);
+          console.error(
+            `\n${c.fail} ${c.error(`Could not build resume document: ${(err as Error).message}`)}`,
+          );
           continue;
         }
 
         // Run evaluation
         const evalSpinner = createSpinner('Running professional feedback...');
-        let evaluation;
+        let evaluation: JobEvaluation;
         try {
           evaluation = await evaluateForJob(doc, refinement.jobAnalysis);
           evalSpinner.succeed(`${c.ok} Feedback complete.`);
@@ -299,18 +326,18 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
           continue;
         }
 
-        const { feedbackAction } = await inquirer.prompt([
+        const { feedbackAction } = (await inquirer.prompt([
           {
             type: 'list',
             loop: false,
             name: 'feedbackAction',
             message: 'Apply feedback?',
             choices: [
-              { value: 'skip',  name: 'Skip' },
+              { value: 'skip', name: 'Skip' },
               { value: 'apply', name: 'Apply feedback to document' },
             ],
           },
-        ]) as { feedbackAction: string };
+        ])) as { feedbackAction: string };
 
         if (feedbackAction === 'skip') continue;
 
@@ -318,7 +345,7 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
         const enrichedGaps = await enrichFindingsWithUserInput(
           evaluation.gaps,
           inquirer,
-          doc.positions.map(p => `${p.title} at ${p.company}`).join(', '),
+          doc.positions.map((p) => `${p.title} at ${p.company}`).join(', '),
         );
 
         const applySpinner = createSpinner('Applying feedback...');
@@ -327,7 +354,9 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
           applySpinner.succeed(`${c.ok} Feedback applied.`);
         } catch (err) {
           applySpinner.stop();
-          console.error(`\n${c.fail} ${c.error(`Could not apply feedback: ${(err as Error).message}`)}`);
+          console.error(
+            `\n${c.fail} ${c.error(`Could not apply feedback: ${(err as Error).message}`)}`,
+          );
         }
       }
     }

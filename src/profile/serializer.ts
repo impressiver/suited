@@ -1,8 +1,16 @@
-import { createHash } from 'crypto';
-import { readFile, writeFile, mkdir, stat } from 'fs/promises';
-import { dirname, join } from 'path';
-import { Profile, ProfileSchema, RefinedData, GenerationConfig, SavedJob, JobRefinement, ContactMeta } from './schema.js';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileExists } from '../utils/fs.js';
+import {
+  type ContactMeta,
+  type GenerationConfig,
+  type JobRefinement,
+  type Profile,
+  ProfileSchema,
+  type RefinedData,
+  type SavedJob,
+} from './schema.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -115,12 +123,19 @@ export function jobRefinedMdPath(profileDir: string, slug: string): string {
   return join(profileDir, 'jobs', slug, 'refined.md');
 }
 
-export async function saveJobRefinedProfile(profile: Profile, profileDir: string, slug: string): Promise<void> {
+export async function saveJobRefinedProfile(
+  profile: Profile,
+  profileDir: string,
+  slug: string,
+): Promise<void> {
   profile.updatedAt = new Date().toISOString();
   await writeJson(jobRefinedJsonPath(profileDir, slug), profile);
 }
 
-export async function loadJobRefinedProfile(profileDir: string, slug: string): Promise<Profile | null> {
+export async function loadJobRefinedProfile(
+  profileDir: string,
+  slug: string,
+): Promise<Profile | null> {
   const path = jobRefinedJsonPath(profileDir, slug);
   if (!(await fileExists(path))) return null;
   return parseProfile(await readJson(path));
@@ -154,9 +169,7 @@ export async function saveGenerationConfig(
   await writeJson(generationConfigPath(profileDir), config);
 }
 
-export async function loadGenerationConfig(
-  profileDir: string,
-): Promise<GenerationConfig | null> {
+export async function loadGenerationConfig(profileDir: string): Promise<GenerationConfig | null> {
   const path = generationConfigPath(profileDir);
   if (!(await fileExists(path))) return null;
   return readJson<GenerationConfig>(path);
@@ -178,13 +191,16 @@ export async function loadJobs(profileDir: string): Promise<SavedJob[]> {
 
 export async function saveJob(job: SavedJob, profileDir: string): Promise<void> {
   const jobs = await loadJobs(profileDir);
-  if (jobs.some(j => j.textHash === job.textHash)) return; // already saved
+  if (jobs.some((j) => j.textHash === job.textHash)) return; // already saved
   await writeJson(jobsJsonPath(profileDir), [...jobs, job]);
 }
 
 export async function deleteJob(id: string, profileDir: string): Promise<void> {
   const jobs = await loadJobs(profileDir);
-  await writeJson(jobsJsonPath(profileDir), jobs.filter(j => j.id !== id));
+  await writeJson(
+    jobsJsonPath(profileDir),
+    jobs.filter((j) => j.id !== id),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -220,12 +236,12 @@ export function mergeContactMeta(profile: Profile, meta: ContactMeta): Profile {
 
   const contact = { ...profile.contact };
   if (meta.headline && !contact.headline) contact.headline = wrap(meta.headline);
-  if (meta.email    && !contact.email)    contact.email    = wrap(meta.email);
-  if (meta.phone    && !contact.phone)    contact.phone    = wrap(meta.phone);
+  if (meta.email && !contact.email) contact.email = wrap(meta.email);
+  if (meta.phone && !contact.phone) contact.phone = wrap(meta.phone);
   if (meta.location && !contact.location) contact.location = wrap(meta.location);
   if (meta.linkedin && !contact.linkedin) contact.linkedin = wrap(meta.linkedin);
-  if (meta.website  && !contact.website)  contact.website  = wrap(meta.website);
-  if (meta.github   && !contact.github)   contact.github   = wrap(meta.github);
+  if (meta.website && !contact.website) contact.website = wrap(meta.website);
+  if (meta.github && !contact.github) contact.github = wrap(meta.github);
 
   return { ...profile, contact };
 }
@@ -238,19 +254,27 @@ export function jobRefinementPath(profileDir: string, jobId: string): string {
   return join(profileDir, 'refinements', `${jobId}.json`);
 }
 
-export async function loadJobRefinement(profileDir: string, jobId: string): Promise<JobRefinement | null> {
+export async function loadJobRefinement(
+  profileDir: string,
+  jobId: string,
+): Promise<JobRefinement | null> {
   const path = jobRefinementPath(profileDir, jobId);
   if (!(await fileExists(path))) return null;
   return readJson<JobRefinement>(path);
 }
 
-export async function saveJobRefinement(refinement: JobRefinement, profileDir: string): Promise<void> {
+export async function saveJobRefinement(
+  refinement: JobRefinement,
+  profileDir: string,
+): Promise<void> {
   await writeJson(jobRefinementPath(profileDir, refinement.jobId), refinement);
 }
 
 export async function deleteJobRefinement(jobId: string, profileDir: string): Promise<void> {
-  const { unlink } = await import('fs/promises');
-  await unlink(jobRefinementPath(profileDir, jobId)).catch(() => {/* already absent */});
+  const { unlink } = await import('node:fs/promises');
+  await unlink(jobRefinementPath(profileDir, jobId)).catch(() => {
+    /* already absent */
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -258,15 +282,19 @@ export async function deleteJobRefinement(jobId: string, profileDir: string): Pr
 // ---------------------------------------------------------------------------
 
 export async function clearRefined(profileDir: string): Promise<void> {
-  const { unlink } = await import('fs/promises');
+  const { unlink } = await import('node:fs/promises');
   for (const p of [refinedJsonPath(profileDir), refinedMdPath(profileDir)]) {
-    await unlink(p).catch(() => {/* already absent */});
+    await unlink(p).catch(() => {
+      /* already absent */
+    });
   }
 }
 
 export async function clearGenerationConfig(profileDir: string): Promise<void> {
-  const { unlink } = await import('fs/promises');
-  await unlink(generationConfigPath(profileDir)).catch(() => {/* already absent */});
+  const { unlink } = await import('node:fs/promises');
+  await unlink(generationConfigPath(profileDir)).catch(() => {
+    /* already absent */
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +317,10 @@ export async function loadLogoCache(profileDir: string): Promise<Record<string, 
   }
 }
 
-export async function saveLogoCache(cache: Record<string, string>, profileDir: string): Promise<void> {
+export async function saveLogoCache(
+  cache: Record<string, string>,
+  profileDir: string,
+): Promise<void> {
   await writeJson(logoCachePath(profileDir), cache);
 }
 

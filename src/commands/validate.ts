@@ -2,10 +2,10 @@
  * `resume validate` — re-run accuracy guard on the current profile
  */
 
-import { loadActiveProfile, sourceJsonPath } from '../profile/serializer.js';
 import { buildRefList } from '../claude/prompts/curate.js';
-import { fileExists } from '../utils/fs.js';
+import { loadActiveProfile, sourceJsonPath } from '../profile/serializer.js';
 import { c } from '../utils/colors.js';
+import { fileExists } from '../utils/fs.js';
 
 export interface ValidateOptions {
   profileDir?: string;
@@ -27,7 +27,9 @@ export async function runValidate(options: ValidateOptions): Promise<void> {
   let count = 0;
   for (const [id, entry] of refMap) {
     if (count++ >= 5) break;
-    console.log(`  ${c.muted(`[${id}]`)} ${c.label(entry.label + ':')} "${entry.value.slice(0, 60)}${entry.value.length > 60 ? '…' : ''}"`);
+    console.log(
+      `  ${c.muted(`[${id}]`)} ${c.label(`${entry.label}:`)} "${entry.value.slice(0, 60)}${entry.value.length > 60 ? '…' : ''}"`,
+    );
   }
 
   console.log(`\n${c.ok} ${c.success('Profile structure is valid. Accuracy guard is ready.')}`);

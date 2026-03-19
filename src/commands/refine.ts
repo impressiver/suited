@@ -2,6 +2,7 @@ import {
   loadSource, saveRefined, loadRefined, hashSource,
   refinedJsonPath, refinedMdPath, sourceJsonPath,
   loadJobs, loadJobRefinement, saveJobRefinement, deleteJobRefinement,
+  isMdNewerThanJson,
 } from '../profile/serializer.js';
 import { runProfileEditor } from './profile-editor.js';
 import { profileToMarkdown, markdownToProfile } from '../profile/markdown.js';
@@ -748,6 +749,20 @@ export async function runRefine(options: RefineOptions): Promise<void> {
 
   if (!(await fileExists(sourceJsonPath(profileDir)))) {
     throw new Error(`source.json not found in ${profileDir}. Run 'resume import' first.`);
+  }
+
+  // Detect external edits to refined.md — sync to JSON before proceeding
+  if (await isMdNewerThanJson(refinedMdPath(profileDir), refinedJsonPath(profileDir))) {
+    console.log(`\n${c.warn} ${c.warning('refined.md has been modified outside the CLI.')}`);
+    const { sync } = await inquirer.prompt([
+      { type: 'confirm', name: 'sync', message: 'Reload refined.json from the edited markdown?', default: true },
+    ]) as { sync: boolean };
+    if (sync) {
+      const existing = await loadRefined(profileDir);
+      const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      console.log(`${c.ok} ${c.success('refined.json updated from refined.md.')}`);
+    }
   }
 
   const currentHash = await hashSource(profileDir);

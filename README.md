@@ -157,7 +157,22 @@ If any check fails, the pipeline halts.
 
 ## Working with your profile
 
-After importing, suited creates `output/refined.md` — a plain-text file you can edit directly. Changes are detected automatically on the next run. This is the easiest way to rewrite bullets, fix dates, or add anything LinkedIn didn't capture.
+After refining, suited creates `output/refined.md` — a plain-text file you can edit directly. On the next run, suited detects that the file has changed and asks whether to reload it before continuing. This is the easiest way to rewrite bullets, fix dates, or add anything LinkedIn didn't capture.
+
+### Job-specific profiles
+
+When you generate a resume for a specific job, suited saves a curated version of your profile to `output/jobs/{job-slug}/refined.md`. This file contains only the positions, bullets, and skills that were selected and polished for that job.
+
+You can edit it directly — the next time you generate for that job, suited detects the change and asks whether to use your edits as the starting point instead of re-running curation.
+
+```
+output/
+  refined.md                          # your full profile (editable)
+  jobs/
+    acme-corp-senior-engineer/
+      refined.md                      # curated profile for this job (editable)
+      refined.json
+```
 
 ## Multiple profiles
 

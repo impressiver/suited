@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, stat } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Profile, ProfileSchema, RefinedData, GenerationConfig, SavedJob, JobRefinement, ContactMeta } from './schema.js';
 import { fileExists } from '../utils/fs.js';
@@ -7,6 +7,25 @@ import { fileExists } from '../utils/fs.js';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Returns true if mdPath exists and has a newer mtime than jsonPath. */
+export async function isMdNewerThanJson(mdPath: string, jsonPath: string): Promise<boolean> {
+  try {
+    const [mdStat, jsonStat] = await Promise.all([stat(mdPath), stat(jsonPath)]);
+    return mdStat.mtimeMs > jsonStat.mtimeMs;
+  } catch {
+    return false;
+  }
+}
+
+/** URL-safe slug from company + title, e.g. "Acme Corp" + "Sr Engineer" → "acme-corp-sr-engineer" */
+export function makeJobSlug(company: string, title: string): string {
+  return `${company}-${title}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
 
 async function writeJson(filePath: string, data: unknown): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
@@ -82,6 +101,29 @@ export async function loadRefined(profileDir: string): Promise<RefinedData> {
     profile: parseProfile(raw.profile),
     session: raw.session as RefinedData['session'],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Job-specific refined profiles — jobs/{slug}/refined.{json,md}
+// ---------------------------------------------------------------------------
+
+export function jobRefinedJsonPath(profileDir: string, slug: string): string {
+  return join(profileDir, 'jobs', slug, 'refined.json');
+}
+
+export function jobRefinedMdPath(profileDir: string, slug: string): string {
+  return join(profileDir, 'jobs', slug, 'refined.md');
+}
+
+export async function saveJobRefinedProfile(profile: Profile, profileDir: string, slug: string): Promise<void> {
+  profile.updatedAt = new Date().toISOString();
+  await writeJson(jobRefinedJsonPath(profileDir, slug), profile);
+}
+
+export async function loadJobRefinedProfile(profileDir: string, slug: string): Promise<Profile | null> {
+  const path = jobRefinedJsonPath(profileDir, slug);
+  if (!(await fileExists(path))) return null;
+  return parseProfile(await readJson(path));
 }
 
 // ---------------------------------------------------------------------------

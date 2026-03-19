@@ -62,8 +62,8 @@ export async function runDashboard(options: FlowOptions): Promise<void> {
       ? [
           { value: 'import',   name: `1. Import profile data    ${c.muted('(LinkedIn URL, ZIP export, or paste)')}` },
           { value: 'refine',   name: `2. Refine profile          ${c.muted('(Q&A, pro feedback, manual editing)')}` },
-          { value: 'jobs',     name: `3. Manage jobs             ${c.muted('(add, view, delete job descriptions)')}` },
-          { value: 'contact',  name: `4. Contact info            ${c.muted('(view and edit contact details)')}` },
+          { value: 'contact',  name: `3. Contact info            ${c.muted('(view and edit contact details)')}` },
+          { value: 'jobs',     name: `4. Manage jobs             ${c.muted('(add, view, delete job descriptions)')}` },
           { value: 'prepare',  name: `5. Prepare for a job       ${c.muted('(curate profile for a specific job rec)')}` },
           { value: 'generate', name: `6. ${c.highlight('Generate resume')}         ${c.muted('(export PDF)')}` },
           { value: 'exit',     name: c.muted('Exit') },

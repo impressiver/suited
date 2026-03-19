@@ -6,6 +6,8 @@ import {
   loadJobRefinement, saveJobRefinement,
   loadContactMeta, saveContactMeta,
   loadLogoCache, saveLogoCache,
+  isMdNewerThanJson,
+  makeJobSlug, jobRefinedJsonPath, jobRefinedMdPath, saveJobRefinedProfile, loadJobRefinedProfile,
 } from '../profile/serializer.js';
 import { markdownToProfile } from '../profile/markdown.js';
 import { profileToMarkdown } from '../profile/markdown.js';
@@ -54,6 +56,21 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
   const profileDir = options.profileDir ?? 'output';
   const resumesDir = options.output ?? `${profileDir}/resumes`;
+
+  // Detect external edits to refined.md — sync to JSON before generating
+  if (await isMdNewerThanJson(refinedMdPath(profileDir), refinedJsonPath(profileDir))) {
+    const { default: inquirer } = await import('inquirer');
+    console.log(`\n${c.warn} ${c.warning('refined.md has been modified outside the CLI.')}`);
+    const { sync } = await inquirer.prompt([
+      { type: 'confirm', name: 'sync', message: 'Reload refined.json from the edited markdown and re-run from this step?', default: true },
+    ]) as { sync: boolean };
+    if (sync) {
+      const existing = await loadRefined(profileDir);
+      const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      console.log(`${c.ok} ${c.success('refined.json updated from refined.md.')}`);
+    }
+  }
 
   // Load the best available profile (refined → source)
   let profile = await loadActiveProfile(profileDir);
@@ -160,6 +177,29 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       }
       console.log(`  ${c.label('Template:')} ${effectiveTemplate} ${c.muted(`(flair ${effectiveFlair})`)}`);
 
+      // Check for manually-edited job-specific refined profile
+      const jobSlug = makeJobSlug(config.company, config.jobTitle);
+      let useEditedJobProfile = false;
+      if (await isMdNewerThanJson(jobRefinedMdPath(profileDir, jobSlug), jobRefinedJsonPath(profileDir, jobSlug))) {
+        console.log(`\n${c.warn} ${c.warning(`jobs/${jobSlug}/refined.md has been modified.`)}`);
+        const { useMd } = await inquirer.prompt([{
+          type: 'confirm', name: 'useMd',
+          message: 'Use your manual edits as the starting profile instead of re-running curation?',
+          default: true,
+        }]) as { useMd: boolean };
+        if (useMd) {
+          const existingProfile = await loadJobRefinedProfile(profileDir, jobSlug);
+          if (existingProfile) {
+            const editedProfile = await markdownToProfile(jobRefinedMdPath(profileDir, jobSlug), existingProfile);
+            await saveJobRefinedProfile(editedProfile, profileDir, jobSlug);
+            await profileToMarkdown(editedProfile, jobRefinedMdPath(profileDir, jobSlug));
+            resumeDoc = assembleFullResumeDocument(editedProfile, config);
+            useEditedJobProfile = true;
+          }
+        }
+      }
+
+      if (!useEditedJobProfile) {
       // [2/4] Curation — with in-session re-run support (Phase 3 preview)
       let curatorResult: import('../generate/curator.js').CuratorResult | undefined;
       let usedStoredRefinement = false;
@@ -341,6 +381,15 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       } else {
         console.log(c.muted('[4/4] Job fit review skipped (using stored evaluation)'));
       }
+      } // end !useEditedJobProfile
+
+      // Save job-specific refined profile for future manual editing
+      if (!useEditedJobProfile && resumeDoc) {
+        const jobProfile = resumeDocToJobProfile(resumeDoc, profile);
+        await saveJobRefinedProfile(jobProfile, profileDir, jobSlug);
+        await profileToMarkdown(jobProfile, jobRefinedMdPath(profileDir, jobSlug));
+        console.log(c.muted(`  Saved curated profile → jobs/${jobSlug}/refined.md`));
+      }
     } else {
       // No JD — include everything
       const { effectiveFlair, effectiveTemplate } = getFlairInfo(config.flair, 'general');
@@ -348,6 +397,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       console.log(`\n  ${c.label('Template:')} ${displayTemplate}${templateOverride ? '' : c.muted(` (flair ${effectiveFlair})`)}`);
       resumeDoc = assembleFullResumeDocument(profile, config);
     }
+
+    if (!resumeDoc) continue;
 
     // Apply template override (e.g. 'retro') regardless of flair-based selection
     if (templateOverride) resumeDoc = { ...resumeDoc, template: templateOverride };
@@ -398,10 +449,14 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       ? `${safeName(config.company)}-${safeName(config.jobTitle)}`
       : safeName(config.jobTitle) || 'resume';
 
+    const jobSlug = config.company ? makeJobSlug(config.company, config.jobTitle ?? '') : null;
+    const resumeOutputDir = jobSlug ? `${resumesDir}/${jobSlug}` : resumesDir;
+    const fileBaseName = jobSlug ? 'resume' : namePart;
+
     if (config.allTemplates) {
       // Generate one PDF per template
       console.log(c.muted('\nGenerating all templates...'));
-      const generatedPaths = await generateAllTemplates(resumeDoc, namePart, resumesDir, inquirer, profileDir);
+      const generatedPaths = await generateAllTemplates(resumeDoc, fileBaseName, resumeOutputDir, inquirer, profileDir);
       config.profileUpdatedAt = profile.updatedAt;
       config.resolvedTemplate = resumeDoc.template;
       await saveGenerationConfig(config, profileDir);
@@ -409,7 +464,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       console.log(c.muted(`  Settings saved to ${generationConfigPath(profileDir)}`));
     } else {
       // Single template — render, fit-check, export
-      let outputPath = `${resumesDir}/${namePart}-${date}-${hhmm}.pdf`;
+      let outputPath = `${resumeOutputDir}/${fileBaseName}-${date}-${hhmm}.pdf`;
       let html = await renderResumeHtml(resumeDoc);
 
       let fitCancelled = false;
@@ -509,7 +564,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             const newNowTs = new Date();
             const newDate = newNowTs.toISOString().slice(0, 10);
             const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
-            outputPath = `${resumesDir}/${namePart}-${newDate}-${newHhmm}.pdf`;
+            outputPath = `${resumeOutputDir}/${fileBaseName}-${newDate}-${newHhmm}.pdf`;
             let tweakedHtml = await renderResumeHtml(resumeDoc);
             tweakedHtml = await trySqueeze(tweakedHtml, resumeDoc);
             await exportToPdf(tweakedHtml, { template: resumeDoc.template, outputPath });
@@ -541,7 +596,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const newNowTs = new Date();
           const newDate = newNowTs.toISOString().slice(0, 10);
           const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
-          outputPath = `${resumesDir}/${namePart}-${newDate}-${newHhmm}.pdf`;
+          outputPath = `${resumeOutputDir}/${fileBaseName}-${newDate}-${newHhmm}.pdf`;
           let templateHtml = await renderResumeHtml(resumeDoc);
           templateHtml = await trySqueeze(templateHtml, resumeDoc);
           await exportToPdf(templateHtml, { template: resumeDoc.template, outputPath });
@@ -1120,6 +1175,78 @@ async function collectTimelineLogos(
 
   await saveLogoCache(logoUris, profileDir);
   return logoUris;
+}
+
+// ---------------------------------------------------------------------------
+// Build a job-scoped Profile from a polished ResumeDocument
+// ---------------------------------------------------------------------------
+
+function resumeDocToJobProfile(doc: ResumeDocument, base: Profile): Profile {
+  const now = new Date().toISOString();
+  const userEdit = (v: string) => ({ value: v, source: { kind: 'user-edit' as const, editedAt: now } });
+
+  const positions = doc.positions.map(rp => {
+    const basePos = base.positions.find(p => p.title.value === rp.title && p.company.value === rp.company);
+    return {
+      id: basePos?.id ?? `pos-job-${rp.company.toLowerCase().replace(/\W+/g, '-')}`,
+      title: basePos?.title ?? userEdit(rp.title),
+      company: basePos?.company ?? userEdit(rp.company),
+      location: rp.location ? (basePos?.location ?? userEdit(rp.location)) : undefined,
+      startDate: basePos?.startDate ?? userEdit(rp.startDate),
+      endDate: rp.endDate ? (basePos?.endDate ?? userEdit(rp.endDate)) : undefined,
+      bullets: rp.bullets.map(b => userEdit(b)),
+    };
+  });
+
+  const skills = doc.skills.map((name, i) => {
+    const baseSkill = base.skills.find(s => s.name.value === name);
+    return baseSkill ?? { id: `skill-job-${i}`, name: userEdit(name) };
+  });
+
+  const education = doc.education.map(re => {
+    const baseEdu = base.education.find(e => e.institution.value === re.institution);
+    return baseEdu ?? {
+      id: `edu-job-${re.institution.toLowerCase().replace(/\W+/g, '-')}`,
+      institution: userEdit(re.institution),
+      degree: re.degree ? userEdit(re.degree) : undefined,
+      fieldOfStudy: re.fieldOfStudy ? userEdit(re.fieldOfStudy) : undefined,
+    };
+  });
+
+  return {
+    ...base,
+    updatedAt: now,
+    summary: doc.summary ? userEdit(doc.summary) : undefined,
+    positions,
+    skills,
+    education,
+    certifications: doc.certifications.map((cert, i) => ({
+      id: `cert-job-${i}`,
+      name: userEdit(cert.name),
+      authority: cert.authority ? userEdit(cert.authority) : undefined,
+    })),
+    projects: doc.projects.map((proj, i) => ({
+      id: `proj-job-${i}`,
+      title: userEdit(proj.title),
+      description: proj.description ? userEdit(proj.description) : undefined,
+      url: proj.url ? userEdit(proj.url) : undefined,
+    })),
+    languages: doc.languages.map((lang, i) => ({
+      id: `lang-job-${i}`,
+      name: userEdit(lang.name),
+      proficiency: lang.proficiency ? userEdit(lang.proficiency) : undefined,
+    })),
+    volunteer: doc.volunteer.map((vol, i) => ({
+      id: `vol-job-${i}`,
+      organization: userEdit(vol.organization),
+      role: vol.role ? userEdit(vol.role) : undefined,
+      startDate: vol.startDate ? userEdit(vol.startDate) : undefined,
+      endDate: vol.endDate ? userEdit(vol.endDate) : undefined,
+    })),
+    awards: doc.awards.map(a => userEdit(a)),
+    // Clear fields not part of the job-specific profile
+    publications: [],
+  };
 }
 
 // ---------------------------------------------------------------------------

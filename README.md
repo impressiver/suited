@@ -1,5 +1,7 @@
 # suited
 
+> **Note: This project has not yet been published to npm or Homebrew.**
+
 A CLI tool that generates factually-accurate PDF resumes from source data (eg. LinkedIn profile) tailored to fit the job description.
 
 You import your raw resume data, refine it with help from AI, then add job descriptions. Suited picks the most relevant parts of your background, offers suggestions, and produces a polished PDF — without inventing anything.

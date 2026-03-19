@@ -11,6 +11,11 @@ import { JobsScreen } from './screens/JobsScreen.js';
 import { SettingsScreen } from './screens/SettingsScreen.js';
 import { type FocusTarget, SCREEN_ORDER, type ScreenId, type TuiExitBag } from './types.js';
 
+/** Ink only sets `key.return` for `\r`; many TTYs send `\n` for Enter (`name === 'enter'`), which leaves `key.return` false. */
+function isEnterKey(key: { return?: boolean }, input: string): boolean {
+  return Boolean(key.return) || input === '\n' || input === '\r';
+}
+
 export interface AppProps {
   profileDir: string;
   flowOptions: FlowOptions;
@@ -68,13 +73,13 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
           });
           return;
         }
-        if (key.return) {
+        if (isEnterKey(key, input)) {
           setFocusTarget('content');
           return;
         }
       }
 
-      if (focusTarget === 'content' && key.return) {
+      if (focusTarget === 'content' && isEnterKey(key, input)) {
         const args = buildPendingCliArgs(activeScreen, profileDir, flowOptions);
         if (args) {
           exitBag.pending = args;

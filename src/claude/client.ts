@@ -172,3 +172,23 @@ export async function callWithTool<T>(
 
   throw new Error('Unreachable');
 }
+
+/**
+ * Streaming-capable variant for the TUI. Today this yields a single `done` event
+ * (delegates to {@link callWithTool}); Anthropic streaming + tool events can be
+ * wired here without changing call sites’ result shape.
+ */
+export async function* callWithToolStreaming<T>(
+  systemPrompt: string,
+  userMessage: string,
+  tool: Tool,
+  model = 'claude-sonnet-4-6',
+): AsyncGenerator<
+  | { type: 'text'; text: string }
+  | { type: 'tool_start'; name: string }
+  | { type: 'tool_end'; name: string }
+  | { type: 'done'; result: T }
+> {
+  const result = await callWithTool<T>(systemPrompt, userMessage, tool, model);
+  yield { type: 'done', result };
+}

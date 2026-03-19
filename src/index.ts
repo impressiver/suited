@@ -149,7 +149,7 @@ program
     }
   });
 
-// Default action: run the full pipeline when no subcommand is given
+// Default action: runFlow — Ink TUI when stdin+stdout are TTYs, else a non-interactive hint (see flow.ts)
 program.action(async (opts: { profileDir?: string; headed?: boolean; clearSession?: boolean }) => {
   try {
     await runFlow({

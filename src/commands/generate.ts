@@ -59,7 +59,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
   // Detect external edits to refined.md — sync to JSON before generating
   if (await isMdNewerThanJson(refinedMdPath(profileDir), refinedJsonPath(profileDir))) {
-    const { default: inquirer } = await import('inquirer');
     console.log(`\n${c.warn} ${c.warning('refined.md has been modified outside the CLI.')}`);
     const { sync } = await inquirer.prompt([
       { type: 'confirm', name: 'sync', message: 'Reload refined.json from the edited markdown and re-run from this step?', default: true },
@@ -192,7 +191,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           if (existingProfile) {
             const editedProfile = await markdownToProfile(jobRefinedMdPath(profileDir, jobSlug), existingProfile);
             await saveJobRefinedProfile(editedProfile, profileDir, jobSlug);
-            await profileToMarkdown(editedProfile, jobRefinedMdPath(profileDir, jobSlug));
             resumeDoc = assembleFullResumeDocument(editedProfile, config);
             useEditedJobProfile = true;
           }
@@ -386,8 +384,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       // Save job-specific refined profile for future manual editing
       if (!useEditedJobProfile && resumeDoc) {
         const jobProfile = resumeDocToJobProfile(resumeDoc, profile);
-        await saveJobRefinedProfile(jobProfile, profileDir, jobSlug);
-        await profileToMarkdown(jobProfile, jobRefinedMdPath(profileDir, jobSlug));
+        await Promise.all([
+          saveJobRefinedProfile(jobProfile, profileDir, jobSlug),
+          profileToMarkdown(jobProfile, jobRefinedMdPath(profileDir, jobSlug)),
+        ]);
         console.log(c.muted(`  Saved curated profile → jobs/${jobSlug}/refined.md`));
       }
     } else {

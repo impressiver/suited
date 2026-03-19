@@ -1,19 +1,18 @@
 import { Box, Text } from 'ink';
-import { type FocusTarget, NAV_LABELS, SCREEN_ORDER, type ScreenId } from '../types.js';
+import { NAV_LABELS, SCREEN_ORDER, type ScreenId } from '../types.js';
 
 export interface SidebarProps {
   activeScreen: ScreenId;
-  focusTarget: FocusTarget;
 }
 
-export function Sidebar({ activeScreen, focusTarget }: SidebarProps) {
-  const inSidebar = focusTarget === 'sidebar';
+export function Sidebar({ activeScreen }: SidebarProps) {
   return (
     <Box flexDirection="column" width={22} marginRight={2}>
       {SCREEN_ORDER.map((id, i) => {
         const n = i + 1;
         const sel = activeScreen === id;
-        const mark = sel && inSidebar ? '▸ ' : '  ';
+        // Always mark the active row so it stays visible when focus is on the right panel.
+        const mark = sel ? '▸ ' : '  ';
         return (
           <Box key={id}>
             <Text bold={sel} dimColor={!sel}>

@@ -30,11 +30,18 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
 
   const footerHint = useMemo(() => {
     const base =
-      'Tab switch · ↑↓ screen (sidebar) · 1–8 jump · d i r g j p c s · Enter run CLI (content) · q quit';
-    if (focusTarget === 'content' && screenRunsCliOnEnter(activeScreen)) {
-      return `${base} · Esc → sidebar`;
+      '↑↓ change screen (anywhere) · Tab sidebar ↔ panel · 1–8 · d i r g j p c s · q quit';
+    return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
+  }, [focusTarget]);
+
+  const panelFocusBanner = useMemo(() => {
+    if (focusTarget !== 'content') {
+      return null;
     }
-    return `${base} · Esc → sidebar`;
+    if (screenRunsCliOnEnter(activeScreen)) {
+      return 'Enter → run this command in the terminal (you return here when it finishes). Esc → back to nav.';
+    }
+    return 'Enter does nothing on this screen. Esc or Tab → nav · ↑↓ still change screen.';
   }, [activeScreen, focusTarget]);
 
   useInput(
@@ -58,25 +65,24 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
         return;
       }
 
-      if (focusTarget === 'sidebar') {
-        if (key.upArrow) {
-          setActiveScreen((prev) => {
-            const i = SCREEN_ORDER.indexOf(prev);
-            return SCREEN_ORDER[(i - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length];
-          });
-          return;
-        }
-        if (key.downArrow) {
-          setActiveScreen((prev) => {
-            const i = SCREEN_ORDER.indexOf(prev);
-            return SCREEN_ORDER[(i + 1) % SCREEN_ORDER.length];
-          });
-          return;
-        }
-        if (isEnterKey(key, input)) {
-          setFocusTarget('content');
-          return;
-        }
+      if (key.upArrow) {
+        setActiveScreen((prev) => {
+          const i = SCREEN_ORDER.indexOf(prev);
+          return SCREEN_ORDER[(i - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length];
+        });
+        return;
+      }
+      if (key.downArrow) {
+        setActiveScreen((prev) => {
+          const i = SCREEN_ORDER.indexOf(prev);
+          return SCREEN_ORDER[(i + 1) % SCREEN_ORDER.length];
+        });
+        return;
+      }
+
+      if (focusTarget === 'sidebar' && isEnterKey(key, input)) {
+        setFocusTarget('content');
+        return;
       }
 
       if (focusTarget === 'content' && isEnterKey(key, input)) {
@@ -171,6 +177,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
         activeScreen={activeScreen}
         focusTarget={focusTarget}
         footerHint={footerHint}
+        panelFocusBanner={panelFocusBanner}
         name={snapshot.name}
         positionCount={snapshot.positionCount}
         skillCount={snapshot.skillCount}

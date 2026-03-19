@@ -7,7 +7,7 @@ export interface FooterProps {
 }
 
 export function Footer({ focusTarget, hint }: FooterProps) {
-  const focusLabel = focusTarget === 'sidebar' ? 'sidebar' : 'content';
+  const focusLabel = focusTarget === 'sidebar' ? 'nav (left)' : 'panel (right)';
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text dimColor>

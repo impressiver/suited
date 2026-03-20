@@ -18,9 +18,11 @@ import type { ScreenId } from '../types.ts';
 
 const QUICK_ACTIONS: Array<SelectItem<ScreenId>> = [
   { value: 'import', label: '2 · Import source' },
-  { value: 'refine', label: '3 · Refine profile' },
-  { value: 'generate', label: '4 · Generate resume' },
-  { value: 'jobs', label: '5 · Jobs' },
+  { value: 'contact', label: '3 · Contact' },
+  { value: 'jobs', label: '4 · Jobs' },
+  { value: 'refine', label: '5 · Refine profile' },
+  { value: 'profile', label: '6 · Improve' },
+  { value: 'generate', label: '7 · Generate resume' },
   { value: 'settings', label: '8 · Settings' },
 ];
 
@@ -169,7 +171,7 @@ export function DashboardScreen({ snapshot, profileDir }: DashboardScreenProps) 
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text dimColor>
-          Nav: r refine · g generate · i import · j jobs · 8 settings · Tab sidebar
+          Nav: i import · c contact · j jobs · r refine · p improve · g generate · s settings · Tab sidebar
         </Text>
       </Box>
     </Box>

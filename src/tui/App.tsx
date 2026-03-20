@@ -40,7 +40,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
 
   const footerHint = useMemo(() => {
     const base =
-      '↑↓ change screen (anywhere) · Tab sidebar ↔ panel · 1–8 · d i r g j p c s · q quit';
+      '↑↓ change screen (anywhere) · Tab sidebar ↔ panel · 1–8 · d i c j r p g s · q quit';
     if (state.operationInProgress) {
       return `${base} · locked · Esc cancels op`;
     }

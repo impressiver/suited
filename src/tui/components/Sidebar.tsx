@@ -14,11 +14,18 @@ export function Sidebar({ activeScreen }: SidebarProps) {
         // Always mark the active row so it stays visible when focus is on the right panel.
         const mark = sel ? '▸ ' : '  ';
         return (
-          <Box key={id}>
-            <Text bold={sel} dimColor={!sel}>
-              {mark}
-              {n} {NAV_LABELS[id]}
-            </Text>
+          <Box key={id} flexDirection="column">
+            {id === 'settings' && (
+              <Box>
+                <Text dimColor>─────────────</Text>
+              </Box>
+            )}
+            <Box>
+              <Text bold={sel} dimColor={!sel}>
+                {mark}
+                {n} {NAV_LABELS[id]}
+              </Text>
+            </Box>
           </Box>
         );
       })}

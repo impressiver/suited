@@ -11,11 +11,11 @@ export type ScreenId =
 export const SCREEN_ORDER: ScreenId[] = [
   'dashboard',
   'import',
-  'refine',
-  'generate',
-  'jobs',
-  'profile',
   'contact',
+  'jobs',
+  'refine',
+  'profile',
+  'generate',
   'settings',
 ];
 
@@ -33,7 +33,7 @@ export const NAV_LABELS: Record<ScreenId, string> = {
   refine: 'Refine',
   generate: 'Generate',
   jobs: 'Jobs',
-  profile: 'Profile',
+  profile: 'Improve',
   contact: 'Contact',
   settings: 'Settings',
 };

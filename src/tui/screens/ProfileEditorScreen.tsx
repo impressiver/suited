@@ -77,6 +77,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const [phase, setPhase] = useState<'loading' | 'no-source' | 'ready' | 'saving' | 'err'>(
     'loading',
   );
+  const [loadNonce, setLoadNonce] = useState(0);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<RefinementSession | null>(null);
@@ -125,7 +126,20 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         setPhase('err');
       }
     })();
-  }, [profileDir]);
+  }, [profileDir, loadNonce]);
+
+  useInput(
+    (input) => {
+      if (!active || phase !== 'err' || inTextInput) {
+        return;
+      }
+      if (input === 'r' || input === 'R') {
+        setErrMsg(null);
+        setLoadNonce((n) => n + 1);
+      }
+    },
+    { isActive: active && phase === 'err' && !inTextInput },
+  );
 
   const save = useCallback(async () => {
     if (!profile) {
@@ -765,6 +779,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       <Box flexDirection="column">
         <Text bold>Improve profile</Text>
         <Text color="red">{errMsg ?? 'Unknown error'}</Text>
+        <Text dimColor>Press r to retry · Tab → sidebar</Text>
       </Box>
     );
   }

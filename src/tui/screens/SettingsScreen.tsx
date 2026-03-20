@@ -6,13 +6,9 @@ import { SelectList, TextInput } from '../components/shared/index.ts';
 import { hasApiKey } from '../env.ts';
 import type { ProviderId } from '../settings/probeProvider.ts';
 import { probeApiKey } from '../settings/probeProvider.ts';
+import { maskApiKeyForDisplay } from '../settings/maskApiKey.ts';
 import { upsertEnvFileContents } from '../settings/upsertEnvFile.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
-
-function maskKey(key: string): string {
-  if (key.length <= 8) return '••••••••';
-  return `${key.slice(0, 7)}…${'•'.repeat(12)}`;
-}
 
 const PROVIDER_ITEMS: Array<{ value: ProviderId; label: string }> = [
   { value: 'anthropic', label: 'Anthropic (Claude)' },
@@ -150,8 +146,8 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
       <Text dimColor>Profile directory: {profileDir}</Text>
       <Box marginTop={1} flexDirection="column">
         <Text>API (from environment)</Text>
-        <Text dimColor>ANTHROPIC_API_KEY: {ak ? maskKey(ak) : '(not set)'}</Text>
-        <Text dimColor>OPENROUTER_API_KEY: {ok ? maskKey(ok) : '(not set)'}</Text>
+        <Text dimColor>ANTHROPIC_API_KEY: {ak ? maskApiKeyForDisplay(ak) : '(not set)'}</Text>
+        <Text dimColor>OPENROUTER_API_KEY: {ok ? maskApiKeyForDisplay(ok) : '(not set)'}</Text>
         <Text {...(configured ? { color: 'green' } : { color: 'yellow' })}>
           {configured ? 'Provider configured ✓' : 'No API key — add to .env or export in shell'}
         </Text>

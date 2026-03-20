@@ -37,12 +37,14 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [loadNonce, setLoadNonce] = useState(0);
 
   useEffect(() => {
     void (async () => {
       try {
         const profile = await loadActiveProfile(profileDir);
         const c = profile.contact;
+        setLoadErr(null);
         setValues({
           name: pickString(c.name),
           headline: pickString(c.headline),
@@ -57,7 +59,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
         setLoadErr((e as Error).message);
       }
     })();
-  }, [profileDir]);
+  }, [profileDir, loadNonce]);
 
   const saveAll = useCallback(async () => {
     setSaveErr(null);
@@ -77,8 +79,21 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   const active = activeScreen === 'contact' && focusTarget === 'content';
 
   useInput(
+    (input) => {
+      if (!active || loadErr == null) {
+        return;
+      }
+      if (input === 'r' || input === 'R') {
+        setLoadErr(null);
+        setLoadNonce((n) => n + 1);
+      }
+    },
+    { isActive: active && loadErr != null },
+  );
+
+  useInput(
     (input, key) => {
-      if (!active || saving) {
+      if (!active || saving || loadErr != null) {
         return;
       }
       if (phase === 'edit' && key.escape) {
@@ -114,7 +129,13 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   };
 
   if (loadErr) {
-    return <Text color="red">{loadErr}</Text>;
+    return (
+      <Box flexDirection="column">
+        <Text bold>Contact</Text>
+        <Text color="red">{loadErr}</Text>
+        <Text dimColor>Press r to retry after fixing files · Tab → sidebar</Text>
+      </Box>
+    );
   }
 
   if (saving) {
@@ -133,7 +154,12 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
         ↑↓ Tab field · Enter edit · Esc leave field · s save all · writes profile + contact.json
       </Text>
       {savedAt != null && <Text color="green">Last saved: {savedAt}</Text>}
-      {saveErr != null && <Text color="red">{saveErr}</Text>}
+      {saveErr != null && (
+        <Box flexDirection="column">
+          <Text color="red">{saveErr}</Text>
+          <Text dimColor>Fix the issue and press s to save again.</Text>
+        </Box>
+      )}
       <Box marginTop={1} flexDirection="column">
         {FIELD_ORDER.map(({ key, label }, i) => {
           const sel = i === fieldIndex;

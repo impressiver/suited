@@ -200,7 +200,13 @@ export function App({ profileDir, flowOptions }: AppProps) {
   const content = (() => {
     switch (activeScreen) {
       case 'dashboard':
-        return <DashboardScreen snapshot={snapshot} profileDir={profileDir} />;
+        return (
+          <DashboardScreen
+            snapshot={snapshot}
+            profileDir={profileDir}
+            onRefreshSnapshot={snapshot.refresh}
+          />
+        );
       case 'import':
         return (
           <ImportScreen

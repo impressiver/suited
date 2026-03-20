@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SavedJob } from '../../profile/schema.ts';
 import { deleteJob, loadJobRefinement, loadJobs, saveJob } from '../../profile/serializer.ts';
 import { runJobRefinementPipeline } from '../../services/jobRefinement.ts';
@@ -13,6 +13,7 @@ import {
   TextInput,
 } from '../components/shared/index.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
+import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 const ADD_SENTINEL = '__add__';
@@ -27,7 +28,7 @@ type Mode =
   | { m: 'deleteAsk'; job: SavedJob; from: 'list' | 'detail' }
   | { m: 'prepareRun'; job: SavedJob }
   | { m: 'prepareOk'; job: SavedJob; nPos: number; nSkills: number }
-  | { m: 'err'; msg: string };
+  | { m: 'err'; msg: string; canRetryPrepare?: boolean };
 
 export interface JobsScreenProps {
   profileDir: string;
@@ -36,7 +37,9 @@ export interface JobsScreenProps {
 export function JobsScreen({ profileDir }: JobsScreenProps) {
   const dispatch = useAppDispatch();
   const { activeScreen, focusTarget, inTextInput, operationInProgress } = useAppState();
-  const [, rows] = useTerminalSize();
+  const [cols, rows] = useTerminalSize();
+  const splitPane = jobsUseSplitPane(cols);
+  const listPaneW = jobsListPaneWidth(cols);
 
   const [jobs, setJobs] = useState<SavedJob[]>([]);
   const [prepLabel, setPrepLabel] = useState<Record<string, string>>({});
@@ -47,6 +50,9 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   const [titleDraft, setTitleDraft] = useState('');
   const [companyDraft, setCompanyDraft] = useState('');
   const [jdDraft, setJdDraft] = useState('');
+  const [errMenuIdx, setErrMenuIdx] = useState(0);
+  const [prepareFailStreak, setPrepareFailStreak] = useState(0);
+  const lastPrepareJobRef = useRef<SavedJob | null>(null);
 
   const reload = useCallback(async () => {
     const list = await loadJobs(profileDir);
@@ -115,6 +121,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       try {
         const existing = await loadJobRefinement(profileDir, job.id);
         const r = await runJobRefinementPipeline(profileDir, job, existing);
+        setPrepareFailStreak(0);
         setMode({
           m: 'prepareOk',
           job,
@@ -123,7 +130,10 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         });
         await reload();
       } catch (e) {
-        setMode({ m: 'err', msg: (e as Error).message });
+        lastPrepareJobRef.current = job;
+        setPrepareFailStreak((n) => n + 1);
+        setErrMenuIdx(0);
+        setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: true });
       } finally {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
@@ -137,6 +147,21 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     setJdDraft('');
     setMode({ m: 'addTitle' });
   }, []);
+
+  const openListJob = useCallback(
+    (item: { value: string }) => {
+      if (item.value === ADD_SENTINEL) {
+        startAdd();
+        return;
+      }
+      const j = jobs.find((x) => x.id === item.value);
+      if (j) {
+        setMenuIndex(0);
+        setMode({ m: 'detail', job: j });
+      }
+    },
+    [jobs, startAdd],
+  );
 
   useInput(
     (input, _key) => {
@@ -247,6 +272,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     async (jd: string, title: string, company: string) => {
       const text = jd.trim();
       if (!text) {
+        setErrMenuIdx(0);
         setMode({ m: 'err', msg: 'Job description is empty.' });
         return;
       }
@@ -265,6 +291,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         await reload();
         setMode({ m: 'list' });
       } catch (e) {
+        setErrMenuIdx(0);
         setMode({ m: 'err', msg: (e as Error).message });
       } finally {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
@@ -295,12 +322,53 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'err') {
+    const showSettings = prepareFailStreak >= 3 && mode.canRetryPrepare;
+    const errItems = [
+      ...(mode.canRetryPrepare
+        ? [{ value: 'retry' as const, label: 'Retry prepare' }]
+        : []),
+      ...(showSettings ? [{ value: 'settings' as const, label: 'Check Settings (API key)' }] : []),
+      { value: 'back' as const, label: 'Back to list' },
+    ];
     return (
       <Box flexDirection="column">
-        <Text bold color="red">
-          {mode.msg}
-        </Text>
-        <Text dimColor>Esc → list</Text>
+        <Text bold>Jobs — error</Text>
+        <Text color="red">{mode.msg}</Text>
+        {showSettings && (
+          <Box marginTop={1}>
+            <Text dimColor>Several prepare failures — verify API key in Settings.</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <SelectList
+            items={errItems}
+            selectedIndex={errMenuIdx}
+            onChange={(i) => setErrMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'settings') {
+                setPrepareFailStreak(0);
+                dispatch({ type: 'SET_SCREEN', screen: 'settings' });
+                dispatch({ type: 'SET_FOCUS', target: 'content' });
+                setMode({ m: 'list' });
+                return;
+              }
+              if (item.value === 'retry') {
+                const j = lastPrepareJobRef.current;
+                if (j) {
+                  setErrMenuIdx(0);
+                  void runPrepare(j);
+                }
+                return;
+              }
+              setPrepareFailStreak(0);
+              setMode({ m: 'list' });
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc also returns to list when this menu is not focused</Text>
+        </Box>
       </Box>
     );
   }
@@ -315,6 +383,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
             await deleteJob(mode.job.id, profileDir);
             await reload();
           } catch (e) {
+            setErrMenuIdx(0);
             setMode({ m: 'err', msg: (e as Error).message });
             return;
           }
@@ -401,7 +470,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'detail') {
-    return (
+    const detailBody = (
       <Box flexDirection="column">
         <Text bold>
           {mode.job.title} @ {mode.job.company}
@@ -430,10 +499,35 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         </Box>
       </Box>
     );
+
+    if (splitPane) {
+      return (
+        <Box flexDirection="row" width={cols}>
+          <Box width={listPaneW} flexDirection="column">
+            <Text bold>Saved jobs</Text>
+            <Box marginTop={1}>
+              <SelectList
+                items={listItems}
+                selectedIndex={listIndex}
+                onChange={(i) => setListIndex(i)}
+                isActive={false}
+                onSubmit={openListJob}
+              />
+            </Box>
+          </Box>
+          <Box marginLeft={1} flexDirection="column" flexGrow={1}>
+            {detailBody}
+          </Box>
+        </Box>
+      );
+    }
+
+    return detailBody;
   }
 
-  return (
-    <Box flexDirection="column">
+  const previewJob = listJob();
+  const listColumn = (
+    <Box flexDirection="column" width={splitPane ? listPaneW : undefined}>
       <Text bold>Saved jobs</Text>
       <Text dimColor>↑↓ · Enter open · a add · d delete · p prepare · g generate</Text>
       <Box marginTop={1}>
@@ -442,19 +536,39 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
           selectedIndex={listIndex}
           onChange={(i) => setListIndex(i)}
           isActive={active && mode.m === 'list'}
-          onSubmit={(item) => {
-            if (item.value === ADD_SENTINEL) {
-              startAdd();
-            } else {
-              const j = jobs.find((x) => x.id === item.value);
-              if (j) {
-                setMenuIndex(0);
-                setMode({ m: 'detail', job: j });
-              }
-            }
-          }}
+          onSubmit={openListJob}
         />
       </Box>
     </Box>
   );
+
+  if (splitPane) {
+    return (
+      <Box flexDirection="row" width={cols}>
+        {listColumn}
+        <Box marginLeft={1} flexDirection="column" flexGrow={1} minWidth={12}>
+          <Text bold dimColor>
+            Preview
+          </Text>
+          {previewJob ? (
+            <Box flexDirection="column" marginTop={1}>
+              <Text>
+                {previewJob.title} @ {previewJob.company}
+              </Text>
+              <Text dimColor>{prepLabel[previewJob.id] ?? '…'}</Text>
+              <Box marginTop={1}>
+                <Text dimColor>Enter — full actions (view JD, prepare, generate)</Text>
+              </Box>
+            </Box>
+          ) : (
+            <Box marginTop={1}>
+              <Text dimColor>Select a job or choose + Add new job</Text>
+            </Box>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  return listColumn;
 }

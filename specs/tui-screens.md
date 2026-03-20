@@ -116,6 +116,10 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **Loads on mount:** `loadJobs()`.
 
+**Layout:** Below **80** terminal columns, list is **stacked** (full width). At **80+** columns, **list + Preview** (`jobsUseSplitPane` / `jobsListPaneWidth` in `src/tui/jobsLayout.ts`). **Detail** mode on wide layouts keeps the job list visible on the left (read-only) with actions on the right.
+
+**Errors:** Prepare failures offer **Retry prepare**, **Check Settings** after repeated failures, **Back to list** (`SelectList`); Esc still returns to list.
+
 **States:**
 - `list` — two-panel or stacked; job list left, detail right; active job highlighted
 - `add-title` — TextInput for job title

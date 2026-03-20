@@ -28,4 +28,22 @@ describe('runFlow non-TTY', () => {
     );
     expect(process.exitCode).toBe(0);
   });
+
+  it('same when stdin TTY but stdout is not (per SSOT: either stream non-TTY)', async () => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    const { runFlow } = await import('./flow.ts');
+    await runFlow({});
+    expect(stderrSpy).toHaveBeenCalled();
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('same when both stdin and stdout are non-TTY', async () => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    const { runFlow } = await import('./flow.ts');
+    await runFlow({});
+    expect(stderrSpy).toHaveBeenCalled();
+    expect(process.exitCode).toBe(0);
+  });
 });

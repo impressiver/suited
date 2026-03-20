@@ -23,6 +23,8 @@ src/
     index.tsx                   ← Ink app root; exports runTui()
     App.tsx                     ← Screen router, global keybindings
     store.tsx                   ← Context + useReducer global state
+    fetchProfileSnapshot.ts     ← disk → ProfileSnapshot (shared with useProfileSnapshot; fixture-tested)
+    jobsLayout.ts               ← Jobs split/stack column threshold (80)
     hooks/
       useProfile.ts
       useOperationAbort.ts   ← Esc ↔ AbortController (see tui-architecture.md)

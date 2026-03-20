@@ -83,6 +83,8 @@ src/
 | Input suppression | Mount `<MultilineInput>`; focus; press `q` | App still mounted; `inTextInput=true` in store |
 | Already-refined sub-menu | Navigate to Refine with refined profile stub | Sub-menu renders; no Inquirer output in `lastFrame()` |
 | Error + retry | Stub scraper to throw; Import; submit | Error state renders; Retry re-runs op |
+| Profile snapshot fixtures | Temp dir + `saveSource` / `saveRefined` / `saveJob` | `fetchProfileSnapshot` + `getDashboardVariant` match expected states |
+| Jobs width | Mock `useTerminalSize` 79 vs 100 | `JobsScreen` output includes `Preview` only at 80+ cols |
 | `pendingJobId` navigation | Dispatch `SET_PENDING_JOB('job-1')` + `SET_SCREEN('generate')` | GenerateScreen skips JD picker; `pendingJobId` cleared |
 | Esc double-press (streaming) | Start streaming op; press Esc once | `aborted` sub-state shown; press Esc again → back |
 

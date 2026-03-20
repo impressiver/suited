@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useEffect, useMemo, useState } from 'react';
 import { loadActiveProfile } from '../../profile/serializer.ts';
 import type { HealthScore } from '../../services/improve.ts';
@@ -12,7 +12,7 @@ import {
 import { getDashboardVariant } from '../dashboardVariant.ts';
 import { hasApiKey } from '../env.ts';
 import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
-import { useAppDispatch } from '../store.tsx';
+import { useAppDispatch, useAppState } from '../store.tsx';
 import { suggestedNextLine } from '../suggestedNext.ts';
 import type { ScreenId } from '../types.ts';
 
@@ -29,10 +29,14 @@ const QUICK_ACTIONS: Array<SelectItem<ScreenId>> = [
 export interface DashboardScreenProps {
   snapshot: ProfileSnapshot;
   profileDir: string;
+  /** Re-load snapshot from disk (e.g. health retry). */
+  onRefreshSnapshot?: () => void;
 }
 
-export function DashboardScreen({ snapshot, profileDir }: DashboardScreenProps) {
+export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: DashboardScreenProps) {
   const dispatch = useAppDispatch();
+  const { activeScreen, focusTarget } = useAppState();
+  const panelActive = activeScreen === 'dashboard' && focusTarget === 'content';
   const api = hasApiKey();
   const variant = getDashboardVariant(snapshot, api);
   const [health, setHealth] = useState<HealthScore | null>(null);
@@ -62,6 +66,18 @@ export function DashboardScreen({ snapshot, profileDir }: DashboardScreenProps) 
       cancelled = true;
     };
   }, [profileDir, snapshot.loading, snapshot.error, snapshot.hasRefined]);
+
+  useInput(
+    (input) => {
+      if (input !== 'r' && input !== 'R') {
+        return;
+      }
+      if (healthErr && onRefreshSnapshot) {
+        onRefreshSnapshot();
+      }
+    },
+    { isActive: panelActive && Boolean(healthErr && onRefreshSnapshot) },
+  );
 
   const next = suggestedNextLine({
     hasApiKey: api,
@@ -145,8 +161,11 @@ export function DashboardScreen({ snapshot, profileDir }: DashboardScreenProps) 
         </Box>
       )}
       {healthErr && (
-        <Box marginBottom={1}>
+        <Box marginBottom={1} flexDirection="column">
           <Text color="yellow">Could not load health: {healthErr}</Text>
+          {onRefreshSnapshot != null && (
+            <Text dimColor>Press r to retry loading the profile for health.</Text>
+          )}
         </Box>
       )}
       <Text bold>Suggested next</Text>

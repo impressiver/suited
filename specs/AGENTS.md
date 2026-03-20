@@ -175,6 +175,10 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/screens/ProfileEditorScreen.tsx`** — loads refined (preserve session) or source; sections include summary, experience (positions/bullets), **skills**, **education**, **certifications**, **projects** (list + a/d/`[`/`]` + primary-field edit); **`s`** save, Esc with unsaved overlay (**s** / **d**/**n** / Esc); `App` defers **a**/**d** from global nav; `InlineEditor` + `SelectList`.
 - **`src/tui/App.tsx`** — passes `profileDir` into Refine/Profile; footer hints; **↑↓** screen-cycle suppressed on Refine/Profile content like other list screens.
 
+### Phase A (MVP shell) — criteria
+
+Phase A checklist in [`tui-definition-of-done.md`](./tui-definition-of-done.md) is **satisfied in-repo**: non-TTY `flow` tests, dashboard snapshot fixtures + variant mapping, Jobs 79/80 layout tests, Settings key masking test, error recovery on Dashboard / Contact / Profile / Jobs, etc.
+
 ### Phase 9+ — incremental (living)
 
 - **`useOperationAbort`** (`src/tui/hooks/useOperationAbort.ts`) + **`isUserAbort`** (`src/tui/isUserAbort.ts`) — Esc ↔ `AbortController` for Refine / Import / Generate.

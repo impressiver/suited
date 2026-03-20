@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { render } from 'ink';
 import type { FlowOptions } from '../commands/flow.js';
 import { App } from './App.js';
+import { AppStoreProvider } from './store.js';
 
 export async function runTui(options: FlowOptions): Promise<void> {
   const profileDir = options.profileDir ?? 'output';
@@ -13,7 +14,9 @@ export async function runTui(options: FlowOptions): Promise<void> {
   while (true) {
     const exitBag = { pending: null as string[] | null, quit: false };
     const { waitUntilExit } = render(
-      <App profileDir={profileDir} flowOptions={options} exitBag={exitBag} />,
+      <AppStoreProvider profileDir={profileDir}>
+        <App profileDir={profileDir} flowOptions={options} exitBag={exitBag} />
+      </AppStoreProvider>,
     );
     await waitUntilExit();
 

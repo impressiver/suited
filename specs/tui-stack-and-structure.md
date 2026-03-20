@@ -22,7 +22,7 @@ src/
   tui/
     index.tsx                   ← Ink app root; exports runTui()
     App.tsx                     ← Screen router, global keybindings
-    store.ts                    ← Context + useReducer global state
+    store.tsx                   ← Context + useReducer global state
     hooks/
       useProfile.ts
       useAsyncOp.ts

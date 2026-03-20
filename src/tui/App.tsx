@@ -1,5 +1,5 @@
 import { Box, useApp, useInput } from 'ink';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { FlowOptions } from '../commands/flow.js';
 import { buildPendingCliArgs, screenRunsCliOnEnter } from './cliArgs.js';
 import { Layout } from './components/Layout.js';
@@ -9,7 +9,8 @@ import { DelegateScreen } from './screens/DelegateScreen.js';
 import { ImportScreen } from './screens/ImportScreen.js';
 import { JobsScreen } from './screens/JobsScreen.js';
 import { SettingsScreen } from './screens/SettingsScreen.js';
-import { type FocusTarget, SCREEN_ORDER, type ScreenId, type TuiExitBag } from './types.js';
+import { useAppDispatch, useAppState } from './store.js';
+import { SCREEN_ORDER, type TuiExitBag } from './types.js';
 
 /** Ink only sets `key.return` for `\r`; many TTYs send `\n` for Enter (`name === 'enter'`), which leaves `key.return` false. */
 function isEnterKey(key: { return?: boolean }, input: string): boolean {
@@ -25,14 +26,29 @@ export interface AppProps {
 export function App({ profileDir, flowOptions, exitBag }: AppProps) {
   const { exit } = useApp();
   const snapshot = useProfileSnapshot(profileDir);
-  const [activeScreen, setActiveScreen] = useState<ScreenId>('dashboard');
-  const [focusTarget, setFocusTarget] = useState<FocusTarget>('sidebar');
+  const state = useAppState();
+  const dispatch = useAppDispatch();
+
+  const { activeScreen, focusTarget } = state;
+
+  useEffect(() => {
+    if (!snapshot.loading) {
+      dispatch({ type: 'SET_HAS_REFINED', hasRefined: snapshot.hasRefined });
+      dispatch({ type: 'SET_ERROR', error: snapshot.error });
+    }
+  }, [snapshot.loading, snapshot.hasRefined, snapshot.error, dispatch]);
 
   const footerHint = useMemo(() => {
     const base =
       '↑↓ change screen (anywhere) · Tab sidebar ↔ panel · 1–8 · d i r g j p c s · q quit';
+    if (state.operationInProgress) {
+      return `${base} · locked · Esc cancels op`;
+    }
+    if (state.inTextInput) {
+      return 'Text field focused · q does not quit · Esc cancels field';
+    }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
-  }, [focusTarget]);
+  }, [focusTarget, state.inTextInput, state.operationInProgress]);
 
   const panelFocusBanner = useMemo(() => {
     if (focusTarget !== 'content') {
@@ -46,14 +62,28 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
 
   useInput(
     (input, key) => {
+      if (state.inTextInput) {
+        return;
+      }
+
+      if (state.operationInProgress) {
+        if (key.escape) {
+          dispatch({ type: 'CANCEL_OPERATION' });
+        }
+        return;
+      }
+
       if (key.tab) {
-        setFocusTarget((f) => (f === 'sidebar' ? 'content' : 'sidebar'));
+        dispatch({
+          type: 'SET_FOCUS',
+          target: focusTarget === 'sidebar' ? 'content' : 'sidebar',
+        });
         return;
       }
 
       if (key.escape) {
         if (focusTarget === 'content') {
-          setFocusTarget('sidebar');
+          dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
         }
         return;
       }
@@ -66,22 +96,25 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       }
 
       if (key.upArrow) {
-        setActiveScreen((prev) => {
-          const i = SCREEN_ORDER.indexOf(prev);
-          return SCREEN_ORDER[(i - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length];
+        dispatch({
+          type: 'SET_SCREEN',
+          screen:
+            SCREEN_ORDER[
+              (SCREEN_ORDER.indexOf(activeScreen) - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length
+            ],
         });
         return;
       }
       if (key.downArrow) {
-        setActiveScreen((prev) => {
-          const i = SCREEN_ORDER.indexOf(prev);
-          return SCREEN_ORDER[(i + 1) % SCREEN_ORDER.length];
+        dispatch({
+          type: 'SET_SCREEN',
+          screen: SCREEN_ORDER[(SCREEN_ORDER.indexOf(activeScreen) + 1) % SCREEN_ORDER.length],
         });
         return;
       }
 
       if (focusTarget === 'sidebar' && isEnterKey(key, input)) {
-        setFocusTarget('content');
+        dispatch({ type: 'SET_FOCUS', target: 'content' });
         return;
       }
 
@@ -99,12 +132,12 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
         const idx = parseInt(input, 10) - 1;
         const next = SCREEN_ORDER[idx];
         if (next) {
-          setActiveScreen(next);
+          dispatch({ type: 'SET_SCREEN', screen: next });
         }
         return;
       }
 
-      const letterMap: Record<string, ScreenId> = {
+      const letterMap: Record<string, (typeof SCREEN_ORDER)[number]> = {
         d: 'dashboard',
         i: 'import',
         r: 'refine',
@@ -116,7 +149,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       };
       const mapped = letterMap[input];
       if (mapped) {
-        setActiveScreen(mapped);
+        dispatch({ type: 'SET_SCREEN', screen: mapped });
       }
     },
     { isActive: true },

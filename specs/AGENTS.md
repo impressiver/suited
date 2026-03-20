@@ -99,7 +99,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | Phase | Scope | Status |
 |-------|--------|--------|
 | **1** | **S1 — Service extraction** (`src/services/*`, commands delegate; `computeRefinementDiff`, CLI parity tests) | **Done** (2026-03-19) |
-| **2** | **T0 — TUI infrastructure hardening** (`store.ts`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | Not started |
+| **2** | **T0 — TUI infrastructure hardening** (`store.tsx`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | **Done** (2026-03-19) |
 | **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | Not started |
 | **4+** | Screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §4–15 |
 
@@ -117,6 +117,14 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 2. **Do not** run parallel agents on the same command file + the same service file without splitting (e.g. one agent on `commands/refine.ts`, another on `commands/import.ts`). **Phase 1 was S1-only** — no parallel T0/T1 on `App.tsx` / `store.ts` until Phase 2 starts.  
 3. After each phase, merge or rebase before starting the next so `main` reflects the new boundaries (`src/services/**` is shared infrastructure for later T2).
 
-### What’s next (Phase 2 preview)
+### Phase 2 — completed work
 
-- Introduce global **`store.ts`** + **`store.test.ts`** per [`tui-architecture.md`](./tui-architecture.md) and [`tui-implementation-order.md`](./tui-implementation-order.md) §2; migrate `App.tsx` off ad-hoc `useState` where spec requires (`inTextInput`, `operationInProgress`, etc.).
+- **`src/tui/store.tsx`** — `AppState` / `appReducer` / `AppStoreProvider` / `useAppState` / `useAppDispatch` (aligned with [`tui-architecture.md`](./tui-architecture.md); `SET_HAS_REFINED` for snapshot sync until full `SET_PROFILE` loads).
+- **`src/tui/App.tsx`** — single top-level `useInput`: suppresses global nav when `inTextInput` or `operationInProgress`; `Esc` → `CANCEL_OPERATION` while op locked; footer hints for locked / text-input modes.
+- **`src/tui/runTui.tsx`** — wraps the app with `AppStoreProvider`.
+- **`src/tui/store.test.ts`** — reducer unit tests.
+- **`src/commands/flow.test.ts`** — non-TTY `runFlow` stderr + `exitCode` (canonical behavior per [`tui-README.md`](./tui-README.md)).
+
+### What’s next (Phase 3 preview)
+
+- **T1 — Shared components** per [`tui-implementation-order.md`](./tui-implementation-order.md) §3; wire `SET_IN_TEXT_INPUT` from `TextInput` / `MultilineInput` when those land.

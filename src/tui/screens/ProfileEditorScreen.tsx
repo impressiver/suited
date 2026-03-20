@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { profileToMarkdown } from '../../profile/markdown.ts';
 import type {
   Certification,
@@ -24,6 +24,7 @@ import {
 import { fileExists } from '../../utils/fs.ts';
 import { ConfirmPrompt, InlineEditor, SelectList, Spinner } from '../components/shared/index.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 function cloneProfile(p: Profile): Profile {
@@ -110,6 +111,100 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const [saveFailStreak, setSaveFailStreak] = useState(0);
   const [saveErrMenuIdx, setSaveErrMenuIdx] = useState(0);
   const top = stack.at(-1);
+
+  const profileFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    if (phase === 'loading') {
+      return `Improve · loading…${sb}`;
+    }
+    if (phase === 'no-source') {
+      return `Improve · import a profile first${sb}`;
+    }
+    if (phase === 'err' && !profile) {
+      return `Improve · r retry${sb}`;
+    }
+    if (phase === 'err' && profile) {
+      return `Improve · ↑↓ Enter · retry / settings / dismiss${sb}`;
+    }
+    if (phase === 'saving') {
+      return `Improve · saving…${sb}`;
+    }
+    if (!profile) {
+      return `Improve${sb}`;
+    }
+    if (unsaved) {
+      return `Improve · s save and continue · d/n discard · Esc stay`;
+    }
+    if (
+      bulletDeletePrompt ||
+      skillDeletePrompt ||
+      eduDeletePrompt ||
+      certDeletePrompt ||
+      projDeletePrompt ||
+      positionDeletePrompt
+    ) {
+      return `Improve · Enter confirm · Esc cancel${sb}`;
+    }
+    if (!top) {
+      return `Improve${sb}`;
+    }
+    if (top.k === 'sections') {
+      return `Improve · ↑↓ Enter section · Esc back · s save${sb}`;
+    }
+    if (top.k === 'summary') {
+      return editingSummary
+        ? `Improve · Enter save · Esc cancel edit${sb}`
+        : `Improve · Enter edit summary · Esc back · s save${sb}`;
+    }
+    if (top.k === 'positions') {
+      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter → bullets${sb}`;
+    }
+    if (top.k === 'skills') {
+      return `Improve · ↑↓ · [ ] move · a add · d delete · Enter edit name${sb}`;
+    }
+    if (top.k === 'skill-edit') {
+      return `Improve · Enter save · Esc back${sb}`;
+    }
+    if (top.k === 'education') {
+      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter edit institution${sb}`;
+    }
+    if (top.k === 'education-edit') {
+      return `Improve · Enter save · Esc back · institution only${sb}`;
+    }
+    if (top.k === 'certifications') {
+      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter edit name${sb}`;
+    }
+    if (top.k === 'cert-edit') {
+      return `Improve · Enter save · Esc back${sb}`;
+    }
+    if (top.k === 'projects') {
+      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter edit title${sb}`;
+    }
+    if (top.k === 'project-edit') {
+      return `Improve · Enter save · Esc back${sb}`;
+    }
+    if (top.k === 'bullets') {
+      return `Improve · ↑↓ · [ ] move · a add · d delete · Enter edit bullet${sb}`;
+    }
+    if (top.k === 'bullet-edit') {
+      return `Improve · Enter save · Esc cancel${sb}`;
+    }
+    return `Improve${sb}`;
+  }, [
+    phase,
+    profile,
+    unsaved,
+    top,
+    bulletDeletePrompt,
+    skillDeletePrompt,
+    eduDeletePrompt,
+    certDeletePrompt,
+    projDeletePrompt,
+    positionDeletePrompt,
+    editingSummary,
+  ]);
+
+  useRegisterPanelFooterHint(profileFooterHint);
 
   useEffect(() => {
     dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: dirty });
@@ -771,7 +866,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       <Box flexDirection="column">
         <Text bold>Improve profile</Text>
         <Text color="red">{errMsg ?? 'Unknown error'}</Text>
-        <Text dimColor>Press r to retry · Tab → sidebar</Text>
       </Box>
     );
   }
@@ -916,7 +1010,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     <Box flexDirection="column">
       <Text bold>Improve profile</Text>
       <Text dimColor>
-        {session ? 'Editing refined.json' : 'Editing source.json'} · Esc back · s save
+        {session ? 'Editing refined.json' : 'Editing source.json'}
         {dirty ? ' · unsaved changes' : ''}
       </Text>
       <Text dimColor>{breadcrumb.join(' › ')}</Text>
@@ -932,7 +1026,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           <Text bold color="yellow">
             Unsaved changes
           </Text>
-          <Text dimColor>s save and continue · d/n discard and continue · Esc stay</Text>
         </Box>
       )}
 
@@ -970,7 +1063,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
 
       {top.k === 'summary' && (
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>Enter edit · Esc cancel edit</Text>
           <Box marginTop={1}>
             <InlineEditor
               value={editingSummary ? summaryDraft : (profile.summary?.value ?? '')}
@@ -997,17 +1089,11 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               }}
             />
           </Box>
-          {!editingSummary && (
-            <Box marginTop={1}>
-              <Text dimColor>Press Enter to edit</Text>
-            </Box>
-          )}
         </Box>
       )}
 
       {top.k === 'positions' && (
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>↑↓ select · [ ] reorder · a add · d delete · Enter → bullets</Text>
           {positionDeletePrompt && (
             <Box marginTop={1}>
               <ConfirmPrompt
@@ -1078,9 +1164,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           }));
           return (
             <Box marginTop={1} flexDirection="column">
-              <Text dimColor>
-                ↑↓ select · [ ] move up/down · a add · d delete · Enter edit name
-              </Text>
               {skillDeletePrompt && (
                 <Box marginTop={1}>
                   <ConfirmPrompt
@@ -1171,9 +1254,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                   popStack();
                 }}
               />
-              <Box marginTop={1}>
-                <Text dimColor>Enter save · Esc back</Text>
-              </Box>
             </Box>
           );
         })()}
@@ -1189,9 +1269,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           }));
           return (
             <Box marginTop={1} flexDirection="column">
-              <Text dimColor>
-                ↑↓ select · [ ] reorder · a add · d delete · Enter edit institution
-              </Text>
               {eduDeletePrompt && (
                 <Box marginTop={1}>
                   <ConfirmPrompt
@@ -1259,7 +1336,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           }
           return (
             <Box marginTop={1} flexDirection="column">
-              <Text dimColor>Institution (degree & dates: CLI or future editor)</Text>
               <InlineEditor
                 value={e.institution.value}
                 onChange={(v) => {
@@ -1283,9 +1359,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                   popStack();
                 }}
               />
-              <Box marginTop={1}>
-                <Text dimColor>Enter save · Esc back</Text>
-              </Box>
             </Box>
           );
         })()}
@@ -1301,7 +1374,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           }));
           return (
             <Box marginTop={1} flexDirection="column">
-              <Text dimColor>↑↓ select · [ ] reorder · a add · d delete · Enter edit name</Text>
               {certDeletePrompt && (
                 <Box marginTop={1}>
                   <ConfirmPrompt
@@ -1392,9 +1464,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                   popStack();
                 }}
               />
-              <Box marginTop={1}>
-                <Text dimColor>Enter save · Esc back</Text>
-              </Box>
             </Box>
           );
         })()}
@@ -1410,7 +1479,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           }));
           return (
             <Box marginTop={1} flexDirection="column">
-              <Text dimColor>↑↓ select · [ ] reorder · a add · d delete · Enter edit title</Text>
               {projDeletePrompt && (
                 <Box marginTop={1}>
                   <ConfirmPrompt
@@ -1501,9 +1569,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                   popStack();
                 }}
               />
-              <Box marginTop={1}>
-                <Text dimColor>Enter save · Esc back</Text>
-              </Box>
             </Box>
           );
         })()}
@@ -1520,7 +1585,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           }));
           return (
             <Box marginTop={1} flexDirection="column">
-              <Text dimColor>↑↓ select · [ ] move up/down · a add · d delete · Enter edit</Text>
               {bulletDeletePrompt && (
                 <Box marginTop={1}>
                   <ConfirmPrompt
@@ -1617,9 +1681,6 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                   popStack();
                 }}
               />
-              <Box marginTop={1}>
-                <Text dimColor>Enter save · Esc cancel</Text>
-              </Box>
             </Box>
           );
         })()}

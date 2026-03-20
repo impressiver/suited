@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { markdownToProfile, profileToMarkdown } from '../../profile/markdown.ts';
 import type {
   Profile,
@@ -35,6 +35,7 @@ import {
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 function cloneProfile(p: Profile): Profile {
@@ -427,6 +428,45 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     [createController, dispatch, persistRefinedKeepSession, profileDir, releaseController],
   );
 
+  const refineFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    switch (phase.k) {
+      case 'loading':
+        return `Refine · loading…${sb}`;
+      case 'no-source':
+        return `Refine · import a profile first${sb}`;
+      case 'polish-pick':
+        return `Refine · ↑↓ Enter · Esc back to refined menu${sb}`;
+      case 'direct-edit-input':
+        return `Refine · Ctrl+D submit · Esc back to menu${sb}`;
+      case 'has-refined-menu':
+        return phase.syncPrompt
+          ? `Refine · Enter confirm md sync · Esc cancel${sb}`
+          : `Refine · ↑↓ Enter · Q&A, polish, direct edit, Jobs${sb}`;
+      case 'gen-questions':
+      case 'apply':
+      case 'polish-run':
+      case 'direct-edit-run':
+      case 'syncing-md':
+      case 'saving':
+        return `Refine · working…${sb}`;
+      case 'qa':
+        return `Refine · Enter submit answer (blank OK)${sb}`;
+      case 'diff':
+        return `Refine · ↑↓ choose action · Enter confirm${sb}`;
+      case 'diff-edit-summary':
+        return `Refine · Enter apply summary · Esc cancel (keep prior)${sb}`;
+      case 'done':
+        return `Refine · done · Tab sidebar${sb}`;
+      case 'err':
+        return `Refine · ↑↓ Enter · retry / settings / back${sb}`;
+      default:
+        return `Refine${sb}`;
+    }
+  }, [phase]);
+
+  useRegisterPanelFooterHint(refineFooterHint);
+
   if (phase.k === 'loading') {
     return (
       <Box flexDirection="column">
@@ -441,7 +481,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       <Box flexDirection="column">
         <Text bold>Refine</Text>
         <Text color="red">{phase.msg}</Text>
-        <Text dimColor>Import a profile first (Import screen).</Text>
       </Box>
     );
   }
@@ -457,7 +496,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Refine — polish</Text>
-        <Text dimColor>Expert pass on selected sections · Esc back via menu</Text>
         <Box marginTop={1}>
           <SelectList
             items={polishItems}
@@ -498,7 +536,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Refine — direct edit</Text>
-        <Text dimColor>Describe changes (Ctrl+D submit) · Esc → back to menu</Text>
         <Box marginTop={1}>
           <MultilineInput
             value={directEditDraft}
@@ -633,7 +670,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         </Text>
         <Text dimColor>{q.context}</Text>
         <Text>{q.question}</Text>
-        <Text dimColor>Enter submit · optional: leave blank</Text>
         <TextInput
           value={answerDraft}
           onChange={setAnswerDraft}
@@ -674,9 +710,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         <Text bold>Review changes</Text>
         <DiffView blocks={blocks} />
         <Box marginTop={1}>
-          <Text dimColor>↑↓ choose action · Enter confirm (or edit summary, then return here)</Text>
-        </Box>
-        <Box marginTop={1}>
           <SelectList
             items={diffItems}
             selectedIndex={diffSelectIdx}
@@ -711,7 +744,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Refine — edit proposed summary</Text>
-        <Text dimColor>Enter applies and returns to diff · Esc cancels (keeps prior proposed)</Text>
         <Box marginTop={1}>
           <TextInput
             value={summaryTweakDraft}

@@ -1,23 +1,78 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clearLinkedInSession } from '../../ingestion/linkedin-scraper.ts';
+import type { Profile } from '../../profile/schema.ts';
+import { loadSource, sourceJsonPath } from '../../profile/serializer.ts';
 import { importProfileFromInput } from '../../services/importProfile.ts';
 import { missingContactDetailPromptLabels } from '../../utils/contact.ts';
-import { MultilineInput, SelectList, Spinner, TextInput } from '../components/shared/index.ts';
+import { fileExists } from '../../utils/fs.ts';
+import {
+  MultilineInput,
+  ScrollView,
+  SelectList,
+  Spinner,
+  TextInput,
+} from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 export interface ImportScreenProps {
   profileDir: string;
   headed?: boolean;
   clearSession?: boolean;
+  /** After a successful import, refresh global snapshot (header / dashboard). */
+  onSourceChanged?: () => void;
 }
 
 type Phase = 'idle' | 'running' | 'done' | 'error';
 
-export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: ImportScreenProps) {
+type SourcePreviewState =
+  | { status: 'loading' }
+  | { status: 'absent' }
+  | { status: 'err'; msg: string }
+  | { status: 'ok'; lines: string[] };
+
+const PREVIEW_SCROLL_ROWS = 8;
+
+function buildSourcePreviewLines(profile: Profile): string[] {
+  const lines: string[] = [];
+  const name = profile.contact.name.value.trim() || '(no name)';
+  const headline = profile.contact.headline?.value?.trim();
+  lines.push(headline ? `${name} — ${headline}` : name);
+  const extras: string[] = [];
+  if (profile.certifications.length > 0) {
+    extras.push(`${profile.certifications.length} certs`);
+  }
+  if (profile.projects.length > 0) {
+    extras.push(`${profile.projects.length} projects`);
+  }
+  const extraSuffix = extras.length > 0 ? ` · ${extras.join(' · ')}` : '';
+  lines.push(
+    `${profile.positions.length} positions · ${profile.skills.length} skills · ${profile.education.length} education${extraSuffix}`,
+  );
+  const cap = 5;
+  for (const p of profile.positions.slice(0, cap)) {
+    lines.push(`  · ${p.title.value} @ ${p.company.value}`);
+  }
+  if (profile.positions.length > cap) {
+    lines.push(`  · … +${profile.positions.length - cap} more roles`);
+  }
+  const sum = profile.summary?.value?.replace(/\s+/g, ' ').trim();
+  if (sum) {
+    lines.push(sum.length > 140 ? `${sum.slice(0, 137)}…` : sum);
+  }
+  return lines;
+}
+
+export function ImportScreen({
+  profileDir,
+  headed: headedOpt,
+  clearSession,
+  onSourceChanged,
+}: ImportScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
   const { focusTarget, activeScreen, inTextInput } = useAppState();
@@ -34,6 +89,25 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
   const [errMenuIdx, setErrMenuIdx] = useState(0);
   const [doneContactGap, setDoneContactGap] = useState<string | null>(null);
   const lastRawInputRef = useRef('');
+  const [sourcePreview, setSourcePreview] = useState<SourcePreviewState>({ status: 'loading' });
+
+  const reloadSourcePreview = useCallback(async () => {
+    setSourcePreview({ status: 'loading' });
+    try {
+      if (!(await fileExists(sourceJsonPath(profileDir)))) {
+        setSourcePreview({ status: 'absent' });
+        return;
+      }
+      const profile = await loadSource(profileDir);
+      setSourcePreview({ status: 'ok', lines: buildSourcePreviewLines(profile) });
+    } catch (e) {
+      setSourcePreview({ status: 'err', msg: (e as Error).message });
+    }
+  }, [profileDir]);
+
+  useEffect(() => {
+    void reloadSourcePreview();
+  }, [reloadSourcePreview]);
 
   useEffect(() => {
     if (clearSession) {
@@ -42,6 +116,23 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
   }, [clearSession]);
 
   const active = activeScreen === 'import' && focusTarget === 'content';
+
+  const importFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    if (phase === 'running') {
+      return `Import · importing…${sb}`;
+    }
+    if (phase === 'error') {
+      return `Import · ↑↓ Enter · Esc sidebar · retry / settings / dismiss${sb}`;
+    }
+    const modeHint =
+      mode === 'line'
+        ? 'Enter submit · Esc sidebar · h headed browser toggle · p paste mode'
+        : 'Ctrl+D submit · Esc sidebar · h headed toggle · p single-line mode';
+    return `Import · ${modeHint}${sb}`;
+  }, [mode, phase]);
+
+  useRegisterPanelFooterHint(importFooterHint);
 
   const runImport = useCallback(
     async (raw: string) => {
@@ -75,6 +166,8 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
         setDoneContactGap(gaps.length > 0 ? gaps.join(', ') : null);
         setApiFailureStreak(0);
         setPhase('done');
+        void reloadSourcePreview();
+        onSourceChanged?.();
       } catch (e) {
         if (isUserAbort(e)) {
           setPhase('idle');
@@ -89,7 +182,27 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
-    [createController, dispatch, headed, profileDir, releaseController],
+    [
+      createController,
+      dispatch,
+      headed,
+      onSourceChanged,
+      profileDir,
+      releaseController,
+      reloadSourcePreview,
+    ],
+  );
+
+  useInput(
+    (_input, key) => {
+      if (!active || phase === 'running') {
+        return;
+      }
+      if (key.escape) {
+        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
+      }
+    },
+    { isActive: active && phase !== 'running' },
   );
 
   useInput(
@@ -107,24 +220,42 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
     { isActive: active && phase !== 'running' },
   );
 
+  const showSettings = apiFailureStreak >= 3 && phase === 'error';
+
+  const sourcePreviewBlock = (
+    <Box marginTop={1} flexDirection="column">
+      <Text bold>Current source (source.json)</Text>
+      {sourcePreview.status === 'loading' && <Text dimColor>Loading…</Text>}
+      {sourcePreview.status === 'absent' && (
+        <Text dimColor>No profile on disk yet — import below to create source.json.</Text>
+      )}
+      {sourcePreview.status === 'err' && (
+        <Text color="yellow">Could not load source: {sourcePreview.msg}</Text>
+      )}
+      {sourcePreview.status === 'ok' && (
+        <Box marginTop={1} flexDirection="column">
+          <ScrollView lines={sourcePreview.lines} height={PREVIEW_SCROLL_ROWS} />
+        </Box>
+      )}
+    </Box>
+  );
+
   if (phase === 'running') {
     return (
       <Box flexDirection="column">
         <Text bold>Import</Text>
-        <Spinner label="Importing profile…" />
+        {sourcePreviewBlock}
+        <Box marginTop={1}>
+          <Spinner label="Importing profile…" />
+        </Box>
       </Box>
     );
   }
 
-  const showSettings = apiFailureStreak >= 3 && phase === 'error';
-
   return (
     <Box flexDirection="column">
       <Text bold>Import</Text>
-      <Text dimColor>
-        LinkedIn URL, export ZIP path, export directory, or profile text · h headed browser (
-        {headed ? 'on' : 'off'}) · p {mode === 'line' ? 'paste mode' : 'single-line mode'}
-      </Text>
+      {sourcePreviewBlock}
       {detectedKind != null && phase === 'done' && (
         <Text dimColor>
           Detected: {detectedKind} · {summary}
@@ -193,30 +324,24 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
       )}
       <Box marginTop={1} flexDirection="column">
         {mode === 'line' ? (
-          <>
-            <Text dimColor>Input:</Text>
-            <TextInput
-              value={lineValue}
-              onChange={setLineValue}
-              focus={active && mode === 'line' && phase !== 'error'}
-              placeholder="https://linkedin.com/in/… or path to .zip"
-              onSubmit={(v) => {
-                void runImport(v);
-              }}
-            />
-          </>
+          <TextInput
+            value={lineValue}
+            onChange={setLineValue}
+            focus={active && mode === 'line' && phase !== 'error'}
+            placeholder="https://linkedin.com/in/… or path to .zip"
+            onSubmit={(v) => {
+              void runImport(v);
+            }}
+          />
         ) : (
-          <>
-            <Text dimColor>Paste profile text · Ctrl+D when done</Text>
-            <MultilineInput
-              value={pasteValue}
-              onChange={setPasteValue}
-              focus={active && mode === 'paste' && phase !== 'error'}
-              onSubmit={(v) => {
-                void runImport(v);
-              }}
-            />
-          </>
+          <MultilineInput
+            value={pasteValue}
+            onChange={setPasteValue}
+            focus={active && mode === 'paste' && phase !== 'error'}
+            onSubmit={(v) => {
+              void runImport(v);
+            }}
+          />
         )}
       </Box>
     </Box>

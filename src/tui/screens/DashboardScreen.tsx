@@ -4,29 +4,13 @@ import { loadActiveProfile } from '../../profile/serializer.ts';
 import type { HealthScore } from '../../services/improve.ts';
 import { computeHealthScore } from '../../services/improve.ts';
 import { validateProfile } from '../../services/validate.ts';
-import {
-  ScrollView,
-  type SelectItem,
-  SelectList,
-  StatusBadge,
-} from '../components/shared/index.ts';
+import { ScrollView, StatusBadge } from '../components/shared/index.ts';
 import { getDashboardVariant } from '../dashboardVariant.ts';
 import { hasApiKey } from '../env.ts';
 import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
-import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppState } from '../store.tsx';
 import { suggestedNextLine } from '../suggestedNext.ts';
-import type { ScreenId } from '../types.ts';
-
-const QUICK_ACTIONS: Array<SelectItem<ScreenId>> = [
-  { value: 'import', label: '2 · Import source' },
-  { value: 'contact', label: '3 · Contact' },
-  { value: 'jobs', label: '4 · Jobs' },
-  { value: 'refine', label: '5 · Refine profile' },
-  { value: 'profile', label: '6 · Improve' },
-  { value: 'generate', label: '7 · Generate resume' },
-  { value: 'settings', label: '8 · Settings' },
-];
 
 export interface DashboardScreenProps {
   snapshot: ProfileSnapshot;
@@ -36,9 +20,12 @@ export interface DashboardScreenProps {
 }
 
 export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: DashboardScreenProps) {
-  const navigate = useNavigateToScreen();
   const { activeScreen, focusTarget } = useAppState();
   const panelActive = activeScreen === 'dashboard' && focusTarget === 'content';
+
+  useRegisterPanelFooterHint(
+    'Dashboard · ↑↓ change screen · Tab sidebar · 1–8 · d i c j r p g s · q quit',
+  );
   const api = hasApiKey();
   const variant = getDashboardVariant(snapshot, api);
   const [health, setHealth] = useState<HealthScore | null>(null);
@@ -114,8 +101,6 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
     hasSource: snapshot.hasSource,
     hasRefined: snapshot.hasRefined,
   });
-
-  const [quickIndex, setQuickIndex] = useState(0);
 
   const variantTone = useMemo(() => {
     switch (variant) {
@@ -221,22 +206,6 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       <Box marginTop={1} flexDirection="column">
         <Text bold>Activity</Text>
         <ScrollView lines={activityLines} height={3} />
-      </Box>
-      <Box marginTop={1} flexDirection="column">
-        <Text bold>Quick actions (↑↓ Enter)</Text>
-        <SelectList
-          items={QUICK_ACTIONS}
-          selectedIndex={quickIndex}
-          onChange={(i) => setQuickIndex(i)}
-          onSubmit={(item) => navigate(item.value)}
-          isActive={panelActive}
-        />
-      </Box>
-      <Box marginTop={1} flexDirection="column">
-        <Text dimColor>
-          Nav: i import · c contact · j jobs · r refine · p improve · g generate · s settings · Tab
-          sidebar
-        </Text>
       </Box>
     </Box>
   );

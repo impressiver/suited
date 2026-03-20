@@ -7,6 +7,7 @@ import { MultilineInput, ProgressSteps, SelectList, Spinner } from '../component
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 type Phase =
@@ -79,6 +80,32 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const lastGenCtxRef = useRef<GenerateRunCtx | null>(null);
 
   const active = activeScreen === 'generate' && focusTarget === 'content';
+
+  const generateFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    switch (phase.p) {
+      case 'pick-source':
+        return `Generate · ↑↓ · Enter · paste, saved job, or full resume${sb}`;
+      case 'paste':
+        return `Generate · Ctrl+D continue · Esc back${sb}`;
+      case 'pick-saved':
+        return `Generate · ↑↓ · Enter choose job${sb}`;
+      case 'pick-flair':
+        return `Generate · ↑↓ flair · Enter run${sb}`;
+      case 'done':
+        return `Generate · ↑↓ Enter next step · letter keys / sidebar still work${sb}`;
+      case 'err':
+        return phase.kind === 'preflight'
+          ? `Generate · Enter back to source${sb}`
+          : `Generate · ↑↓ Enter · retry / settings / back${sb}`;
+      case 'run':
+        return `Generate · running… · Esc cancels when supported${sb}`;
+      default:
+        return `Generate${sb}`;
+    }
+  }, [phase]);
+
+  useRegisterPanelFooterHint(generateFooterHint);
 
   useEffect(() => {
     const id = pendingJobId;
@@ -224,7 +251,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
             }}
           />
         </Box>
-        <Text dimColor>Or use the sidebar / letter keys (unchanged).</Text>
       </Box>
     );
   }
@@ -328,7 +354,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         ) : (
           <Text dimColor>Full resume (all profile content)</Text>
         )}
-        <Text dimColor>↑↓ flair · Enter generate · Esc → sidebar</Text>
         <Box marginTop={1}>
           <SelectList
             items={flairItems}
@@ -356,7 +381,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Paste job description</Text>
-        <Text dimColor>Ctrl+D continue · Esc back (via sidebar focus)</Text>
         <MultilineInput
           value={pasteBuf}
           onChange={setPasteBuf}
@@ -416,7 +440,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   return (
     <Box flexDirection="column">
       <Text bold>Generate resume</Text>
-      <Text dimColor>↑↓ · Enter · Target a job or export everything</Text>
       <Box marginTop={1}>
         <SelectList
           items={sourceItems}

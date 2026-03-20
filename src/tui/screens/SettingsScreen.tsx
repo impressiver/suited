@@ -4,6 +4,7 @@ import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SelectList, TextInput } from '../components/shared/index.ts';
 import { hasApiKey } from '../env.ts';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { maskApiKeyForDisplay } from '../settings/maskApiKey.ts';
 import type { ProviderId } from '../settings/probeProvider.ts';
 import { probeApiKey } from '../settings/probeProvider.ts';
@@ -140,6 +141,18 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
     [shortcutsActive, fieldFocus],
   );
 
+  const settingsFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    const base =
+      'Settings · a/A Anthropic · o/O OpenRouter · e key field · l provider list · s save (probe + .env) · restart suited after save';
+    if (fieldFocus === 'provider') {
+      return `${base} · ↑↓ choose provider${sb}`;
+    }
+    return `${base} · paste masked key${sb}`;
+  }, [fieldFocus]);
+
+  useRegisterPanelFooterHint(settingsFooterHint);
+
   return (
     <Box flexDirection="column">
       <Text bold>Settings</Text>
@@ -165,7 +178,6 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text bold>API key (e)</Text>
-        <Text dimColor>Masked in field · paste your key · s save (probe + write .env)</Text>
         <TextInput
           value={keyDraft}
           onChange={setKeyDraft}
@@ -180,9 +192,6 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
         </Box>
       ) : null}
       <Box marginTop={1} flexDirection="column">
-        <Text dimColor>
-          a/A Anthropic · o/O OpenRouter · e key · l provider · s save · restart suited after save
-        </Text>
         <Text dimColor>{envNote}</Text>
       </Box>
     </Box>

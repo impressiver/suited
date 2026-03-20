@@ -102,7 +102,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **1** | **S1 — Service extraction** (`src/services/*`, commands delegate; `computeRefinementDiff`, CLI parity tests) | **Done** (2026-03-19) |
 | **2** | **T0 — TUI infrastructure hardening** (`store.tsx`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | **Done** (2026-03-19) |
 | **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | **Done** (2026-03-19) |
-| **4** | **T2 — Dashboard + Settings** (variants, health, quick actions; API key probe + `.env`) | **Done** (2026-03-19) |
+| **4** | **T2 — Dashboard + Settings** (variants, health, pipeline/activity; API key probe + `.env`) | **Done** (2026-03-19) |
 | **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Generate/Refine/Profile were stubs at phase close — now superseded by phases 7–8) | **Done** (2026-03-19) |
 | **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
 | **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, flair, `pendingJobId` | **Done** (2026-03-19) |
@@ -141,9 +141,9 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/tui/dashboardVariant.ts`** (+ test) — maps snapshot + `hasApiKey()` to the five dashboard states.
 - **`src/tui/settings/`** — `probeProvider.ts` (Anthropic / OpenRouter key probes), `upsertEnvFile.ts` (+ test) for `.env` merges.
-- **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant; health (`computeHealthScore`) when refined; **validation** (`validateProfile` reference count) when source exists; `ScrollView` pipeline/activity; `SelectList` quick actions via **`NavigateProvider`**.
+- **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant; health (`computeHealthScore`) when refined; **validation** (`validateProfile` reference count) when source exists; `ScrollView` pipeline/activity (navigation is the sidebar only).
 - **`src/tui/screens/SettingsScreen.tsx`** — provider list + masked `TextInput`, **`s`** save (probe + write `.env`), shortcuts **`a`/`A`**, **`o`/`O`**, **`e`**, **`l`**.
-- **`src/tui/App.tsx`** — on **Dashboard** with **content** focus, **↑↓** move quick-action list (not global screen nav); **1–8** / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save).
+- **`src/tui/App.tsx`** — **1–8** / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save). **↑↓** screen-cycle on Dashboard **content** focus (no in-panel list).
 
 **Imports:** local modules **always** use **`.ts` / `.tsx`** on relative paths (not `.js`, not extensionless). `allowImportingTsExtensions` + `rewriteRelativeImportExtensions` make **`pnpm build`** emit resolvable Node ESM. Extensionless relatives + plain **`tsc` → `node dist/`** do not work; **Biome `useImportExtensions`** enforces the rule so you do not have to remember it by hand.
 
@@ -160,7 +160,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/services/jobRefinement.ts`** — `runJobRefinementPipeline()` (analyze + curate + `saveJobRefinement`); **`commands/prepare.ts`** delegates curation to it (CLI spinners removed for that path; behavior preserved).
 - **`src/tui/store.tsx`** — `deferLetterShortcutsFor` + `SET_DEFER_LETTER_SHORTCUTS` so Jobs can own **a / d / g / p** without colliding with global **`p`→profile** / **`g`→generate**.
-- **`src/tui/App.tsx`** — Jobs content: defer those letters; **Esc** chain owned by Jobs (not forced to sidebar); **↑↓** screen-cycle suppressed on Jobs like Dashboard.
+- **`src/tui/App.tsx`** — Jobs content: defer those letters; **Esc** chain owned by Jobs (not forced to sidebar); **↑↓** screen-cycle suppressed on Jobs when lists/detail own arrows.
 - **`src/tui/screens/JobsScreen.tsx`** — Jobs list/detail, prepare (`runJobRefinementPipeline`), **curation preview** (`formatCurationPreviewLines`), **job-fit feedback** (`evaluateForJob` / `applyJobFeedback`), generate hand-off, split layout at 80+ cols.
 
 ### Phase 7 — completed work

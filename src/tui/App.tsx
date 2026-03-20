@@ -6,6 +6,7 @@ import type { FlowOptions } from './flowOptions.ts';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
 import { useTerminalSize } from './hooks/useTerminalSize.ts';
 import { NavigateProvider } from './navigationContext.tsx';
+import { PanelFooterHintProvider } from './panelFooterHintContext.tsx';
 import { ContactScreen } from './screens/ContactScreen.tsx';
 import { DashboardScreen } from './screens/DashboardScreen.tsx';
 import { GenerateScreen } from './screens/GenerateScreen.tsx';
@@ -15,7 +16,7 @@ import { ProfileEditorScreen } from './screens/ProfileEditorScreen.tsx';
 import { RefineScreen } from './screens/RefineScreen.tsx';
 import { SettingsScreen } from './screens/SettingsScreen.tsx';
 import { useAppDispatch, useAppState } from './store.tsx';
-import { SCREEN_ORDER, type ScreenId } from './types.ts';
+import { NAV_LABELS, SCREEN_ORDER, type ScreenId } from './types.ts';
 
 /** Ink only sets `key.return` for `\r`; many TTYs send `\n` for Enter (`name === 'enter'`), which leaves `key.return` false. */
 function isEnterKey(key: { return?: boolean }, input: string): boolean {
@@ -34,6 +35,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const [pendingNav, setPendingNav] = useState<ScreenId | null>(null);
+  const [panelFooterHint, setPanelFooterHint] = useState<string | null>(null);
 
   const goToScreen = useCallback(
     (screen: ScreenId) => {
@@ -64,33 +66,23 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (state.inTextInput) {
       return 'Text field focused · q does not quit · Esc cancels field';
     }
-    if (activeScreen === 'contact' && focusTarget === 'content') {
-      return 'Contact · ↑↓ Tab field · Enter edit · s save all · Esc sidebar (from browse)';
+    if (focusTarget === 'sidebar') {
+      return `${base} · Enter → panel`;
     }
-    if (activeScreen === 'jobs' && focusTarget === 'content') {
-      return 'Jobs · a add · d delete · p prepare · g generate · Esc back · Tab sidebar';
+    if (panelFooterHint != null && panelFooterHint !== '') {
+      return panelFooterHint;
     }
-    if (activeScreen === 'generate' && focusTarget === 'content') {
-      return 'Generate · ↑↓ lists · Enter confirm · paste uses Ctrl+D · Tab sidebar';
-    }
-    if (activeScreen === 'refine' && focusTarget === 'content') {
-      return 'Refine · ↑↓ · Enter · diff: action list + summary tweak · Q&A Enter submit · Tab sidebar';
-    }
-    if (activeScreen === 'profile' && focusTarget === 'content') {
-      return 'Profile · ↑↓ · [ ] reorder · Enter · Esc · s save · a/d (positions & lists) · Tab sidebar';
-    }
-    return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
-  }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);
+    return `${NAV_LABELS[activeScreen]} · Tab sidebar · 1–8 · letter keys · q quit`;
+  }, [activeScreen, focusTarget, panelFooterHint, state.inTextInput, state.operationInProgress]);
 
   const panelFocusBanner = useMemo(() => {
     if (focusTarget !== 'content') {
       return null;
     }
-    return 'Tab or Esc → return to sidebar · On Dashboard/Contact/Jobs/Generate/Refine/Profile, ↑↓ may move lists instead of changing screen';
+    return 'Tab or Esc → return to sidebar · On Contact/Jobs/Generate/Refine/Profile, ↑↓ may move lists instead of changing screen';
   }, [focusTarget]);
 
   const screenUsesContentArrows = (screen: ScreenId): boolean =>
-    screen === 'dashboard' ||
     screen === 'contact' ||
     screen === 'jobs' ||
     screen === 'generate' ||
@@ -226,6 +218,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
             profileDir={profileDir}
             headed={flowOptions.headed}
             clearSession={flowOptions.clearSession}
+            onSourceChanged={snapshot.refresh}
           />
         );
       case 'refine':
@@ -265,19 +258,21 @@ export function App({ profileDir, flowOptions }: AppProps) {
             />
           </Box>
         )}
-        <Layout
-          activeScreen={activeScreen}
-          focusTarget={focusTarget}
-          footerHint={footerHint}
-          panelFocusBanner={panelFocusBanner}
-          name={snapshot.name}
-          positionCount={snapshot.positionCount}
-          skillCount={snapshot.skillCount}
-          hasRefined={snapshot.hasRefined}
-          hasSource={snapshot.hasSource}
-        >
-          {content}
-        </Layout>
+        <PanelFooterHintProvider setHint={setPanelFooterHint}>
+          <Layout
+            activeScreen={activeScreen}
+            focusTarget={focusTarget}
+            footerHint={footerHint}
+            panelFocusBanner={panelFocusBanner}
+            name={snapshot.name}
+            positionCount={snapshot.positionCount}
+            skillCount={snapshot.skillCount}
+            hasRefined={snapshot.hasRefined}
+            hasSource={snapshot.hasSource}
+          >
+            {content}
+          </Layout>
+        </PanelFooterHintProvider>
       </Box>
     </NavigateProvider>
   );

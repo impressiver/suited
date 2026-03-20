@@ -15,20 +15,20 @@ Every screen documents: what loads on mount, the full state machine (every state
 - `refined` — suggest Generate or manage jobs; show health score from `computeHealthScore()`
 - `ready` — has jobs + refined; suggest Generate; show last PDF details
 
-**Components:** `StatusBadge` (pipeline), `SelectList` (quick actions), `ScrollView` (recent activity).
+**Components:** `StatusBadge` (pipeline), `ScrollView` (pipeline + activity). Navigation matches the left sidebar (`1–8` and letter keys).
 
 ### ImportScreen
 
-**Loads on mount:** optional `clearSession` clears LinkedIn cookies file.
+**Loads on mount:** optional `clearSession` clears LinkedIn cookies file. **Current source:** reads `source.json` when present and shows a compact preview (name/headline, counts, up to five roles, truncated summary) in a `ScrollView`; after a successful import, reloads preview and calls **`onSourceChanged`** (wired to `useProfileSnapshot.refresh` in `App`) so the header stays in sync.
 
 **States (current implementation):**
-- `idle` / `done` / `error` — single-line or paste input; **h** toggles headed Chrome for URL scrape; **p** toggles paste mode
+- `idle` / `done` / `error` — single-line or paste input; **h** toggles headed Chrome for URL scrape; **p** toggles paste mode; **Esc** returns to the sidebar even while the line/paste field is focused (global `App` input is suppressed during text entry, so Import handles this locally)
 - `running` — `Spinner`; `importProfileFromInput({ signal })` drives detect → scrape (URL, cooperative **`AbortSignal`** between nav steps) / ZIP+CSV / dir / Claude paste parse; **Esc** aborts via global `operationCancelSeq` + `useOperationAbort`
 - `error` — message + **`SelectList`**: Retry (same input), optional **Check Settings** after 3 consecutive failures, Dismiss (return to idle)
 
 **Still aspirational vs early spec:** granular `ProgressSteps`, dedicated `detecting`/`scraping` labels, post-import contact-only prompt as a separate state (contact is merged in the service today).
 
-**Components:** `TextInput`, `Spinner`, `MultilineInput`, `SelectList` (error recovery).
+**Components:** `ScrollView` (source preview), `TextInput`, `Spinner`, `MultilineInput`, `SelectList` (error recovery).
 
 ### RefineScreen
 

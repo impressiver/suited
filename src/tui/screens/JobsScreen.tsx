@@ -27,6 +27,7 @@ import {
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 const ADD_SENTINEL = '__add__';
@@ -143,6 +144,41 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }, [jobs, prepLabel]);
 
   const active = activeScreen === 'jobs' && focusTarget === 'content';
+
+  const jobsFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    switch (mode.m) {
+      case 'list':
+        return splitPane
+          ? `Jobs · ↑↓ list · Enter open · a add · d delete · p prepare · g generate${sb} · Preview shows selected job`
+          : `Jobs · ↑↓ · Enter open · a add · d delete · p prepare · g generate${sb}`;
+      case 'detail':
+        return `Jobs · ↑↓ · Enter · a d g p · Esc list${sb}`;
+      case 'addTitle':
+      case 'addCompany':
+        return `Jobs · Esc back · Enter next${sb}`;
+      case 'addJd':
+        return `Jobs · Ctrl+D save job · Esc back${sb}`;
+      case 'viewJd':
+        return `Jobs · ↑↓ scroll JD · Esc back${sb}`;
+      case 'deleteAsk':
+        return `Jobs · Enter confirm delete · Esc cancel${sb}`;
+      case 'prepareOk':
+        return `Jobs · ↑↓ scroll summary · Esc → list${sb}`;
+      case 'viewPrep':
+        return `Jobs · ↑↓ scroll prep · Esc → job menu${sb}`;
+      case 'feedbackView':
+        return `Jobs · ↑↓ scroll · Enter on actions · Esc back${sb}`;
+      case 'feedbackDone':
+        return `Jobs · Esc → list${sb}`;
+      case 'err':
+        return `Jobs · ↑↓ Enter · Esc → list when menu not focused${sb}`;
+      default:
+        return `Jobs${sb}`;
+    }
+  }, [mode.m, splitPane]);
+
+  useRegisterPanelFooterHint(jobsFooterHint);
 
   const listJob = useCallback((): SavedJob | null => {
     const id = listItems[listIndex]?.value;
@@ -518,7 +554,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         <Text color="green">
           {mode.job.title} @ {mode.job.company} — {mode.nPos} positions · {mode.nSkills} skills
         </Text>
-        <Text dimColor>↑↓ scroll summary · Esc → list</Text>
         <Box marginTop={1}>
           <ScrollView lines={mode.previewLines} height={h} scrollOffset={mode.prepScroll} />
         </Box>
@@ -533,7 +568,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         <Text bold>
           Preparation — {mode.job.title} @ {mode.job.company}
         </Text>
-        <Text dimColor>↑↓ scroll · Esc → job menu</Text>
         <Box marginTop={1}>
           <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
         </Box>
@@ -559,7 +593,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Professional feedback</Text>
-        <Text dimColor>↑↓ scroll · Esc back</Text>
         <Box marginTop={1}>
           <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
         </Box>
@@ -598,7 +631,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
           Feedback
         </Text>
         <Text>{mode.note}</Text>
-        <Text dimColor>Esc → list</Text>
       </Box>
     );
   }
@@ -646,9 +678,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
             }}
           />
         </Box>
-        <Box marginTop={1}>
-          <Text dimColor>Esc also returns to list when this menu is not focused</Text>
-        </Box>
       </Box>
     );
   }
@@ -688,7 +717,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         <Text bold>
           JD — {mode.job.title} @ {mode.job.company}
         </Text>
-        <Text dimColor>↑↓ scroll · Esc back</Text>
         <ScrollView lines={lines} height={h} scrollOffset={mode.scroll} />
       </Box>
     );
@@ -698,7 +726,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Add job — title</Text>
-        <Text dimColor>Esc back · Enter next</Text>
         <TextInput
           value={titleDraft}
           onChange={setTitleDraft}
@@ -717,7 +744,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Add job — company</Text>
-        <Text dimColor>Esc back · Enter next</Text>
         <TextInput
           value={companyDraft}
           onChange={setCompanyDraft}
@@ -736,7 +762,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Add job — description</Text>
-        <Text dimColor>Ctrl+D save job · Esc back</Text>
         <MultilineInput
           value={jdDraft}
           onChange={setJdDraft}
@@ -755,7 +780,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         <Text bold>
           {mode.job.title} @ {mode.job.company}
         </Text>
-        <Text dimColor>↑↓ · Enter · a d g p · Esc list</Text>
         <Box marginTop={1}>
           <SelectList
             items={detailMenuItems}
@@ -832,7 +856,6 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   const listColumn = (
     <Box flexDirection="column" width={splitPane ? listPaneW : undefined}>
       <Text bold>Saved jobs</Text>
-      <Text dimColor>↑↓ · Enter open · a add · d delete · p prepare · g generate</Text>
       <Box marginTop={1}>
         <SelectList
           items={listItems}
@@ -859,13 +882,10 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
                 {previewJob.title} @ {previewJob.company}
               </Text>
               <Text dimColor>{prepLabel[previewJob.id] ?? '…'}</Text>
-              <Box marginTop={1}>
-                <Text dimColor>Enter — full actions (view JD, prepare, generate)</Text>
-              </Box>
             </Box>
           ) : (
             <Box marginTop={1}>
-              <Text dimColor>Select a job or choose + Add new job</Text>
+              <Text dimColor>No job selected</Text>
             </Box>
           )}
         </Box>

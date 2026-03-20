@@ -209,11 +209,11 @@ Across the shell, **at most one** list-style **caret** (`›`, bright / `white` 
 | **`Sidebar`** | **`focusTarget === 'sidebar'`** and row is `activeScreen`: show `›` on that row only. | When focus is **`content`**, **all** sidebar rows dim; **no** caret on any row (current screen is still implied by the header / active route). |
 | **`SelectList`** | Caret on the selected row **only when `isActive` is true** (this list owns arrow keys). | When **`isActive` is false**, **no** caret on any row; **all** rows dim. Selection index may still update programmatically for when the list becomes active again. |
 | **Contact (field list)** | Caret on the focused field label **only when** the panel has content focus **and** phase is **browse** (not while a `TextInput` is focused — avoid two cursors). | When sidebar has focus, or for non-selected fields, dim labels and values accordingly. |
-| **Dashboard quick actions** | `isActive` **MUST** track panel focus (e.g. `focusTarget === 'content'`), not always `true`. | Same as `SelectList` when inactive. |
+| **Dashboard (main panel)** | No `SelectList` in the panel; no list caret. Use sidebar / number / letter keys. | N/A |
 
 **Not a caret:** Breadcrumb separators (e.g. `Summary › Experience` in Profile) use `›` as typography in **dim** text; they **MUST NOT** be styled as the white list caret.
 
-**Implementation reference:** `Sidebar.tsx` (takes `focusTarget`), `SelectList.tsx`, `ContactScreen.tsx`, `DashboardScreen.tsx`; split layouts (e.g. Jobs list + detail) rely on **`isActive={false}`** on the non-focused column.
+**Implementation reference:** `Sidebar.tsx` (takes `focusTarget`), `SelectList.tsx`, `ContactScreen.tsx`; split layouts (e.g. Jobs list + detail) rely on **`isActive={false}`** on the non-focused column.
 
 ---
 

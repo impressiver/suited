@@ -1,9 +1,10 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Sourced } from '../../profile/schema.ts';
 import { loadActiveProfile } from '../../profile/serializer.ts';
 import { type ContactFields, mergeContactMeta } from '../../services/contact.ts';
 import { Spinner, TextInput } from '../components/shared/index.ts';
+import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 type FieldKey = keyof ContactFields;
@@ -79,6 +80,23 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
 
   const active = activeScreen === 'contact' && focusTarget === 'content';
 
+  const contactFooterHint = useMemo(() => {
+    const sb = ' · Tab sidebar';
+    if (loadErr != null) {
+      return `Contact · r retry after fixing files${sb}`;
+    }
+    if (saving) {
+      return `Contact · saving…${sb}`;
+    }
+    const errNote = saveErr != null ? ' · fix issue then s save' : '';
+    if (phase === 'browse') {
+      return `Contact · ↑↓ Tab field · Enter edit · s save all (profile + contact.json)${errNote}${sb}`;
+    }
+    return `Contact · Esc leave field · Enter next field${errNote}${sb}`;
+  }, [loadErr, phase, saveErr, saving]);
+
+  useRegisterPanelFooterHint(contactFooterHint);
+
   useInput(
     (input) => {
       if (!active || loadErr == null) {
@@ -134,7 +152,6 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
       <Box flexDirection="column">
         <Text bold>Contact</Text>
         <Text color="red">{loadErr}</Text>
-        <Text dimColor>Press r to retry after fixing files · Tab → sidebar</Text>
       </Box>
     );
   }
@@ -151,14 +168,10 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   return (
     <Box flexDirection="column">
       <Text bold>Contact</Text>
-      <Text dimColor>
-        ↑↓ Tab field · Enter edit · Esc leave field · s save all · writes profile + contact.json
-      </Text>
       {savedAt != null && <Text color="green">Last saved: {savedAt}</Text>}
       {saveErr != null && (
         <Box flexDirection="column">
           <Text color="red">{saveErr}</Text>
-          <Text dimColor>Fix the issue and press s to save again.</Text>
         </Box>
       )}
       <Box marginTop={1} flexDirection="column">

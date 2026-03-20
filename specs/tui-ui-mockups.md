@@ -12,13 +12,12 @@ ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional c
 │   2 Import    │  ────────────────────────────────────────────────────────    │
 │   3 Refine    │  Pipeline                                                    │
 │   4 Generate  │    Source [●]  Refined [●]  Jobs [●]  Last PDF [●]          │
-│   5 Jobs      │                                                              │
-│   6 Profile   │  Quick actions                                               │
-│   7 Contact   │    [ Refine ]   [ Import ]   [ Generate… ]   [ Jobs ]       │
+│   5 Jobs      │  Activity                                                  │
+│   6 Profile   │    Jobs saved: 3 · Last PDF: …                              │
+│   7 Contact   │                                                              │
 │   8 Settings  │                                                              │
-│               │  Recent                                                      │
-│               │    Mar 18  generated  acme-senior-engineer.pdf              │
-│               │    Mar 17  refined    refined.json updated                  │
+│               │                                                              │
+│               │                                                              │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
 │ Tab focus  ·  ↑↓ select  ·  Enter open  ·  1–8 screen  ·  q quit           │
 └──────────────────────────────────────────────────────────────────────────────┘

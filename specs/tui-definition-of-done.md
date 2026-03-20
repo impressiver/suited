@@ -4,6 +4,7 @@
 
 Residual gaps vs an ideal CLI pixel-match (optional follow-ups):
 
+- **Suggestion diffs (side-by-side)** — **Task:** Implement **full side-by-side** presentation for reviewing model-suggested changes (two columns: before | after, or an equivalent fixed-width layout), not only today’s unified `DiffView` blocks (`-` / `+` lines). Apply across flows where users accept or reject AI edits: **Refine** diff-review (Q&A apply, polish, direct edit, consultant apply), and **Jobs** job-fit feedback / tailored draft changes where a structured diff is shown. Requirements: remain readable under **`NO_COLOR`** (labels, borders, column headers — not color alone); support **narrow terminals** (graceful fallback to stacked or unified); **scroll** or paging when content exceeds the viewport; reuse or extend `computeRefinementDiff` / `DiffBlock` data where possible rather than ad-hoc strings.
 - **Generate** — Pre-flight JD analysis / curation **review checkpoints** before PDF (today: analysis runs inside `runTuiGeneratePdf`). **Token streaming** UI for analyze / curate / polish (step list + spinner today).
 - **Refine** — **Per-bullet** inline diff (CLI Inquirer); TUI uses block diff + summary edit. **Streaming panes** for polish / direct-edit (tools run with spinner).
 - **Jobs feedback** — CLI `prepare` can **enrich** gaps with Inquirer Q&A before `applyJobFeedback`; TUI applies gap list **without** that interactive enrichment (same `applyJobFeedback` call).
@@ -51,7 +52,7 @@ Add to Phase B:
 - [x] **Subcommand-equivalent actions** in TUI without subprocess. **Permanent CLI-only:** `--jd`, `--all-templates`, and any flag not surfaced in Settings/Generate. **`suited validate`** → Dashboard reference count. **`suited improve`** → Dashboard health + Refine / Profile / Contact. **`suited prepare`** → Jobs: prepare, **view curation** (`formatCurationPreviewLines`), **professional feedback** (`evaluateForJob` / `applyJobFeedback` simplified path).
 - [x] **Jobs:** Curation summary after prepare + scrollable preview; view prep + job-fit feedback from job menu when refinement exists (see [tui-screens.md](./tui-screens.md#jobsscreen)).
 - [x] **Profile editor:** Structured lists + save; navigate-away guard; save failure **Retry / Settings / Dismiss** (multi-field forms: see post–Phase C polish).
-- [x] **Refine** — Already-refined menu: Q&A, **polish** (section presets), **direct edit**, **Jobs** link; diff save keeps or replaces Q&A session as appropriate.
+- [x] **Refine** — Already-refined menu: Q&A, **polish** (section presets), **direct edit**; diff save keeps or replaces Q&A session as appropriate. (Jobs / other screens: sidebar only.)
 - [x] **Generate** — Progress steps, post-done actions (see post–Phase C for JD checkpoints + streaming).
 - [x] **`isMdNewerThanJson`** — Refine banner + confirm.
 - [x] **Retry limit** — Refine / Import / Generate / Jobs prepare / **Profile save** (Settings after 3).

@@ -66,12 +66,9 @@ ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional c
 │   2 Import    │  Refine profile                                              │
 │ ► 3 Refine    │  Profile is already refined. What would you like to do?      │
 │   4 Generate  │  ────────────────────────────────────────────────────────    │
-│   …           │    Run hiring consultant review                              │
-│               │  ► Polish bullets (AI rewrite)                              │
-│               │    Rerun Q&A from scratch                                   │
-│               │    Apply direct edit (free-form instructions)                │
-│               │    Edit profile manually (opens $EDITOR)                    │
-│               │    Prepare for a saved job                                  │
+│   …           │  ► Run Q&A from source (new refinement pass)                │
+│               │    Polish sections (AI)                                     │
+│               │    Direct edit (instructions to Claude)                      │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
 │ ↑↓ choose  ·  Enter confirm  ·  Esc back                                    │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -217,32 +214,16 @@ Then runs curation inline (spinner → streaming → summary → action row), ne
 │   3 Refine    │  Generate tailored resume                                   │
 │ ► 4 Generate  │  Where is the job description?                              │
 │   5 Jobs      │  ────────────────────────────────────────────────────────    │
-│   …           │  ► Paste a job description                                  │
-│               │    Use a saved job                                          │
-│               │    No job description (generic tailoring)                   │
+│   …           │  ► Use a saved job                                          │
+│               │    Full resume (no job targeting)                           │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
 │ ↑↓ choose  ·  Enter confirm  ·  Esc back                                    │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Generate — paste JD
+### Generate — JD text (Jobs screen)
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ Suited  ·  Jane Smith  ·  generate                                          │
-├───────────────┬──────────────────────────────────────────────────────────────┤
-│ ► 4 Generate  │  Paste job description                                      │
-│   …           │  ────────────────────────────────────────────────────────    │
-│               │  ┌──────────────────────────────────────────────────────┐  │
-│               │  │ About the role                                       │  │
-│               │  │ We are hiring a Staff Engineer to own…               │  │
-│               │  │ …                                                    │  │
-│               │  └──────────────────────────────────────────────────────┘  │
-│               │  1,240 chars  ·  Ctrl+D: done  ·  Esc: back               │
-├───────────────┴──────────────────────────────────────────────────────────────┤
-│ Multiline: Enter = newline  ·  q does NOT quit                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+Ad-hoc JD paste happens when **adding a job** on **Jobs** (`MultilineInput`), not on Generate. Generate picks **saved jobs** or **full resume** only.
 
 ### Generate — template + flair configuration
 

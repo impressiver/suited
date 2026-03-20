@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
 import { runTuiGeneratePdf } from '../../services/generateResume.ts';
-import { MultilineInput, ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
+import { ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -12,7 +12,6 @@ import { useAppDispatch, useAppState } from '../store.tsx';
 
 type Phase =
   | { p: 'pick-source' }
-  | { p: 'paste' }
   | { p: 'pick-saved'; jobs: SavedJob[]; idx: number }
   | {
       p: 'pick-flair';
@@ -69,7 +68,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const { pendingJobId, activeScreen, focusTarget } = useAppState();
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ p: 'pick-source' });
-  const [pasteBuf, setPasteBuf] = useState('');
   const [sourceIdx, setSourceIdx] = useState(0);
   const [apiFailureStreak, setApiFailureStreak] = useState(0);
   const [errMenuIdx, setErrMenuIdx] = useState(0);
@@ -85,9 +83,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
     const sb = ' · Tab sidebar';
     switch (phase.p) {
       case 'pick-source':
-        return `Generate · ↑↓ · Enter · paste, saved job, or full resume${sb}`;
-      case 'paste':
-        return `Generate · Ctrl+D continue · Esc back${sb}`;
+        return `Generate · ↑↓ · Enter · saved job or full resume${sb}`;
       case 'pick-saved':
         return `Generate · ↑↓ · Enter choose job${sb}`;
       case 'pick-flair':
@@ -131,7 +127,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
 
   const sourceItems = useMemo(
     () => [
-      { value: 'paste', label: 'Paste job description' },
       { value: 'saved', label: 'Use a saved job' },
       { value: 'full', label: 'Full resume (no job targeting)' },
     ],
@@ -164,6 +159,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           onProgress: setRunStepIndex,
         });
         setApiFailureStreak(0);
+        setDoneMenuIdx(0);
         setPhase({ p: 'done', path: outputPath });
       } catch (e) {
         if (isUserAbort(e)) {
@@ -213,9 +209,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
             items={[
               { value: 'again', label: 'Regenerate with same options' },
               { value: 'flair', label: 'Change flair / job options' },
-              { value: 'source', label: 'New source (paste / saved job / full resume)' },
-              { value: 'jobs', label: 'Jobs — manage saved JDs' },
-              { value: 'dash', label: 'Dashboard' },
+              { value: 'source', label: 'New source (saved job or full resume)' },
             ]}
             selectedIndex={doneMenuIdx}
             onChange={(i) => setDoneMenuIdx(i)}
@@ -233,21 +227,15 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
                 if (snap) {
                   setPhase({ p: 'pick-flair', ...snap });
                 } else {
+                  setSourceIdx(0);
                   setPhase({ p: 'pick-source' });
                 }
                 return;
               }
               if (item.value === 'source') {
+                setSourceIdx(0);
                 setPhase({ p: 'pick-source' });
-                return;
               }
-              if (item.value === 'jobs') {
-                navigate('jobs');
-                dispatch({ type: 'SET_FOCUS', target: 'content' });
-                return;
-              }
-              navigate('dashboard');
-              dispatch({ type: 'SET_FOCUS', target: 'content' });
             }}
           />
         </Box>
@@ -270,6 +258,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
               onChange={() => {}}
               isActive={active}
               onSubmit={() => {
+                setSourceIdx(0);
                 setPhase({ p: 'pick-source' });
               }}
             />
@@ -377,32 +366,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
     );
   }
 
-  if (phase.p === 'paste') {
-    return (
-      <Box flexDirection="column">
-        <Text bold>Paste job description</Text>
-        <MultilineInput
-          value={pasteBuf}
-          onChange={setPasteBuf}
-          focus={active}
-          onSubmit={(text) => {
-            const t = text.trim();
-            if (!t) {
-              return;
-            }
-            setPhase({
-              p: 'pick-flair',
-              jd: t,
-              title: 'Unknown Role',
-              company: 'Unknown Company',
-              idx: 2,
-            });
-          }}
-        />
-      </Box>
-    );
-  }
-
   if (phase.p === 'pick-saved') {
     const items = phase.jobs.map((j) => ({
       value: j.id,
@@ -447,11 +410,6 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           onChange={(i) => setSourceIdx(i)}
           isActive={active}
           onSubmit={async (item) => {
-            if (item.value === 'paste') {
-              setPasteBuf('');
-              setPhase({ p: 'paste' });
-              return;
-            }
             if (item.value === 'saved') {
               const jobs = await loadJobs(profileDir);
               if (jobs.length === 0) {

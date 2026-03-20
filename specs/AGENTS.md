@@ -172,7 +172,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 ### Phase 8 — completed work (MVP)
 
-- **`src/tui/screens/RefineScreen.tsx`** — `loadSource` → already-refined menu (Q&A, **polish**, **direct edit**, Jobs link) + md/json sync → Q&A → `applyRefinements` → `DiffView` + **`SelectList`** → `saveRefined` / **keep-session** saves for polish & direct edit; `profileDir` from `App`.
+- **`src/tui/screens/RefineScreen.tsx`** — `loadSource` → already-refined menu (Q&A, **polish**, **direct edit**) + md/json sync → Q&A → `applyRefinements` → `DiffView` + **`SelectList`** → `saveRefined` / **keep-session** saves for polish & direct edit; `profileDir` from `App`.
 - **`src/tui/screens/ProfileEditorScreen.tsx`** — loads refined (preserve session) or source; sections include summary, experience (positions/bullets), **skills**, **education**, **certifications**, **projects** (list + a/d/`[`/`]` + primary-field edit); **`s`** save, Esc with unsaved overlay (**s** / **d**/**n** / Esc); `App` defers **a**/**d** from global nav; `InlineEditor` + `SelectList`.
 - **`src/tui/App.tsx`** — passes `profileDir` into Refine/Profile; footer hints; **↑↓** screen-cycle suppressed on Refine/Profile content like other list screens.
 

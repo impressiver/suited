@@ -1,5 +1,10 @@
 import { callWithTool, callWithToolStreaming } from '../claude/client.ts';
 import {
+  APPLY_PROFILE_FEEDBACK_SYSTEM,
+  buildProfileFeedbackPrompt,
+  type ConsultantFinding,
+} from '../claude/prompts/consultant.ts';
+import {
   buildQAContext,
   DIRECT_EDIT_SYSTEM,
   EXPERT_POLISH_SYSTEM,
@@ -322,4 +327,21 @@ export async function* applyDirectEdit(
   }
   if (!last) throw new Error('applyDirectEdit: no result from model');
   yield { type: 'done', result: applyRefinementsFromTool(profile, last) };
+}
+
+/** Apply hiring-consultant findings to a profile (same tool path as CLI `refine` consultant). */
+export async function applyConsultantFindingsToProfile(
+  profile: Profile,
+  findings: ConsultantFinding[],
+  signal?: AbortSignal,
+): Promise<Profile> {
+  const profileText = profileToRefineText(profile);
+  const rawRefinements = await callWithTool<RefinementsOutput>(
+    APPLY_PROFILE_FEEDBACK_SYSTEM,
+    buildProfileFeedbackPrompt(profileText, findings),
+    refinementsToolSchema,
+    undefined,
+    signal,
+  );
+  return applyRefinementsFromTool(profile, rawRefinements);
 }

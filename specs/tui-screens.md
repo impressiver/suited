@@ -34,29 +34,32 @@ Every screen documents: what loads on mount, the full state machine (every state
 
 **Loads on mount:** `loadRefined()`. If refined, start at `already-refined`; else start at `not-refined`.
 
+**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **Professional consultant review (hiring manager, whole profile)**, **Direct edit**. No duplicate “open Jobs” / “stay” rows — use the **sidebar** for navigation.
+
 **External edit detection (`isMdNewerThanJson`):** The CLI checks whether `refined.md` has been externally edited (newer mtime than `refined.json`) and prompts sync. The TUI **MUST** replicate this check on mount. If `refined.md` is newer, show an inline banner inside the `already-refined` sub-menu: "Your `refined.md` was edited outside the TUI. Sync changes now?" with `<ConfirmPrompt>` → on yes, call `markdownToProfile()` + `saveRefined()`. This **must not** silently drop the external edits.
 
-**States:**
+**States (implemented):**
 ```
 not-refined:
-  → generating-questions      (spinner; calls generateRefinementQuestions)
-  → qa-phase                  (TextInput per question; questions[index] rendered inline)
-  → generating-refinements    (spinner; calls applyRefinements with answers)
-  → diff-review               (DiffView per block; TUI: `SelectList` accept / **edit proposed summary** / discard, then return to diff)
-  → saving                    (spinner; calls saveRefined)
-  → consultant-running        (streaming; calls evaluateProfileForJob)
-  → consultant-done           (action row: Generate / Back)
-  → error                     (error + retry)
-  → cancelled                 (Retry / Back; distinct from error)
+  → generating-questions      (spinner; generateRefinementQuestions)
+  → qa-phase                  (TextInput per question)
+  → generating-refinements    (spinner; applyRefinements)
+  → diff-review               (DiffView; accept / edit proposed summary / discard)
+  → saving                    (spinner; saveRefined)
+  → error / retry             (retryKind-specific)
 
 already-refined:
   → sub-menu (SelectList):
-      "Run consultant review"      → consultant-running → consultant-done
-      "Polish bullets (AI)"        → polish-section-select → polish-running → diff-review
-      "Rerun Q&A from scratch"     → generating-questions (same flow as not-refined)
-      "Apply direct edit"          → direct-edit-input → direct-edit-running → diff-review
-      "Prepare for a saved job"    → job-picker → curation-running → curation-summary
+      Run Q&A from source
+      Polish sections (AI)     → polish-pick → polish-run → diff-review (keep-session) → saving
+      Professional consultant  → consultant-run (spinner; evaluateProfile on refined profile)
+                               → consultant-view (ScrollView + apply / back)
+                               → consultant-apply (spinner; applyConsultantFindingsToProfile)
+                               → diff-review (keep-session) or done if empty diff
+      Direct edit              → MultilineInput → direct-edit-run → diff-review (keep-session)
 ```
+
+**Job-specific** hiring-manager feedback stays on **Jobs** → job detail → **Professional feedback (job fit)** (`evaluateForJob`), not on Refine.
 
 **Key constraint:** Every sub-state renders inside `<RefineScreen>`. No sub-state spawns an Inquirer prompt or calls `runRefine`.
 
@@ -64,21 +67,22 @@ already-refined:
 
 **Polish sub-flow:** `polish-section-select` renders a `CheckboxList` of sections (Experience, Skills, etc.) and optionally a `SelectList` of positions to narrow scope. Only after the user confirms does the screen call `polishProfile(profile, { sections, positionIds })`. This mirrors the existing CLI's interactive section/position prompts — the TUI replaces those prompts with the CheckboxList step.
 
-**Prepare sub-flow:** `SelectList` of saved jobs → on select, calls `curateForJob()` with streaming → shows `ProgressSteps` → shows curation summary → action row (accept + save, rerun, back).
+**Prepare sub-flow:** Handled on **JobsScreen** (not Refine): saved job → Prepare → curation summary, etc.
 
-**Components:** `SelectList`, `TextInput`, `MultilineInput`, `DiffView`, `InlineEditor`, `Spinner`, `ProgressSteps`, `ScrollView` (streaming output), `ConfirmPrompt`.
+**Components:** `SelectList`, `TextInput`, `MultilineInput`, `DiffView`, `InlineEditor`, `Spinner`, `ScrollView`, `ConfirmPrompt`.
+
+**Backlog — side-by-side suggestion diffs:** Replace or augment unified `DiffView` with a **before | after** (side-by-side) layout for all AI-suggestion review steps above. Tracked as a post–Phase C task in [`tui-definition-of-done.md`](./tui-definition-of-done.md) (**Suggestion diffs (side-by-side)**).
 
 ### GenerateScreen
 
 **Loads on mount:** If `pendingJobId` is set in `AppState`, clear it and jump to flair picker with that job’s JD.
 
-**Current implementation (MVP):** source picker (paste / saved / full resume) → optional MultilineInput → flair **`SelectList`** → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
+**Current implementation (MVP):** source picker (**saved job** / **full resume** only — ad-hoc JD paste lives on **Jobs** when adding a job) → flair **`SelectList`** → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
 
 **States (target / north star):**
 ```
 idle:
-  → jd-source-picker      (SelectList: paste / use saved / no JD)
-  → jd-paste              (MultilineInput; Ctrl+D submits)
+  → jd-source-picker      (SelectList: use saved / no JD)
   → jd-saved-picker       (SelectList of saved jobs)
   → jd-confirmed          (show job title/company; go to config)
 
@@ -106,7 +110,8 @@ pipeline (all cancellable via Esc + AbortSignal):
 - Change template / flair (same JD — go back to `template-picker`)
 - Generate for a different job (go back to `jd-source-picker`)
 - Tweak content (`MultilineInput` → `tweak-running` → re-runs trim + PDF only; maps to `tweakResumeContent()`)
-- Back to Dashboard
+
+**Navigation** (Jobs, Dashboard, etc.) is the **sidebar** / number keys — not duplicated on the done row.
 
 **`--jd` flag / `--all-templates`:** CLI-only. Not replicated in TUI. See [Goals & constraints](./tui-goals-and-constraints.md#coverage-validate-improve-prepare---jd-flag).
 
@@ -157,6 +162,8 @@ pipeline (all cancellable via Esc + AbortSignal):
 **Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, `1–8`, Esc to sidebar), if unsaved changes exist, a `<ConfirmPrompt>` overlays the current state: "Unsaved changes — save before leaving? (Enter=save / n=discard / Esc=stay)". This is the resolved policy (see [Open questions](./tui-open-questions.md) — question 3). Writes via `saveRefined()` or `saveSource()`.
 
 **No `$EDITOR`:** Profile editing is entirely inline. If a user wants to open the markdown in their editor, they do it via the CLI (`suited refine --edit`), not the TUI.
+
+**Improve vs Refine:** Improve (`ProfileEditorScreen`) is **manual** structured editing. **General** hiring-consultant feedback on the refined profile is **Refine → Professional consultant review** (not on Improve).
 
 **Components:** `InlineEditor`, `SelectList`, `CheckboxList`, `ConfirmPrompt`, `ScrollView`.
 

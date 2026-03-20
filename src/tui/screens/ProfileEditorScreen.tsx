@@ -1014,6 +1014,11 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         {dirty ? ' · unsaved changes' : ''}
       </Text>
       <Text dimColor>{breadcrumb.join(' › ')}</Text>
+      {session && (
+        <Text dimColor>
+          AI hiring-manager feedback on the whole profile: Refine → Professional consultant review.
+        </Text>
+      )}
 
       {unsaved && (
         <Box

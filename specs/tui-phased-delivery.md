@@ -30,7 +30,7 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, direct edit, Jobs link, md sync), **Profile** (editor + dirty nav guard + save error menu). **NavigateProvider** for guarded navigation. Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, direct edit, md sync), **Profile** (editor + dirty nav guard + save error menu). **NavigateProvider** for guarded navigation. Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 ---
 

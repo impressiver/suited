@@ -21,12 +21,6 @@ export const SCREEN_ORDER: ScreenId[] = [
 
 export type FocusTarget = 'sidebar' | 'content';
 
-/** Mutable bag read by `runTui` after Ink unmounts. */
-export interface TuiExitBag {
-  pending: string[] | null;
-  quit: boolean;
-}
-
 export const NAV_LABELS: Record<ScreenId, string> = {
   dashboard: 'Dashboard',
   import: 'Import',

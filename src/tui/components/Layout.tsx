@@ -24,11 +24,11 @@ export function Layout({
   ...headerProps
 }: LayoutProps) {
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" padding={1} flexGrow={1} height="100%">
       <Header {...headerProps} />
-      <Box marginTop={1} flexDirection="row">
+      <Box marginTop={1} flexDirection="row" flexGrow={1}>
         <Sidebar activeScreen={activeScreen} />
-        <Box flexGrow={1} flexDirection="column">
+        <Box flexGrow={1} flexDirection="column" minHeight={0}>
           {panelFocusBanner != null && panelFocusBanner !== '' && (
             <Box marginBottom={1} flexDirection="column">
               <Text bold color="cyan">

@@ -15,7 +15,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       try {
         const jobs = await loadJobs(profileDir);
         if (jobs.length === 0) {
-          setLines(['(no saved jobs yet — run suited jobs in CLI to add)']);
+          setLines(['(no saved jobs yet — add one from the Jobs screen when create UI lands)']);
           return;
         }
         setLines(
@@ -44,7 +44,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         <Text key={line}>{line}</Text>
       ))}
       <Box marginTop={1}>
-        <Text dimColor>Full add/delete UI: run `suited jobs`. Enter here opens jobs CLI.</Text>
+        <Text dimColor>Full add/delete/prepare UI is tracked in specs/tui-implementation-order.md §8.</Text>
       </Box>
     </Box>
   );

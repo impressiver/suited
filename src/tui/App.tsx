@@ -1,16 +1,19 @@
 import { Box, useApp, useInput } from 'ink';
 import { useEffect, useMemo } from 'react';
 import type { FlowOptions } from '../commands/flow.ts';
-import { buildPendingCliArgs, screenRunsCliOnEnter } from './cliArgs.ts';
 import { Layout } from './components/Layout.tsx';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
+import { useTerminalSize } from './hooks/useTerminalSize.ts';
+import { ContactScreen } from './screens/ContactScreen.tsx';
 import { DashboardScreen } from './screens/DashboardScreen.tsx';
-import { DelegateScreen } from './screens/DelegateScreen.tsx';
+import { GenerateScreen } from './screens/GenerateScreen.tsx';
 import { ImportScreen } from './screens/ImportScreen.tsx';
 import { JobsScreen } from './screens/JobsScreen.tsx';
+import { ProfileEditorScreen } from './screens/ProfileEditorScreen.tsx';
+import { RefineScreen } from './screens/RefineScreen.tsx';
 import { SettingsScreen } from './screens/SettingsScreen.tsx';
 import { useAppDispatch, useAppState } from './store.tsx';
-import { SCREEN_ORDER, type TuiExitBag } from './types.ts';
+import { SCREEN_ORDER, type ScreenId } from './types.ts';
 
 /** Ink only sets `key.return` for `\r`; many TTYs send `\n` for Enter (`name === 'enter'`), which leaves `key.return` false. */
 function isEnterKey(key: { return?: boolean }, input: string): boolean {
@@ -20,11 +23,11 @@ function isEnterKey(key: { return?: boolean }, input: string): boolean {
 export interface AppProps {
   profileDir: string;
   flowOptions: FlowOptions;
-  exitBag: TuiExitBag;
 }
 
-export function App({ profileDir, flowOptions, exitBag }: AppProps) {
+export function App({ profileDir, flowOptions }: AppProps) {
   const { exit } = useApp();
+  const [cols, rows] = useTerminalSize();
   const snapshot = useProfileSnapshot(profileDir);
   const state = useAppState();
   const dispatch = useAppDispatch();
@@ -40,25 +43,28 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
 
   const footerHint = useMemo(() => {
     const base =
-      '↑↓ change screen (anywhere) · Tab sidebar ↔ panel · 1–8 · d i c j r p g s · q quit';
+      '↑↓ change screen (most views) · Tab sidebar ↔ panel · 1–8 · d i c j r p g s · q quit';
     if (state.operationInProgress) {
       return `${base} · locked · Esc cancels op`;
     }
     if (state.inTextInput) {
       return 'Text field focused · q does not quit · Esc cancels field';
     }
+    if (activeScreen === 'contact' && focusTarget === 'content') {
+      return 'Contact · ↑↓ Tab field · Enter edit · s save all · Esc sidebar (from browse)';
+    }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
-  }, [focusTarget, state.inTextInput, state.operationInProgress]);
+  }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);
 
   const panelFocusBanner = useMemo(() => {
     if (focusTarget !== 'content') {
       return null;
     }
-    if (screenRunsCliOnEnter(activeScreen)) {
-      return 'Enter → run this command in the terminal (you return here when it finishes). Esc → back to nav.';
-    }
-    return 'Enter does nothing on this screen. Esc or Tab → nav · ↑↓ still change screen.';
-  }, [activeScreen, focusTarget]);
+    return 'Tab or Esc → return to sidebar · On Dashboard/Contact, ↑↓ may move lists or fields instead of changing screen';
+  }, [focusTarget]);
+
+  const screenUsesContentArrows = (screen: ScreenId): boolean =>
+    screen === 'dashboard' || screen === 'contact';
 
   useInput(
     (input, key) => {
@@ -74,6 +80,9 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       }
 
       if (key.tab) {
+        if (activeScreen === 'contact' && focusTarget === 'content') {
+          return;
+        }
         dispatch({
           type: 'SET_FOCUS',
           target: focusTarget === 'sidebar' ? 'content' : 'sidebar',
@@ -89,14 +98,12 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       }
 
       if (input === 'q' || input === 'Q') {
-        exitBag.quit = true;
-        exitBag.pending = null;
         exit();
         return;
       }
 
       if (key.upArrow) {
-        if (!(focusTarget === 'content' && activeScreen === 'dashboard')) {
+        if (!(focusTarget === 'content' && screenUsesContentArrows(activeScreen))) {
           dispatch({
             type: 'SET_SCREEN',
             screen:
@@ -108,7 +115,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
         return;
       }
       if (key.downArrow) {
-        if (!(focusTarget === 'content' && activeScreen === 'dashboard')) {
+        if (!(focusTarget === 'content' && screenUsesContentArrows(activeScreen))) {
           dispatch({
             type: 'SET_SCREEN',
             screen: SCREEN_ORDER[(SCREEN_ORDER.indexOf(activeScreen) + 1) % SCREEN_ORDER.length],
@@ -119,16 +126,6 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
 
       if (focusTarget === 'sidebar' && isEnterKey(key, input)) {
         dispatch({ type: 'SET_FOCUS', target: 'content' });
-        return;
-      }
-
-      if (focusTarget === 'content' && isEnterKey(key, input)) {
-        const args = buildPendingCliArgs(activeScreen, profileDir, flowOptions);
-        if (args) {
-          exitBag.pending = args;
-          exitBag.quit = false;
-          exit();
-        }
         return;
       }
 
@@ -164,41 +161,23 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       case 'dashboard':
         return <DashboardScreen snapshot={snapshot} profileDir={profileDir} />;
       case 'import':
-        return <ImportScreen profileDir={profileDir} />;
+        return (
+          <ImportScreen
+            profileDir={profileDir}
+            headed={flowOptions.headed}
+            clearSession={flowOptions.clearSession}
+          />
+        );
       case 'refine':
-        return (
-          <DelegateScreen
-            title="Refine profile"
-            description="Interactive Q&A and refinement (Claude). Uses the same flow as `suited refine`."
-            cliHint="suited refine --profile-dir <dir>"
-          />
-        );
+        return <RefineScreen />;
       case 'generate':
-        return (
-          <DelegateScreen
-            title="Generate resume"
-            description="Job description, templates, PDF export — same as `suited generate`."
-            cliHint="suited generate --profile-dir <dir>"
-          />
-        );
+        return <GenerateScreen />;
       case 'jobs':
         return <JobsScreen profileDir={profileDir} />;
       case 'profile':
-        return (
-          <DelegateScreen
-            title="Improve profile"
-            description="Health checks, editing, and markdown tools via `suited improve`."
-            cliHint="suited improve --profile-dir <dir>"
-          />
-        );
+        return <ProfileEditorScreen />;
       case 'contact':
-        return (
-          <DelegateScreen
-            title="Contact info"
-            description="View and edit contact fields."
-            cliHint="suited contact --profile-dir <dir>"
-          />
-        );
+        return <ContactScreen profileDir={profileDir} />;
       case 'settings':
         return <SettingsScreen profileDir={profileDir} />;
       default: {
@@ -209,7 +188,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
   })();
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={cols} height={rows}>
       <Layout
         activeScreen={activeScreen}
         focusTarget={focusTarget}

@@ -1,19 +1,9 @@
-import { detectInput } from '../ingestion/detector.ts';
-import { parseLinkedInExport } from '../ingestion/linkedin-export.ts';
-import { parseLinkedInPaste } from '../ingestion/linkedin-paste.ts';
-import { clearLinkedInSession, scrapeLinkedInProfile } from '../ingestion/linkedin-scraper.ts';
-import { profileToMarkdown } from '../profile/markdown.ts';
+import { clearLinkedInSession } from '../ingestion/linkedin-scraper.ts';
 import type { Profile } from '../profile/schema.ts';
-import {
-  loadContactMeta,
-  mergeContactMeta,
-  saveSource,
-  sourceJsonPath,
-  sourceMdPath,
-} from '../profile/serializer.ts';
+import { sourceJsonPath, sourceMdPath } from '../profile/serializer.ts';
+import { importProfileFromInput } from '../services/importProfile.ts';
 import { c } from '../utils/colors.ts';
 import { ensureContactDetails } from '../utils/contact.ts';
-import { extractZip, findCsvDir } from '../utils/zip.ts';
 
 export interface ImportOptions {
   input?: string;
@@ -47,38 +37,15 @@ export async function runImport(options: ImportOptions): Promise<void> {
   }
 
   console.log(c.muted("\nHmm, let me see what you've got..."));
-  const detected = await detectInput(input.trim());
+  const { detected, profile } = await importProfileFromInput({
+    input,
+    profileDir,
+    headed: options.headed,
+    onPhase: (msg) => {
+      console.log(c.muted(`  ${msg}`));
+    },
+  });
   console.log(`  ${c.arr} ${c.value(detected.kind)}`);
-
-  let profile: Profile;
-
-  if (detected.kind === 'linkedin-url') {
-    console.log(c.muted('  Scraping LinkedIn profile...'));
-    const pageText = await scrapeLinkedInProfile(detected.value, { headed: options.headed });
-    console.log(c.muted('  Extracting data with Claude (verbatim only, no embellishment)...'));
-    profile = await parseLinkedInPaste(pageText);
-  } else if (detected.kind === 'export-zip') {
-    console.log(c.muted('  Unzipping the goods...'));
-    const extracted = await extractZip(detected.value);
-    const found = await findCsvDir(extracted);
-    if (!found) throw new Error('No CSV files found in the ZIP archive.');
-    console.log(c.muted('  Parsing LinkedIn export (no AI, just raw data)...'));
-    profile = await parseLinkedInExport(found);
-  } else if (detected.kind === 'export-dir') {
-    console.log('  Parsing LinkedIn export (no AI used)...');
-    profile = await parseLinkedInExport(detected.value);
-  } else {
-    console.log('  Parsing with Claude (verbatim extraction only)...');
-    profile = await parseLinkedInPaste(detected.value);
-  }
-
-  // Merge any previously saved contact metadata (email, phone, etc.)
-  // so re-imports don't wipe out manually entered contact details.
-  const contactMeta = await loadContactMeta(profileDir);
-  profile = mergeContactMeta(profile, contactMeta);
-
-  await saveSource(profile, profileDir);
-  await profileToMarkdown(profile, sourceMdPath(profileDir));
   printSummary(profile);
 
   console.log(`\n${c.ok} ${c.success('Profile imported and saved.')}`);

@@ -30,7 +30,7 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Ink TUI with global navigation, Dashboard/Jobs/Settings/Import/Jobs screens implemented. Refine, Generate, Profile, Contact are stubs (`DelegateScreen`) — these **MUST** be replaced with inline Ink screens. The subprocess-delegation infrastructure (`cliArgs.ts`, `exitBag`, `runTui` loop) is **removed** as part of committing to a single full-screen interface.
+- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import (inline via `importProfileFromInput`), Contact (`mergeContactMeta`), and Jobs (read-only list) are functional in-tree. Refine, Generate, and Profile show inline stubs per Phase A. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 ---
 

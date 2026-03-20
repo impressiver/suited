@@ -102,7 +102,8 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **2** | **T0 — TUI infrastructure hardening** (`store.tsx`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | **Done** (2026-03-19) |
 | **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | **Done** (2026-03-19) |
 | **4** | **T2 — Dashboard + Settings** (variants, health, quick actions; API key probe + `.env`) | **Done** (2026-03-19) |
-| **5+** | Remaining screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §5–15 |
+| **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Refine/Generate/Profile stubs) | **Done** (2026-03-19) |
+| **6+** | Jobs CRUD, full Refine/Generate/Profile screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §8–15 |
 
 ### Phase 1 — completed work
 
@@ -142,6 +143,15 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 **Imports:** local modules **always** use **`.ts` / `.tsx`** on relative paths (not `.js`, not extensionless). `allowImportingTsExtensions` + `rewriteRelativeImportExtensions` make **`pnpm build`** emit resolvable Node ESM. Extensionless relatives + plain **`tsc` → `node dist/`** do not work; **Biome `useImportExtensions`** enforces the rule so you do not have to remember it by hand.
 
-### What’s next (Phase 5 preview)
+### Phase 5 — completed work
 
-- **T2 / implementation order §5+** — Contact / Import / Jobs / … per [`tui-screens.md`](./tui-screens.md); L1 streaming where applicable.
+- **`src/services/importProfile.ts`** — `importProfileFromInput()` (detect/scrape/parse/save); **`commands/import.ts`** delegates the core path and keeps CLI logging + `ensureContactDetails`.
+- **`src/tui/runTui.tsx`** — single `render` + `waitUntilExit` (removed `exitBag` / `spawnSync` loop).
+- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); removed Enter-to-CLI and **`cliArgs.ts`**; **Contact** + **Import** inline; **Refine** / **Generate** / **Profile** stub screens; **Tab** passes through on Contact content for field cycling; **↑↓** reserved on Contact for fields (with Dashboard).
+- **`src/tui/hooks/useTerminalSize.ts`** — listens to `stdout` `resize`.
+- **`src/tui/components/Layout.tsx`** — main row `flexGrow={1}` for usable height.
+- **Removed** — `DelegateScreen.tsx`, `cliArgs.ts`, **`TuiExitBag`**.
+
+### What’s next (Phase 6 preview)
+
+- **T2 / implementation order §8+** — Jobs CRUD, full Refine/Generate/Profile per [`tui-screens.md`](./tui-screens.md); L1 streaming where applicable.

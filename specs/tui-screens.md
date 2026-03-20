@@ -46,7 +46,7 @@ not-refined:
   → generating-questions      (spinner; calls generateRefinementQuestions)
   → qa-phase                  (TextInput per question; questions[index] rendered inline)
   → generating-refinements    (spinner; calls applyRefinements with answers)
-  → diff-review               (DiffView per block; accept / edit-inline / discard)
+  → diff-review               (DiffView per block; TUI: `SelectList` accept / **edit proposed summary** / discard, then return to diff)
   → saving                    (spinner; calls saveRefined)
   → consultant-running        (streaming; calls evaluateProfileForJob)
   → consultant-done           (action row: Generate / Back)
@@ -145,7 +145,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 **States:**
 - `section-list` — SelectList: Summary / Experience / Skills / Education / Certifications / Projects (**all** present in TUI; Education/Certs/Projects use the same list + **`[`/`]`** + a/d pattern as Skills — primary field edit only unless noted)
 - `summary` — `InlineEditor` pre-filled with current summary; Enter saves, Esc discards
-- `position-list` — SelectList of positions; `a` adds; `d` deletes (ConfirmPrompt)
+- `position-list` — SelectList of positions; `a` adds; `d` deletes (`ConfirmPrompt`); **`[`** / **`]`** reorder (TUI)
 - `position-detail` — shows role metadata; Enter → `bullets`
 - `bullets` — SelectList: `↑↓` moves selection; **`[` / `]`** swaps the selected bullet with the previous/next row (reorder); `a` add, `d` delete, Enter → `bullet-edit` (implemented in TUI; `↑↓` cannot also swap without a mode switch, so reorder is `[` / `]`)
 - `bullet-edit` — `InlineEditor` pre-filled; Enter saves, Esc discards

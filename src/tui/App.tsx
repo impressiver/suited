@@ -1,7 +1,7 @@
 import { Box, useApp, useInput } from 'ink';
 import { useEffect, useMemo } from 'react';
-import type { FlowOptions } from './flowOptions.ts';
 import { Layout } from './components/Layout.tsx';
+import type { FlowOptions } from './flowOptions.ts';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
 import { useTerminalSize } from './hooks/useTerminalSize.ts';
 import { ContactScreen } from './screens/ContactScreen.tsx';
@@ -60,10 +60,10 @@ export function App({ profileDir, flowOptions }: AppProps) {
       return 'Generate · ↑↓ lists · Enter confirm · paste uses Ctrl+D · Tab sidebar';
     }
     if (activeScreen === 'refine' && focusTarget === 'content') {
-      return 'Refine · ↑↓ menu · Enter · Q&A Enter submit · y/n on diff · Tab sidebar';
+      return 'Refine · ↑↓ · Enter · diff: action list + summary tweak · Q&A Enter submit · Tab sidebar';
     }
     if (activeScreen === 'profile' && focusTarget === 'content') {
-      return 'Profile · ↑↓ · [ ] reorder bullets · Enter · Esc · s save · a/d bullets · Tab sidebar';
+      return 'Profile · ↑↓ · [ ] reorder · Enter · Esc · s save · a/d (positions & lists) · Tab sidebar';
     }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
   }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);

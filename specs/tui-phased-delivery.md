@@ -30,7 +30,7 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import, Contact, **Jobs** (full Phase-A flow), **Generate** (`runTuiGeneratePdf` + source/flair UI + `pendingJobId` hand-off from Jobs), **Refine** (Q&A → diff → save; `refined.md` / `refined.json` sync prompt when md is newer), and **Profile** (summary, experience bullets, **skills** / **education** / **certifications** / **projects** lists with add/delete/reorder `[`/`]` and primary-field inline edit; save to source or refined) are functional in-tree. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import, Contact, **Jobs** (full Phase-A flow), **Generate** (`runTuiGeneratePdf` + source/flair UI + `pendingJobId` hand-off from Jobs), **Refine** (Q&A → diff → **SelectList** accept / summary tweak / discard; `refined.md` / `refined.json` sync when md is newer), and **Profile** (summary, experience bullets, **skills** / **education** / **certifications** / **projects** lists with add/delete/reorder `[`/`]` and primary-field inline edit; save to source or refined) are functional in-tree. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 **Remaining work** — canonical list: **[Definition of done → What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c)** (Refine/Profile/Generate/Jobs gaps vs `tui-screens.md`, streaming, retry policy, etc.).
 

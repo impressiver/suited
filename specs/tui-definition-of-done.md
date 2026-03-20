@@ -15,7 +15,7 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 
 - [x] **`isMdNewerThanJson`** on mount — banner + `ConfirmPrompt` → `markdownToProfile()` + `saveRefined()` when user confirms (see [screens](./tui-screens.md#refinescreen); implemented in `RefineScreen`).
 - [ ] **Already-refined sub-menu (full)** — today: new Q&A pass + “stay”. Still missing per spec: consultant review, polish (+ section/position pickers), direct edit (`MultilineInput` → `applyDirectEdit`), prepare for saved job (job picker + curation), streaming panes where applicable.
-- [ ] **Diff review** — spec: accept / **edit-inline** / discard; current UI is accept / discard.
+- [ ] **Diff review** — per-block / full **edit-inline** still open. **Done in TUI:** `SelectList` (accept / **edit proposed summary** / discard) + `diff-edit-summary` → recomputed diff.
 
 ### Profile editor
 
@@ -23,6 +23,7 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 - [x] **Skills** — list with **a**/**d**, reorder **`[`**/**`]`**, Enter → inline name edit (not the spec’s `CheckboxList` toggle UX; functional parity for editing the skill list).
 - [x] **Bullets** — reorder via **`[` / `]`** (swap with previous/next); `↑↓` is selection via `SelectList` (spec [ProfileEditorScreen](./tui-screens.md#profileeditorscreen)).
 - [x] **Bullets** — add (`a`) and delete (`d`, `ConfirmPrompt`) on the experience bullet list; `App` defers `a`/`d` so `d` does not jump to Dashboard.
+- [x] **Experience — position list** — **a** add (placeholder title/company/start month), **d** delete + confirm, **`[`** / **`]`** reorder, Enter → bullets.
 - [ ] **Navigate-away confirm** — when dirty, intercept sidebar / `1–8` / screen-cycle (not only in-screen Esc stack); policy in [open questions](./tui-open-questions.md).
 
 ### Generate

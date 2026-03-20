@@ -5,6 +5,7 @@ import { profileToMarkdown } from '../../profile/markdown.ts';
 import type {
   Certification,
   Education,
+  Position,
   Profile,
   Project,
   RefinementSession,
@@ -94,6 +95,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const [eduDeletePrompt, setEduDeletePrompt] = useState<{ eduIdx: number } | null>(null);
   const [certDeletePrompt, setCertDeletePrompt] = useState<{ certIdx: number } | null>(null);
   const [projDeletePrompt, setProjDeletePrompt] = useState<{ projIdx: number } | null>(null);
+  const [positionDeletePrompt, setPositionDeletePrompt] = useState<{ posIdx: number } | null>(null);
   const top = stack.at(-1);
 
   useEffect(() => {
@@ -195,7 +197,8 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         skillDeletePrompt ||
         eduDeletePrompt ||
         certDeletePrompt ||
-        projDeletePrompt
+        projDeletePrompt ||
+        positionDeletePrompt
       ) {
         return;
       }
@@ -232,6 +235,87 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       }
       if (inTextInput) {
         return;
+      }
+      if (top?.k === 'positions') {
+        if (input === 'a' || input === 'A') {
+          let newIdx = 0;
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const month = new Date().toISOString().slice(0, 7);
+            const row: Position = {
+              id: `pos-${randomUUID()}`,
+              title: userEdit('New role'),
+              company: userEdit('Company'),
+              startDate: userEdit(month),
+              bullets: [],
+            };
+            next.positions = [...next.positions, row];
+            newIdx = next.positions.length - 1;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(newIdx);
+          return;
+        }
+        if (input === 'd' || input === 'D') {
+          const positions = profile.positions;
+          if (positions.length > 0) {
+            const pi = Math.min(menuIdx, positions.length - 1);
+            setPositionDeletePrompt({ posIdx: pi });
+          }
+          return;
+        }
+        if (input === '[') {
+          const positions = profile.positions;
+          if (positions.length < 2) {
+            return;
+          }
+          const pi = Math.min(menuIdx, positions.length - 1);
+          if (pi <= 0) {
+            return;
+          }
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const arr = next.positions;
+            const tmp = arr[pi - 1]!;
+            arr[pi - 1] = arr[pi]!;
+            arr[pi] = tmp;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(pi - 1);
+          return;
+        }
+        if (input === ']') {
+          const positions = profile.positions;
+          if (positions.length < 2) {
+            return;
+          }
+          const pi = Math.min(menuIdx, positions.length - 1);
+          if (pi >= positions.length - 1) {
+            return;
+          }
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const arr = next.positions;
+            const tmp = arr[pi]!;
+            arr[pi] = arr[pi + 1]!;
+            arr[pi + 1] = tmp;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(pi + 1);
+          return;
+        }
       }
       if (top?.k === 'bullets') {
         if (input === 'a' || input === 'A') {
@@ -858,14 +942,56 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
 
       {top.k === 'positions' && (
         <Box marginTop={1} flexDirection="column">
+          <Text dimColor>
+            ↑↓ select · [ ] reorder · a add · d delete · Enter → bullets
+          </Text>
+          {positionDeletePrompt && (
+            <Box marginTop={1}>
+              <ConfirmPrompt
+                message="Delete this position (and all its bullets)?"
+                active={active && positionDeletePrompt !== null}
+                onConfirm={() => {
+                  const ctx = positionDeletePrompt;
+                  setPositionDeletePrompt(null);
+                  if (!ctx) {
+                    return;
+                  }
+                  setProfile((p) => {
+                    if (!p) {
+                      return p;
+                    }
+                    const next = cloneProfile(p);
+                    if (ctx.posIdx < 0 || ctx.posIdx >= next.positions.length) {
+                      return p;
+                    }
+                    next.positions.splice(ctx.posIdx, 1);
+                    return next;
+                  });
+                  setDirty(true);
+                  setMenuIdx((i) => {
+                    if (i > ctx.posIdx) {
+                      return i - 1;
+                    }
+                    if (i === ctx.posIdx) {
+                      return Math.max(0, ctx.posIdx - 1);
+                    }
+                    return i;
+                  });
+                }}
+                onCancel={() => {
+                  setPositionDeletePrompt(null);
+                }}
+              />
+            </Box>
+          )}
           {positionItems.length === 0 ? (
-            <Text dimColor>No positions in profile.</Text>
+            <Text dimColor>No positions — press a to add.</Text>
           ) : (
             <SelectList
               items={positionItems}
               selectedIndex={menuIdx}
               onChange={(i) => setMenuIdx(i)}
-              isActive={active && !unsaved}
+              isActive={active && !unsaved && !positionDeletePrompt}
               onSubmit={(item) => {
                 const idx = Number.parseInt(item.value, 10);
                 if (!Number.isNaN(idx)) {

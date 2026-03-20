@@ -1,7 +1,12 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useState } from 'react';
 import { markdownToProfile, profileToMarkdown } from '../../profile/markdown.ts';
-import type { Profile, RefinementQuestion, RefinementSession } from '../../profile/schema.ts';
+import type {
+  Profile,
+  RefinementQuestion,
+  RefinementSession,
+  Sourced,
+} from '../../profile/schema.ts';
 import {
   hashSource,
   isMdNewerThanJson,
@@ -26,6 +31,15 @@ import {
 } from '../components/shared/index.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
+function cloneProfile(p: Profile): Profile {
+  return JSON.parse(JSON.stringify(p)) as Profile;
+}
+
+function userEditSourced(value: string): Sourced<string> {
+  const now = new Date().toISOString();
+  return { value, source: { kind: 'user-edit', editedAt: now } };
+}
+
 type Phase =
   | { k: 'loading' }
   | { k: 'no-source'; msg: string }
@@ -35,6 +49,7 @@ type Phase =
   | { k: 'qa'; questions: RefinementQuestion[]; index: number }
   | { k: 'apply' }
   | { k: 'diff'; original: Profile; proposed: Profile }
+  | { k: 'diff-edit-summary'; original: Profile; proposed: Profile }
   | { k: 'saving' }
   | { k: 'done'; note: string }
   | { k: 'err'; msg: string };
@@ -45,7 +60,7 @@ export interface RefineScreenProps {
 
 export function RefineScreen({ profileDir }: RefineScreenProps) {
   const dispatch = useAppDispatch();
-  const { activeScreen, focusTarget } = useAppState();
+  const { activeScreen, focusTarget, inTextInput } = useAppState();
   const [phase, setPhase] = useState<Phase>({ k: 'loading' });
   const [source, setSource] = useState<Profile | null>(null);
   const [autoStartQa, setAutoStartQa] = useState(false);
@@ -53,8 +68,28 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerDraft, setAnswerDraft] = useState('');
   const [menuIdx, setMenuIdx] = useState(0);
+  const [diffSelectIdx, setDiffSelectIdx] = useState(0);
+  const [summaryTweakDraft, setSummaryTweakDraft] = useState('');
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
+
+  useEffect(() => {
+    if (phase.k === 'diff') {
+      setDiffSelectIdx(0);
+    }
+  }, [phase.k]);
+
+  useInput(
+    (_input, key) => {
+      if (!active || phase.k !== 'diff-edit-summary' || !inTextInput) {
+        return;
+      }
+      if (key.escape) {
+        setPhase({ k: 'diff', original: phase.original, proposed: phase.proposed });
+      }
+    },
+    { isActive: active && phase.k === 'diff-edit-summary' },
+  );
 
   const persistRefined = useCallback(
     async (profile: Profile, qs: RefinementQuestion[], ans: Record<string, string>) => {
@@ -317,19 +352,63 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
 
   if (phase.k === 'diff') {
     const blocks = computeRefinementDiff(phase.original, phase.proposed);
+    const diffItems = [
+      { value: 'accept', label: 'Accept and save refined profile' },
+      { value: 'edit-summary', label: 'Edit proposed summary (then review diff again)' },
+      { value: 'discard', label: 'Discard — keep refined.json unchanged' },
+    ];
     return (
       <Box flexDirection="column">
         <Text bold>Review changes</Text>
         <DiffView blocks={blocks} />
         <Box marginTop={1}>
-          <ConfirmPrompt
-            message="Accept and save refined profile?"
-            active={active}
-            onConfirm={() => {
-              void persistRefined(phase.proposed, questions, answers);
+          <Text dimColor>↑↓ choose action · Enter confirm (or edit summary, then return here)</Text>
+        </Box>
+        <Box marginTop={1}>
+          <SelectList
+            items={diffItems}
+            selectedIndex={diffSelectIdx}
+            onChange={(i) => setDiffSelectIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'accept') {
+                void persistRefined(phase.proposed, questions, answers);
+              } else if (item.value === 'discard') {
+                setPhase({ k: 'done', note: 'Discarded — refined.json unchanged.' });
+              } else if (item.value === 'edit-summary') {
+                setSummaryTweakDraft(phase.proposed.summary?.value ?? '');
+                setPhase({
+                  k: 'diff-edit-summary',
+                  original: phase.original,
+                  proposed: phase.proposed,
+                });
+              }
             }}
-            onCancel={() => {
-              setPhase({ k: 'done', note: 'Discarded — refined.json unchanged.' });
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (phase.k === 'diff-edit-summary') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Refine — edit proposed summary</Text>
+        <Text dimColor>Enter applies and returns to diff · Esc cancels (keeps prior proposed)</Text>
+        <Box marginTop={1}>
+          <TextInput
+            value={summaryTweakDraft}
+            onChange={setSummaryTweakDraft}
+            focus={active}
+            onSubmit={() => {
+              const next = cloneProfile(phase.proposed);
+              const t = summaryTweakDraft.trim();
+              if (t) {
+                next.summary = userEditSourced(t);
+              } else {
+                delete next.summary;
+              }
+              setPhase({ k: 'diff', original: phase.original, proposed: next });
             }}
           />
         </Box>

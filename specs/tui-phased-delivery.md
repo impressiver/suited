@@ -1,12 +1,11 @@
 # Phased delivery & current implementation
 
-## North star (Phase C — full vision)
+## North star (Phase C — full coverage)
 
-- **Zero breakout:** After the TUI mounts, the user never sees raw Inquirer, chalk banners, or unstructured `console.log` from command code. All interaction stays in the Ink tree.
-- **No subprocess** for core flows: Import, Refine, Generate, Jobs, Profile, Contact run via **`src/services/`** + domain modules, not `spawn(suited …)`.
+- **Full service extraction:** Every flow (Import, Refine, Generate, Jobs, Profile, Contact) runs via **`src/services/`** + domain modules with complete feature parity to CLI subcommands.
 - **Complete coverage:** Every flow available via subcommands is available in the TUI with equivalent outcomes.
 
-See [Goals & constraints](./tui-goals-and-constraints.md) and [Screen details](./tui-screens.md).
+The baseline requirements — zero breakout, single full-screen Ink interface, no subprocess delegation — apply from Phase A onward. See [Goals & constraints](./tui-goals-and-constraints.md) and [Screen details](./tui-screens.md).
 
 ---
 
@@ -19,19 +18,19 @@ See [Goals & constraints](./tui-goals-and-constraints.md) and [Screen details](.
 
 ---
 
-## Phase A — shell (may ship first)
+## Phase A — shell
 
-**Purpose:** Shippable navigation shell without rewriting every command.
+**Purpose:** Shippable navigation shell that renders all eight screens inline within the Ink render tree.
 
-**Allowed (interim):**
+**Required:**
 
-- Ink **Layout**, **Sidebar**, eight **screen placeholders** or read-only views.
-- **Subprocess** or CLI delegation **MAY** be used **only** where documented, to avoid blocking on full service extraction — but **MUST** be listed in PRs and removed by Phase B for those flows.
+- Ink **Layout**, **Sidebar**, and all **eight screens** rendered as Ink components — no subprocess delegation, no `DelegateScreen` placeholders.
+- Screens that are not yet fully functional **MUST** render an inline "not yet implemented" message rather than spawning a subprocess or breaking out to CLI.
+- The `runTui` loop / `exitBag` / `cliArgs.ts` subprocess-delegation pattern is **not allowed** at any phase.
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Ink TUI with global navigation, Dashboard/Jobs/Settings-style data, **delegate** flows that run `node <argv[1]> <subcommand> …` with stdio inherited, then return to the TUI. Core refine / validate / improve / contact logic also lives in **`src/services/`** (Phase 1 extraction; CLI delegates there).
-- This is **Phase A** behavior, **not** Phase C. Treat subprocess delegation as **technical debt** toward Phase B/C.
+- **Branch / main:** Ink TUI with global navigation, Dashboard/Jobs/Settings/Import/Jobs screens implemented. Refine, Generate, Profile, Contact are stubs (`DelegateScreen`) — these **MUST** be replaced with inline Ink screens. The subprocess-delegation infrastructure (`cliArgs.ts`, `exitBag`, `runTui` loop) is **removed** as part of committing to a single full-screen interface.
 
 ---
 

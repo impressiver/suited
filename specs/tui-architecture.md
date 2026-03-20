@@ -217,3 +217,5 @@ During `running`: `operationInProgress = true`, sidebar and screen-jump blocked,
   </Layout>
 </App>
 ```
+
+**No subprocess delegation.** `runTui` renders the app once and awaits exit — no while-loop re-render, no `exitBag`, no `cliArgs.ts` argv-building. Every interaction that was previously delegated to a CLI subcommand (refine, generate, import, profile, contact) **MUST** run as an inline screen component via `src/services/`. `DelegateScreen` does not exist in this architecture.

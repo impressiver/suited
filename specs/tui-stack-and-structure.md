@@ -6,7 +6,7 @@
 - **TypeScript** ESM, `jsx: react-jsx`.
 - **ink-text-input 6.0.0** for focused text fields (already installed).
 
-**Invariant (Phase C):** The TUI is a UI shell over **`src/services/`** and domain modules. See [Phased delivery](./tui-phased-delivery.md) for Phase A allowances.
+**Invariant:** The TUI is a single full-screen Ink application. Every screen renders inline within the Ink render tree. Subprocess delegation (`DelegateScreen`, `exitBag`, `cliArgs.ts`) is not permitted at any phase. Unimplemented screens show an inline stub, never a subprocess. See [Phased delivery](./tui-phased-delivery.md).
 
 ---
 

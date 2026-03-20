@@ -5,6 +5,7 @@
 Ship when **all** of the following are true:
 
 - [ ] `suited` with no args in a **non-TTY** does not hang; behavior matches [README — Canonical non-TTY](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth) (stderr message + exit code). Tested by calling the entry with mocked `process.stdin.isTTY = false`.
+- [ ] All **eight screens** render as inline Ink components (no `DelegateScreen`, no subprocess). Unimplemented screens show a "not yet implemented" stub within the Ink tree.
 - [ ] All **eight screens** reachable from sidebar navigation and `1–8` keys; pressing a key navigates without crash.
 - [ ] **Dashboard** shows correct state variant (`no-api-key`, `no-source`, `source-only`, `refined`, `ready`) for each real file condition. Verified manually with fixture directories.
 - [ ] **Settings** reachable; saves API key to `.env`; masked display confirmed visually.
@@ -13,7 +14,7 @@ Ship when **all** of the following are true:
 - [ ] Errors from async ops show a **mapped message** + at least one recovery action (not a blank or frozen screen).
 - [ ] `pnpm test` is green; no pre-existing tests broken by Ink/tsconfig changes.
 
-**Acceptable in Phase A:** subprocess delegation to CLI for heavy flows, **provided** it is documented in [Phased delivery](./tui-phased-delivery.md) and tracked as debt.
+**Not acceptable at any phase:** subprocess delegation, `DelegateScreen` placeholders, or `exitBag`/`cliArgs.ts`-style breakout. Every screen renders inline within the Ink tree. Unimplemented screens show a "not yet implemented" stub — they do not spawn subprocesses.
 
 ---
 
@@ -22,9 +23,9 @@ Ship when **all** of the following are true:
 Add to Phase A:
 
 - [ ] **Forbidden-import CI check** passing: no `src/commands/**` or `inquirer` imports under `src/tui/**` (see [Testing](./tui-testing.md#forbidden-imports-ci-enforcement)). **MUST** pass before Phase B is considered done.
-- [ ] **Import** completes end-to-end in Ink (URL → scrape → parse → contact form if needed → done). No subprocess.
+- [ ] **Import** completes end-to-end in Ink (URL → scrape → parse → contact form if needed → done).
 - [ ] **Refine** fresh Q&A + diff review works in Ink; already-refined sub-menu all six options render (may stub some to "coming soon" for Phase C).
-- [ ] **Generate** completes end-to-end in Ink for at least one JD path (paste or saved). No subprocess.
+- [ ] **Generate** completes end-to-end in Ink for at least one JD path (paste or saved).
 - [ ] `callWithToolStreaming` real implementation: emits `tool_start`/`tool_end` events; no raw partial JSON visible in the streaming pane.
 - [ ] `useAsyncOp` + Esc cancel wired for Import (scrape) and at least one Claude call.
 - [ ] **Service extraction** done: `src/services/refine.ts`, `improve.ts`, `validate.ts`, `contact.ts` exist with correct signatures per [Goals & constraints](./tui-goals-and-constraints.md); CLI behavior unchanged (scripted QA or tests).

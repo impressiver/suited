@@ -106,7 +106,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **4** | **T2 — Dashboard + Settings** (variants, health, pipeline/activity; API key probe + `.env`) | **Done** (2026-03-19) |
 | **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Generate/Refine/Profile were stubs at phase close — now superseded by phases 7–8) | **Done** (2026-03-19) |
 | **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
-| **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, template + flair (independent; flair = designer-agent creative freedom vs baseline), `pendingJobId` | **Done** (2026-03-19) |
+| **7** | **Generate screen (T2)** — build/render pipeline, section `CheckboxList`, JD sources, template + flair, `pendingJobId` | **Done** (2026-03-19) |
 | **8** | **Refine + Profile MVP** — Refine: Q&A, `applyRefinements`, `DiffView`, `saveRefined`; Profile: stack + summary/bullets, persist like CLI `profile-editor` | **Done** (2026-03-19) |
 | **9+** | Phase C + post-C polish | **Phase C** checklist: [`tui-definition-of-done.md` § Phase C](./tui-definition-of-done.md#phase-c--full-vision-north-star). Optional follow-ups: [`post–Phase C`](./tui-definition-of-done.md#whats-left-postphase-c-polish). |
 
@@ -134,7 +134,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 ### Phase 3 — completed work
 
-- **`src/tui/components/shared/`** — `Spinner`, `SelectList`, `TextInput` (ink-text-input + `SET_IN_TEXT_INPUT`), `MultilineInput` (debounced `onChange` via `createDebouncedString` / `useDebouncedStringCallback`), `ConfirmPrompt`, `StatusBadge`, `ScrollView`, `InlineEditor`, `DiffView` (`formatDiffBlockLines` + `DiffBlock` from `src/services/refine.ts`), `ProgressSteps`; barrel **`index.ts`**.
+- **`src/tui/components/shared/`** — `Spinner`, `SelectList`, `CheckboxList`, `TextInput` (ink-text-input + `SET_IN_TEXT_INPUT`), `MultilineInput` (debounced `onChange` via `createDebouncedString` / `useDebouncedStringCallback`), `ConfirmPrompt`, `StatusBadge`, `ScrollView`, `InlineEditor`, `DiffView` (`formatDiffBlockLines` + `DiffBlock` from `src/services/refine.ts`), `ProgressSteps`; barrel **`index.ts`**.
 - **`src/tui/hooks/debounceString.ts`** + tests — shared debounce used by multiline paste path.
 - Colocated **`*.test.ts(x)`** — `renderToString` smoke tests + pure diff/debounce tests.
 
@@ -167,9 +167,9 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 ### Phase 7 — completed work
 
 - **`src/generate/layoutSqueeze.ts`** — shared `trySqueeze` (returns HTML + `appliedSqueezeLevel`), `renderWithSqueeze` (optional reuse of `JobRefinement.pinnedRender`); CLI and `runTuiGeneratePdf` import it.
-- **`src/services/sectionSelection.ts`** (+ test) — `selectAllSections` for non-interactive “include everything”.
-- **`src/services/generateResume.ts`** — `runTuiGeneratePdf()` — reuse job refinement when `jobId` set; else analyze + curate + save refinement; polish; job-scoped profile write; trim/fit loop; PDF + `saveGenerationConfig`.
-- **`src/tui/screens/GenerateScreen.tsx`** — source picker (paste / saved / full), MultilineInput paste, flair SelectList, consumes `pendingJobId` from Jobs.
+- **`src/services/sectionSelection.ts`** (+ test) — `applyResumeSectionSelection` (min **3** experience rows + gap-fill), `buildSectionCheckboxItems`, `collectDefaultSectionKeys`, `selectAllSections` (shared with CLI `selectSections` apply step).
+- **`src/services/generateResume.ts`** — `runTuiGenerateBuildPhase` / `runTuiGenerateRenderPhase` / `runTuiGeneratePdf()` (one-shot all sections); reuse job refinement when `jobId` set; section selection before PDF in TUI; trim/fit loop; `saveGenerationConfig`.
+- **`src/tui/screens/GenerateScreen.tsx`** — source picker, saved job list, flair `SelectList`, **`CheckboxList`** section pick, consumes `pendingJobId` from Jobs.
 
 ### Phase 8 — completed work (MVP)
 
@@ -184,9 +184,9 @@ Phase A checklist in [`tui-definition-of-done.md`](./tui-definition-of-done.md) 
 ### Phase 9+ — incremental (living)
 
 - **`useOperationAbort`** (`src/tui/hooks/useOperationAbort.ts`) + **`isUserAbort`** (`src/tui/isUserAbort.ts`) — Esc ↔ `AbortController` for Refine / Import / Generate.
-- **`src/utils/abort.ts`** — `throwIfAborted` used by LinkedIn scraper + `runTuiGeneratePdf` between major steps.
+- **`src/utils/abort.ts`** — `throwIfAborted` used by LinkedIn scraper + generate pipeline between major steps.
 - **`ImportScreen`** — `importProfileFromInput({ signal })`; error **`SelectList`** (Retry / Settings after 3 / Dismiss).
-- **`GenerateScreen`** — `runTuiGeneratePdf({ signal })`; generate errors: Retry / Settings / back to flair; preflight errors (e.g. no saved jobs): back to source.
+- **`GenerateScreen`** — build/render phases with `{ signal }`; generate errors: Retry (render-only when possible) / Settings / back to flair; preflight errors (e.g. no saved jobs): back to source.
 - Refine refactored to **`useOperationAbort`** (replaces inline `operationCancelSeq` effect).
 
 ### Post–Phase C polish

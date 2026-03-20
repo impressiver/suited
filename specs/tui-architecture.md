@@ -98,7 +98,21 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 **Required:** `<MultilineInput>` **MUST** accumulate input into a `useRef` buffer and **debounce** state updates (e.g. 16ms idle before flushing to `useState`). This is an implementation detail of the component — callers see only the final `onChange(value)` callback. Show character count from the debounced value, not live per-keystroke.
 
-**Layout / UX:** While focused, render a **visible caret** (e.g. inverse block) at the insertion point. Callers **SHOULD** pass a **`width`** (typically `panelInnerWidth(terminalCols)` from `src/tui/panelContentWidth.ts`) so Ink wraps long pasted lines inside the panel instead of overflowing horizontally. On submit, **cancel** any pending debounced flush before calling `onChange` + `onSubmit` so a stale timer cannot overwrite the final value.
+**Layout / UX:** While focused, render a **visible caret** (e.g. inverse block) at the insertion point. Callers **SHOULD** pass **`width`** (`panelInnerWidth(terminalCols)`) and **`height`** (`panelContentViewportRows(terminalRows, reservedForChrome)`) so the field becomes a **virtual viewport**: only that many **wrapped** display rows render; the buffer still holds the full text. New input **tail-follows** (scroll pinned to end); **PgUp** / **PgDn** and **↑** / **↓** scroll the viewport without mutating text. Wrapping uses `linesToWrappedRows` in `src/tui/utils/wrapTextRows.ts` (word wrap + hard break for long tokens). On submit, **cancel** any pending debounced flush before calling `onChange` + `onSubmit`.
+
+### ScrollView — long lines
+
+**Optional `wrapWidth`:** When set, logical `lines` are flattened to wrapped display rows (same helper as `MultilineInput`); `scrollOffset` and `height` apply to those rows. **`displayLines`** bypasses `lines`/`wrapWidth` when the parent already wrapped once (shared with `TextViewport`).
+
+**`padToWidth`:** Rows are padded (or sliced) to that width in JS, then rendered inside a fixed-width column with **`Text wrap="truncate-end"`** so Ink does not re-wrap and spill past the frame (web/terminal layout). **`TextViewport` / `ScrollView`** use **`overflow="hidden"`** so nothing draws past the frame.
+
+**Newlines for wrap:** Use **`splitLinesForWrap`** (or equivalent) before wrapping user/pasted text — **`\\r\\n` / lone `\\r`** must not reach stdout; **`\\r`** resets the cursor to column 0 and makes borders look like they cut through words. **`wrapLineToRows`** also strips **`\\r`** and expands tabs to spaces.
+
+**`TextViewport`:** Single-line dim border with **`panelWidth = panelInnerWidth`** (never wider than the column) + dim status line. Inner content is **`panelWidth − 2`** columns wide (inside the border). Wrapped text uses **`panelFramedTextWidth = panelInnerWidth − 2`** for wrap/pad. **`MultilineInput`** passes **`panelWidth={width + 2}`** when `width` is the framed text width.
+
+**Scroll vs `SelectList`:** When a long text viewport sits above an action `SelectList`, **`↑↓` must move the menu** — use **PgUp/PgDn** (and optional **↑↓** only when no competing list) for the text. Jobs **feedback** and Refine **consultant-view** follow this; JD view and prep summaries use **↑↓** + PgUp/PgDn.
+
+**`wrappedScrollMax`** in `wrapTextRows.ts` keeps scroll bounds consistent with wrapped row counts.
 
 ---
 
@@ -161,7 +175,7 @@ export async function* callWithToolStreaming<T>(
 
 ## Long-running async
 
-**Implemented:** `useOperationAbort()` in `src/tui/hooks/useOperationAbort.ts` — returns `createController` / `releaseController`. Subscribes to store `operationCancelSeq` (incremented on `CANCEL_OPERATION` / Esc while locked) and aborts the active `AbortController`. Screens pair this with `SET_OPERATION_IN_PROGRESS` and pass `ac.signal` into services (`importProfileFromInput`, `generateRefinementQuestions`, `runTuiGeneratePdf`, …).
+**Implemented:** `useOperationAbort()` in `src/tui/hooks/useOperationAbort.ts` — returns `createController` / `releaseController`. Subscribes to store `operationCancelSeq` (incremented on `CANCEL_OPERATION` / Esc while locked) and aborts the active `AbortController`. Screens pair this with `SET_OPERATION_IN_PROGRESS` and pass `ac.signal` into services (`importProfileFromInput`, `generateRefinementQuestions`, `runTuiGenerateBuildPhase` / `runTuiGenerateRenderPhase`, …).
 
 **Optional future:** a higher-level `useAsyncOp<T>()` that also owns `{ status, result, error }` in local state:
 

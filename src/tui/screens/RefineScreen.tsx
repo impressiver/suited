@@ -36,14 +36,20 @@ import {
   SelectList,
   Spinner,
   TextInput,
+  TextViewport,
 } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
-import { panelInnerWidth } from '../panelContentWidth.ts';
+import {
+  panelContentViewportRows,
+  panelFramedTextWidth,
+  panelInnerWidth,
+} from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
+import { linesToWrappedRows, wrappedScrollMax } from '../utils/wrapTextRows.ts';
 
 function cloneProfile(p: Profile): Profile {
   return JSON.parse(JSON.stringify(p)) as Profile;
@@ -129,6 +135,10 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [consultantMenuIdx, setConsultantMenuIdx] = useState(0);
   const consultantWorkRef = useRef<{ base: Profile; evaluation: ProfileEvaluation } | null>(null);
   const [cols, rows] = useTerminalSize();
+  const panelW = panelInnerWidth(cols);
+  const textW = panelFramedTextWidth(cols);
+  const consultantScrollH = panelContentViewportRows(rows, 14);
+  const directEditViewportH = panelContentViewportRows(rows, 12);
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
 
@@ -220,18 +230,18 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       if (!active || phase.k !== 'consultant-view' || inTextInput) {
         return;
       }
-      const h = Math.max(4, Math.min(16, rows - 14));
-      const maxScroll = Math.max(0, phase.previewLines.length - h);
-      if (key.upArrow) {
+      const maxScroll = wrappedScrollMax(phase.previewLines, consultantScrollH, textW);
+      const step = Math.max(1, consultantScrollH - 1);
+      if (key.pageUp) {
         setPhase({
           ...phase,
-          scroll: Math.max(0, phase.scroll - 1),
+          scroll: Math.max(0, phase.scroll - step),
         });
       }
-      if (key.downArrow) {
+      if (key.pageDown) {
         setPhase({
           ...phase,
-          scroll: Math.min(maxScroll, phase.scroll + 1),
+          scroll: Math.min(maxScroll, phase.scroll + step),
         });
       }
     },
@@ -634,7 +644,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       case 'polish-pick':
         return `Refine · ↑↓ Enter · Esc back to refined menu${sb}`;
       case 'direct-edit-input':
-        return `Refine · Ctrl+D submit · Esc back to menu${sb}`;
+        return `Refine · Ctrl+D or Ctrl+S submit · PgUp/PgDn · ↑↓ scroll · Esc menu${sb}`;
       case 'first-refine-menu':
         return `Refine · ↑↓ Enter · Q&A pass or manual section edit${sb}`;
       case 'has-refined-menu':
@@ -642,7 +652,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           ? `Refine · Enter confirm md sync · Esc cancel${sb}`
           : `Refine · ↑↓ Enter · Q&A, polish, consultant, manual edit, direct edit${sb}`;
       case 'consultant-view':
-        return `Refine · ↑↓ scroll & menu · Enter · Esc back to menu${sb}`;
+        return `Refine · PgUp/PgDn scroll text · ↑↓ actions · Enter · Esc menu${sb}`;
       case 'gen-questions':
       case 'apply':
       case 'polish-run':
@@ -767,14 +777,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
 
   if (phase.k === 'direct-edit-input') {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold>Refine — direct edit</Text>
-        <Box marginTop={1}>
+        <Box marginTop={1} flexGrow={1}>
           <MultilineInput
             value={directEditDraft}
             onChange={setDirectEditDraft}
             focus={active}
-            width={panelInnerWidth(cols)}
+            width={textW}
+            height={directEditViewportH}
             onSubmit={(text) => {
               const t = text.trim();
               if (!t) {
@@ -816,7 +827,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   }
 
   if (phase.k === 'consultant-view') {
-    const h = Math.max(4, Math.min(16, rows - 14));
+    const consultantRows = linesToWrappedRows(phase.previewLines, textW);
     const consultantItems = [
       ...(phase.evaluation.improvements.length > 0
         ? [
@@ -831,9 +842,25 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     return (
       <Box flexDirection="column">
         <Text bold>Professional consultant review</Text>
-        <Text dimColor>Overall feedback on your refined profile (not job-specific).</Text>
-        <Box marginTop={1}>
-          <ScrollView lines={phase.previewLines} height={h} scrollOffset={phase.scroll} />
+        <Text dimColor>
+          Overall feedback on your refined profile (not job-specific). PgUp/PgDn scrolls the text;
+          ↑↓ moves actions.
+        </Text>
+        <Box marginTop={1} flexGrow={1}>
+          <TextViewport
+            panelWidth={panelW}
+            viewportHeight={consultantScrollH}
+            scrollOffset={phase.scroll}
+            totalRows={consultantRows.length}
+            kind="Consultant review"
+          >
+            <ScrollView
+              displayLines={consultantRows}
+              height={consultantScrollH}
+              scrollOffset={phase.scroll}
+              padToWidth={textW}
+            />
+          </TextViewport>
         </Box>
         <Box marginTop={1}>
           <SelectList

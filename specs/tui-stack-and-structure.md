@@ -25,6 +25,8 @@ src/
     store.tsx                   ← Context + useReducer global state
     fetchProfileSnapshot.ts     ← disk → ProfileSnapshot (shared with useProfileSnapshot; fixture-tested)
     jobsLayout.ts               ← Jobs split/stack column threshold (80)
+    panelContentWidth.ts        ← panelInnerWidth, panelContentViewportRows
+    utils/wrapTextRows.ts       ← word-wrap to display rows; ScrollView + MultilineInput
     hooks/
       useProfile.ts
       useOperationAbort.ts   ← Esc ↔ AbortController (see tui-architecture.md)
@@ -45,10 +47,11 @@ src/
         TextInput.tsx
         MultilineInput.tsx
         SelectList.tsx
-        CheckboxList.tsx       (Phase C / optional)
+        CheckboxList.tsx       (Generate section pick; Refine polish scope when wired)
         ConfirmPrompt.tsx
         StatusBadge.tsx
         ScrollView.tsx
+        TextViewport.tsx
         InlineEditor.tsx
     screens/
       DashboardScreen.tsx

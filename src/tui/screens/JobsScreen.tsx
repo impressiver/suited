@@ -23,13 +23,19 @@ import {
   SelectList,
   Spinner,
   TextInput,
+  TextViewport,
 } from '../components/shared/index.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
-import { panelInnerWidth } from '../panelContentWidth.ts';
+import {
+  panelContentViewportRows,
+  panelFramedTextWidth,
+  panelInnerWidth,
+} from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
+import { linesToWrappedRows, splitLinesForWrap, wrappedScrollMax } from '../utils/wrapTextRows.ts';
 
 const ADD_SENTINEL = '__add__';
 
@@ -72,6 +78,12 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   const navigate = useNavigateToScreen();
   const { activeScreen, focusTarget, inTextInput, operationInProgress } = useAppState();
   const [cols, rows] = useTerminalSize();
+  const panelW = panelInnerWidth(cols);
+  const textW = panelFramedTextWidth(cols);
+  const jdViewScrollH = panelContentViewportRows(rows, 11);
+  const prepScrollH = panelContentViewportRows(rows, 12);
+  const feedbackScrollH = panelContentViewportRows(rows, 14);
+  const jdEditorH = panelContentViewportRows(rows, 14);
   const splitPane = jobsUseSplitPane(cols);
   const listPaneW = jobsListPaneWidth(cols);
 
@@ -157,17 +169,17 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       case 'addCompany':
         return `Jobs · Esc back · Enter next${sb}`;
       case 'addJd':
-        return `Jobs · Ctrl+D or Ctrl+S save job · Esc back${sb}`;
+        return `Jobs · Ctrl+D or Ctrl+S save · PgUp/PgDn · ↑↓ scroll · Esc back${sb}`;
       case 'viewJd':
-        return `Jobs · ↑↓ scroll JD · Esc back${sb}`;
+        return `Jobs · ↑↓ PgUp/PgDn scroll JD · Esc → job menu${sb}`;
       case 'deleteAsk':
         return `Jobs · Enter confirm delete · Esc cancel${sb}`;
       case 'prepareOk':
-        return `Jobs · ↑↓ scroll summary · Esc → list${sb}`;
+        return `Jobs · ↑↓ PgUp/PgDn scroll · Esc → list${sb}`;
       case 'viewPrep':
-        return `Jobs · ↑↓ scroll prep · Esc → job menu${sb}`;
+        return `Jobs · ↑↓ PgUp/PgDn scroll · Esc → job menu${sb}`;
       case 'feedbackView':
-        return `Jobs · ↑↓ scroll · Enter on actions · Esc back${sb}`;
+        return `Jobs · PgUp/PgDn scroll text · ↑↓ actions · Enter · Esc back${sb}`;
       case 'feedbackDone':
         return `Jobs · Esc → list${sb}`;
       case 'err':
@@ -426,9 +438,17 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       if (!active || mode.m !== 'viewJd' || inTextInput) {
         return;
       }
-      const lines = mode.job.text.split('\n');
-      const h = Math.max(4, Math.min(18, rows - 12));
-      const maxScroll = Math.max(0, lines.length - h);
+      const lines = splitLinesForWrap(mode.job.text);
+      const maxScroll = wrappedScrollMax(lines, jdViewScrollH, textW);
+      const step = Math.max(1, jdViewScrollH - 1);
+      if (key.pageUp) {
+        setMode((m) => (m.m === 'viewJd' ? { ...m, scroll: Math.max(0, m.scroll - step) } : m));
+      }
+      if (key.pageDown) {
+        setMode((m) =>
+          m.m === 'viewJd' ? { ...m, scroll: Math.min(maxScroll, m.scroll + step) } : m,
+        );
+      }
       if (key.upArrow) {
         setMode((m) => (m.m === 'viewJd' ? { ...m, scroll: Math.max(0, m.scroll - 1) } : m));
       }
@@ -449,15 +469,13 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       if (!(mode.m === 'prepareOk' || mode.m === 'viewPrep' || mode.m === 'feedbackView')) {
         return;
       }
-      const h =
-        mode.m === 'feedbackView'
-          ? Math.max(4, Math.min(16, rows - 14))
-          : Math.max(4, Math.min(18, rows - 12));
+      const h = mode.m === 'feedbackView' ? feedbackScrollH : prepScrollH;
       const lines = mode.m === 'prepareOk' ? mode.previewLines : mode.lines;
       const scroll = mode.m === 'prepareOk' ? mode.prepScroll : mode.scroll;
-      const maxScroll = Math.max(0, lines.length - h);
-      if (key.upArrow) {
-        const next = Math.max(0, scroll - 1);
+      const maxScroll = wrappedScrollMax(lines, h, textW);
+      const step = Math.max(1, h - 1);
+
+      const applyScroll = (next: number) => {
         if (mode.m === 'prepareOk') {
           setMode({ ...mode, prepScroll: next });
         } else if (mode.m === 'viewPrep') {
@@ -465,15 +483,21 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         } else {
           setMode({ ...mode, scroll: next });
         }
+      };
+
+      if (key.pageUp) {
+        applyScroll(Math.max(0, scroll - step));
       }
-      if (key.downArrow) {
-        const next = Math.min(maxScroll, scroll + 1);
-        if (mode.m === 'prepareOk') {
-          setMode({ ...mode, prepScroll: next });
-        } else if (mode.m === 'viewPrep') {
-          setMode({ ...mode, scroll: next });
-        } else {
-          setMode({ ...mode, scroll: next });
+      if (key.pageDown) {
+        applyScroll(Math.min(maxScroll, scroll + step));
+      }
+
+      if (mode.m !== 'feedbackView') {
+        if (key.upArrow) {
+          applyScroll(Math.max(0, scroll - 1));
+        }
+        if (key.downArrow) {
+          applyScroll(Math.min(maxScroll, scroll + 1));
         }
       }
     },
@@ -507,7 +531,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
 
   const finalizeNewJob = useCallback(
     async (jd: string, title: string, company: string) => {
-      const text = jd.trim();
+      const text = jd.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       if (!text) {
         setErrMenuIdx(0);
         setMode({ m: 'err', msg: 'Job description is empty.' });
@@ -547,29 +571,55 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'prepareOk') {
-    const h = Math.max(4, Math.min(18, rows - 12));
+    const prepRows = linesToWrappedRows(mode.previewLines, textW);
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold>Prepared</Text>
         <Text color="green">
           {mode.job.title} @ {mode.job.company} — {mode.nPos} positions · {mode.nSkills} skills
         </Text>
-        <Box marginTop={1}>
-          <ScrollView lines={mode.previewLines} height={h} scrollOffset={mode.prepScroll} />
+        <Box marginTop={1} flexGrow={1}>
+          <TextViewport
+            panelWidth={panelW}
+            viewportHeight={prepScrollH}
+            scrollOffset={mode.prepScroll}
+            totalRows={prepRows.length}
+            kind="Curation summary"
+          >
+            <ScrollView
+              displayLines={prepRows}
+              height={prepScrollH}
+              scrollOffset={mode.prepScroll}
+              padToWidth={textW}
+            />
+          </TextViewport>
         </Box>
       </Box>
     );
   }
 
   if (mode.m === 'viewPrep') {
-    const h = Math.max(4, Math.min(18, rows - 12));
+    const prepViewRows = linesToWrappedRows(mode.lines, textW);
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold>
           Preparation — {mode.job.title} @ {mode.job.company}
         </Text>
-        <Box marginTop={1}>
-          <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
+        <Box marginTop={1} flexGrow={1}>
+          <TextViewport
+            panelWidth={panelW}
+            viewportHeight={prepScrollH}
+            scrollOffset={mode.scroll}
+            totalRows={prepViewRows.length}
+            kind="Preparation"
+          >
+            <ScrollView
+              displayLines={prepViewRows}
+              height={prepScrollH}
+              scrollOffset={mode.scroll}
+              padToWidth={textW}
+            />
+          </TextViewport>
         </Box>
       </Box>
     );
@@ -585,16 +635,29 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'feedbackView') {
-    const h = Math.max(4, Math.min(16, rows - 14));
+    const feedbackRows = linesToWrappedRows(mode.lines, textW);
     const feedbackItems = [
       { value: 'apply', label: 'Apply gap suggestions to tailored draft' },
       { value: 'back', label: '← Back to job menu' },
     ];
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold>Professional feedback</Text>
-        <Box marginTop={1}>
-          <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
+        <Box marginTop={1} flexGrow={1}>
+          <TextViewport
+            panelWidth={panelW}
+            viewportHeight={feedbackScrollH}
+            scrollOffset={mode.scroll}
+            totalRows={feedbackRows.length}
+            kind="Feedback"
+          >
+            <ScrollView
+              displayLines={feedbackRows}
+              height={feedbackScrollH}
+              scrollOffset={mode.scroll}
+              padToWidth={textW}
+            />
+          </TextViewport>
         </Box>
         <Box marginTop={1}>
           <SelectList
@@ -710,14 +773,30 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'viewJd') {
-    const lines = mode.job.text.split('\n');
-    const h = Math.max(4, Math.min(18, rows - 12));
+    const lines = splitLinesForWrap(mode.job.text);
+    const jdRows = linesToWrappedRows(lines, textW);
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold>
           JD — {mode.job.title} @ {mode.job.company}
         </Text>
-        <ScrollView lines={lines} height={h} scrollOffset={mode.scroll} />
+        <Text dimColor>Read-only · Esc returns to job menu</Text>
+        <Box marginTop={1} flexGrow={1}>
+          <TextViewport
+            panelWidth={panelW}
+            viewportHeight={jdViewScrollH}
+            scrollOffset={mode.scroll}
+            totalRows={jdRows.length}
+            kind="Job description"
+          >
+            <ScrollView
+              displayLines={jdRows}
+              height={jdViewScrollH}
+              scrollOffset={mode.scroll}
+              padToWidth={textW}
+            />
+          </TextViewport>
+        </Box>
       </Box>
     );
   }
@@ -759,20 +838,20 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'addJd') {
-    const jdW = panelInnerWidth(cols);
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold>Add job — description</Text>
         <Text dimColor>
           Paste or type the JD, then <Text bold>Ctrl+D</Text> or <Text bold>Ctrl+S</Text> to save ·
-          Esc → company step
+          PgUp/PgDn · ↑↓ scroll · Esc → company step
         </Text>
-        <Box marginTop={1}>
+        <Box marginTop={1} flexGrow={1}>
           <MultilineInput
             value={jdDraft}
             onChange={setJdDraft}
             focus={active}
-            width={jdW}
+            width={textW}
+            height={jdEditorH}
             onSubmit={(text) => {
               void finalizeNewJob(text, mode.title, mode.company);
             }}
@@ -837,7 +916,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
 
     if (splitPane) {
       return (
-        <Box flexDirection="row" width={cols}>
+        <Box flexDirection="row" flexGrow={1}>
           <Box width={listPaneW} flexDirection="column">
             <Text bold>Saved jobs</Text>
             <Box marginTop={1}>
@@ -862,7 +941,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
 
   const previewJob = listJob();
   return (
-    <Box flexDirection="column" width={cols}>
+    <Box flexDirection="column" flexGrow={1}>
       <Box flexDirection="column">
         <Text bold>Saved jobs</Text>
         <Box marginTop={1}>

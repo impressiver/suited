@@ -1,3 +1,4 @@
+export { type CheckboxItem, CheckboxList, type CheckboxListProps } from './CheckboxList.tsx';
 export { ConfirmPrompt, type ConfirmPromptProps } from './ConfirmPrompt.tsx';
 export { DiffView, type DiffViewProps, formatDiffBlockLines } from './DiffView.tsx';
 export { InlineEditor, type InlineEditorProps } from './InlineEditor.tsx';
@@ -8,3 +9,4 @@ export { type SelectItem, SelectList, type SelectListProps } from './SelectList.
 export { Spinner, type SpinnerProps } from './Spinner.tsx';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge.tsx';
 export { TextInput, type TextInputProps } from './TextInput.tsx';
+export { TextViewport, type TextViewportProps } from './TextViewport.tsx';

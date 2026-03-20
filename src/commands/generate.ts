@@ -61,6 +61,10 @@ import {
   saveRefined,
 } from '../profile/serializer.ts';
 import { persistJobRefinementPinnedRender } from '../services/jobRefinement.ts';
+import {
+  applyResumeSectionSelection,
+  MIN_VISIBLE_RESUME_POSITIONS,
+} from '../services/sectionSelection.ts';
 import { c } from '../utils/colors.ts';
 import { fileExists } from '../utils/fs.ts';
 import { openInEditor } from '../utils/interactive.ts';
@@ -1144,7 +1148,8 @@ async function selectSections(
   const savedSet = savedSelection ? new Set(savedSelection) : null;
 
   // Build a merged list: individual position items + other sections
-  type Choice = { name: string; value: string; checked: boolean };
+  type Choice = { name: string; value: string; checked: boolean; disabled?: string };
+  const positionFloor = Math.min(MIN_VISIBLE_RESUME_POSITIONS, doc.positions.length);
   const choices: Choice[] = [
     ...(doc.summary
       ? [{ name: 'Summary', value: 'summary', checked: savedSet ? savedSet.has('summary') : true }]
@@ -1153,7 +1158,10 @@ async function selectSections(
     ...doc.positions.map((p, i) => ({
       name: `${p.title} @ ${p.company}  ${c.muted(`${p.startDate} – ${p.endDate ?? 'Present'} · ${p.bullets.length} bullet${p.bullets.length === 1 ? '' : 's'}`)}`,
       value: `pos:${i}`,
-      checked: savedSet ? savedSet.has(`pos:${i}`) : true,
+      checked: i < positionFloor ? true : savedSet ? savedSet.has(`pos:${i}`) : true,
+      ...(i < positionFloor
+        ? { disabled: '(always included — keeps experience section full)' }
+        : {}),
     })),
     ...(doc.education.length
       ? [
@@ -1229,48 +1237,14 @@ async function selectSections(
     },
   ])) as { selected: string[] };
 
-  const enabled = new Set(selected);
-
-  // Derive selected position indices from pos:N values
-  const selectedPosIdxs = selected
-    .filter((v) => v.startsWith('pos:'))
-    .map((v) => parseInt(v.slice(4), 10))
-    .sort((a, b) => a - b);
-
-  // Gap-fill: positions are newest-first; include every entry between selected extremes
-  const selectedPositions: ResumeDocument['positions'] = [];
-  if (selectedPosIdxs.length > 0) {
-    const maxIdx = Math.max(...selectedPosIdxs);
-    const selectedSet = new Set(selectedPosIdxs);
-    const autoFilled: string[] = [];
-    for (let i = 0; i <= maxIdx; i++) {
-      if (!selectedSet.has(i)) autoFilled.push(doc.positions[i]?.company ?? '');
-    }
-    if (autoFilled.length > 0) {
-      console.log(
-        `  ${c.warn} ${c.warning(`Re-included to avoid employment gaps: ${autoFilled.join(', ')}`)}`,
-      );
-    }
-    for (let i = 0; i <= maxIdx; i++) {
-      selectedPositions.push(doc.positions[i]);
-    }
+  const { doc: nextDoc, gapReincludedCompanies } = applyResumeSectionSelection(doc, selected);
+  if (gapReincludedCompanies.length > 0) {
+    console.log(
+      `  ${c.warn} ${c.warning(`Re-included to avoid employment gaps: ${gapReincludedCompanies.join(', ')}`)}`,
+    );
   }
 
-  return {
-    doc: {
-      ...doc,
-      summary: enabled.has('summary') ? doc.summary : undefined,
-      positions: selectedPositions,
-      education: enabled.has('education') ? doc.education : [],
-      skills: enabled.has('skills') ? doc.skills : [],
-      projects: enabled.has('projects') ? doc.projects : [],
-      certifications: enabled.has('certifications') ? doc.certifications : [],
-      languages: enabled.has('languages') ? doc.languages : [],
-      volunteer: enabled.has('volunteer') ? doc.volunteer : [],
-      awards: enabled.has('awards') ? doc.awards : [],
-    },
-    selected,
-  };
+  return { doc: nextDoc, selected };
 }
 
 // ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ import {
 } from '../profile/serializer.ts';
 import { throwIfAborted } from '../utils/abort.ts';
 import { persistJobRefinementPinnedRender } from './jobRefinement.ts';
-import { selectAllSections } from './sectionSelection.ts';
+import { applyResumeSectionSelection, collectDefaultSectionKeys } from './sectionSelection.ts';
 
 export interface RunTuiGeneratePdfOptions {
   profileDir: string;
@@ -54,6 +54,19 @@ export interface RunTuiGeneratePdfOptions {
 export interface RunTuiGeneratePdfResult {
   outputPath: string;
   config: GenerationConfig;
+}
+
+/** Result of analyze / assemble / polish — before section checkboxes. TUI shows sections, then calls `runTuiGenerateRenderPhase`. */
+export interface TuiGenerateBuiltState {
+  profile: Profile;
+  resumeDocFull: ResumeDocument;
+  config: GenerationConfig;
+  storedJobRefinement: JobRefinement | null;
+  resumesDir: string;
+  profileDir: string;
+  flair: FlairLevel;
+  templateOverride?: TemplateName;
+  jobId?: string;
 }
 
 function resumeDocToJobProfile(doc: ResumeDocument, base: Profile): Profile {
@@ -137,9 +150,12 @@ function safeName(s: string): string {
     .replace(/^-|-$/g, '');
 }
 
-export async function runTuiGeneratePdf(
+/**
+ * Analyze/curate/assemble/polish (job path) or full-document build — stops before section selection.
+ */
+export async function runTuiGenerateBuildPhase(
   options: RunTuiGeneratePdfOptions,
-): Promise<RunTuiGeneratePdfResult> {
+): Promise<TuiGenerateBuiltState> {
   const profileDir = options.profileDir;
   const resumesDir = options.resumesDir ?? `${profileDir}/resumes`;
   const { signal } = options;
@@ -161,7 +177,6 @@ export async function runTuiGeneratePdf(
   };
 
   let resumeDoc: ResumeDocument;
-  /** Loaded when `config.jd` — used for `pinnedRender` reuse after the JD block. */
   let storedJobRefinement: JobRefinement | null = null;
 
   if (config.jd) {
@@ -259,9 +274,46 @@ export async function runTuiGeneratePdf(
     resumeDoc = { ...resumeDoc, logoDataUris: { ...cache } };
   }
 
-  const sectioned = selectAllSections(resumeDoc);
-  resumeDoc = sectioned.doc;
-  config.sectionSelection = sectioned.selected;
+  return {
+    profile,
+    resumeDocFull: resumeDoc,
+    config,
+    storedJobRefinement,
+    resumesDir,
+    profileDir,
+    flair: options.flair,
+    templateOverride: options.templateOverride,
+    jobId: options.jobId,
+  };
+}
+
+export interface RunTuiGenerateRenderPhaseOptions {
+  sectionSelection: string[];
+  signal?: AbortSignal;
+  onProgress?: (stepIndex: number) => void;
+}
+
+/** Apply section selection, HTML squeeze loop, PDF export, save config (after `runTuiGenerateBuildPhase`). */
+export async function runTuiGenerateRenderPhase(
+  built: TuiGenerateBuiltState,
+  ro: RunTuiGenerateRenderPhaseOptions,
+): Promise<RunTuiGeneratePdfResult> {
+  const { signal } = ro;
+  const {
+    profile,
+    config: baseConfig,
+    storedJobRefinement,
+    resumesDir,
+    profileDir,
+    flair,
+    templateOverride,
+    jobId,
+  } = built;
+  const config = baseConfig;
+
+  const appliedSections = applyResumeSectionSelection(built.resumeDocFull, ro.sectionSelection);
+  let resumeDoc = appliedSections.doc;
+  config.sectionSelection = ro.sectionSelection;
 
   const personSlug = safeName(profile.contact.name.value);
   const fileBaseName = `${personSlug}-resume`;
@@ -273,11 +325,12 @@ export async function runTuiGeneratePdf(
   const hhmm = nowTs.toTimeString().slice(0, 5).replace(':', '');
   const outputPath = `${resumeOutputDir}/${fileBaseName}_${date}-${hhmm}.pdf`;
 
-  let { html, appliedSqueezeLevel } = await renderWithSqueeze(resumeDoc, {
-    requestedFlair: options.flair,
-    templateOverride: options.templateOverride,
-    reusePin: options.jobId != null ? storedJobRefinement?.pinnedRender : undefined,
+  let squeeze = await renderWithSqueeze(resumeDoc, {
+    requestedFlair: flair,
+    templateOverride,
+    reusePin: jobId != null ? storedJobRefinement?.pinnedRender : undefined,
   });
+  let { html, appliedSqueezeLevel } = squeeze;
   throwIfAborted(signal);
 
   for (let step = 0; step < 6; step += 1) {
@@ -286,35 +339,49 @@ export async function runTuiGeneratePdf(
     if (!fit.overflows) {
       break;
     }
-    resumeDoc = await autoTrimToFit(resumeDoc, fit.ratio);
-    const next = await renderWithSqueeze(resumeDoc, {
-      requestedFlair: options.flair,
-      templateOverride: options.templateOverride,
+    const trimmed = await autoTrimToFit(resumeDoc, fit.ratio);
+    squeeze = await renderWithSqueeze(trimmed, {
+      requestedFlair: flair,
+      templateOverride,
     });
-    html = next.html;
-    appliedSqueezeLevel = next.appliedSqueezeLevel;
+    resumeDoc = trimmed;
+    html = squeeze.html;
+    appliedSqueezeLevel = squeeze.appliedSqueezeLevel;
   }
 
   throwIfAborted(signal);
-  options.onProgress?.(config.jd ? 3 : 2);
-  options.onProgress?.(config.jd ? 4 : 3);
+  ro.onProgress?.(config.jd ? 3 : 2);
+  ro.onProgress?.(config.jd ? 4 : 3);
   await exportToPdf(html, { template: resumeDoc.template, outputPath });
 
   config.profileUpdatedAt = profile.updatedAt;
   config.resolvedTemplate = resumeDoc.template;
   await saveGenerationConfig(config, profileDir);
 
-  if (options.jobId != null && config.jd) {
-    await persistJobRefinementPinnedRender(options.profileDir, options.jobId, {
-      requestedFlair: options.flair,
+  if (jobId != null && config.jd) {
+    await persistJobRefinementPinnedRender(profileDir, jobId, {
+      requestedFlair: flair,
       effectiveFlair: resumeDoc.flair,
       resolvedTemplate: resumeDoc.template,
-      templateOverride: options.templateOverride,
+      templateOverride,
       squeezeLevel: appliedSqueezeLevel,
       updatedAt: new Date().toISOString(),
     });
   }
 
-  options.onProgress?.(config.jd ? 5 : 4);
+  ro.onProgress?.(config.jd ? 5 : 4);
   return { outputPath, config };
+}
+
+/** One-shot generate with every section included (same as build + render with all keys). */
+export async function runTuiGeneratePdf(
+  options: RunTuiGeneratePdfOptions,
+): Promise<RunTuiGeneratePdfResult> {
+  const built = await runTuiGenerateBuildPhase(options);
+  const sectionSelection = collectDefaultSectionKeys(built.resumeDocFull);
+  return runTuiGenerateRenderPhase(built, {
+    sectionSelection,
+    signal: options.signal,
+    onProgress: options.onProgress,
+  });
 }

@@ -19,16 +19,16 @@ Every screen documents: what loads on mount, the full state machine (every state
 
 ### ImportScreen
 
-**Loads on mount:** optional `clearSession` clears LinkedIn cookies file. **Current source:** reads `source.json` when present and shows a compact preview (name/headline, counts, up to five roles, truncated summary) in a `ScrollView`; after a successful import, reloads preview and calls **`onSourceChanged`** (wired to `useProfileSnapshot.refresh` in `App`) so the header stays in sync.
+**Loads on mount:** optional `clearSession` clears LinkedIn cookies file. **Layout:** import control (**URL/file** or **paste**) is **above** the on-disk preview so the primary field is obvious. **On disk:** reads `source.json` when present and shows name/headline, counts, up to five roles, and **full summary** (wrapped) in a `TextViewport` + `ScrollView` sized to `panelInnerWidth` / `panelFramedTextWidth`; **↑↓ PgUp/PgDn** scroll the preview when not in a text field. After a successful import, reloads preview and calls **`onSourceChanged`**.
 
 **States (current implementation):**
-- `idle` / `done` / `error` — single-line or paste input; **h** toggles headed Chrome for URL scrape; **p** toggles paste mode; **Esc** returns to the sidebar even while the line/paste field is focused (global `App` input is suppressed during text entry, so Import handles this locally)
+- `idle` / `done` / `error` — single-line or paste input (labeled section + hints); **h** headed Chrome; **p** paste mode; **Esc** sidebar (Import `useInput` handles Esc while fields are focused)
 - `running` — `Spinner`; `importProfileFromInput({ signal })` drives detect → scrape (URL, cooperative **`AbortSignal`** between nav steps) / ZIP+CSV / dir / Claude paste parse; **Esc** aborts via global `operationCancelSeq` + `useOperationAbort`
 - `error` — message + **`SelectList`**: Retry (same input), optional **Check Settings** after 3 consecutive failures, Dismiss (return to idle)
 
 **Still aspirational vs early spec:** granular `ProgressSteps`, dedicated `detecting`/`scraping` labels, post-import contact-only prompt as a separate state (contact is merged in the service today).
 
-**Components:** `ScrollView` (source preview), `TextInput`, `Spinner`, `MultilineInput`, `SelectList` (error recovery).
+**Components:** `TextViewport`, `ScrollView`, `TextInput`, `Spinner`, `MultilineInput`, `SelectList` (error recovery).
 
 ### RefineScreen
 
@@ -129,7 +129,7 @@ already-refined:
 
 **Loads on mount:** If `pendingJobId` is set in `AppState`, clear it and jump to flair picker with that job’s JD.
 
-**Current implementation (MVP):** source picker (**saved job** / **full resume** only — ad-hoc JD paste lives on **Jobs** when adding a job) → flair / template **`SelectList`** (flair levels 1–5 plus **Retro** and **Timeline** overrides, matching CLI `generate` prompts) → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
+**Current implementation (MVP):** source picker (**saved job** / **full resume** only — ad-hoc JD paste lives on **Jobs** when adding a job) → flair / template **`SelectList`** (flair levels 1–5 plus **Retro** and **Timeline** overrides, matching CLI `generate` prompts) → **`ProgressSteps` + `Spinner`** while **`runTuiGenerateBuildPhase`** runs (analyze / curate / assemble / polish for job path) → **`CheckboxList`** to include/exclude **summary, each position, education, skills, projects, certifications, languages, volunteer, awards**. **Experience floor:** the first **`MIN_VISIBLE_RESUME_POSITIONS` (3)** roles in document order are **always** included (locked in TUI, disabled in CLI) so PDFs stay substantive; **gap-fill** from index `0` through the max merged index still removes false timeline holes. → **`ProgressSteps` + `Spinner`** while **`runTuiGenerateRenderPhase`** runs (layout, squeeze, PDF, save config). **`runTuiGeneratePdf`** remains a one-shot **build + all sections + render** for non-TUI callers. **`throwIfAborted`** between major steps; **Esc** cancels build/render via **`useOperationAbort`**. **Retry** after a render failure re-runs **`runTuiGenerateRenderPhase`** with the same built document and section keys when available; otherwise rebuilds from flair. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
 
 **Esc (non-running phases):** Like **Jobs**, **`App.tsx`** does not map **Esc** → sidebar while **Generate** content is focused — **`GenerateScreen`** owns **Esc** to step back through source / saved-job / flair / done / error states (including when a paste **`MultilineInput`** is focused). After the field blurs, a further **Esc** can return to the sidebar via the global handler.
 
@@ -169,7 +169,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **`--jd` flag / `--all-templates`:** CLI-only. Not replicated in TUI. See [Goals & constraints](./tui-goals-and-constraints.md#coverage-validate-improve-prepare---jd-flag).
 
-**Components:** `SelectList`, `MultilineInput`, `ProgressSteps`, `Spinner`, `ScrollView` (streaming), `CheckboxList` (curation manual edit), `StatusBadge`.
+**Components:** `SelectList`, `MultilineInput`, `ProgressSteps`, `Spinner`, `ScrollView` (streaming), `CheckboxList` (Generate section pick + planned curation manual edit), `StatusBadge`.
 
 ### JobsScreen
 
@@ -185,7 +185,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 - `add-company` — TextInput for company
 - `add-jd` — MultilineInput for JD paste (panel width + wrap); **Ctrl+D** or **Ctrl+S** submits; calls `saveJob()`; inline + footer hints (footer still shows Jobs line while `inTextInput` via `App.tsx`)
 - `delete-confirm` — `ConfirmPrompt` inline
-- `view-jd` — `ScrollView` of full JD text; Esc to close
+- `view-jd` — `TextViewport` + wrapped `ScrollView` (PgUp/PgDn · ↑↓); dim line “Read-only · Esc…”; Esc → job menu
 - `generate-navigate` — dispatches `SET_SCREEN('generate')` + `SET_PENDING_JOB(jobId)` simultaneously; GenerateScreen reads and clears `pendingJobId` on mount to pre-populate the JD source picker
 - `prepare-curating` — inline curation spinner + streaming for the selected job
 - `prepare-done` — summary; action row (→ Generate, → back). *(Planned:* optional **→ Curate** hand-off to [CurateScreen](#curatescreen-planned) with `pendingJobId` / equivalent so the same job opens in the curate hub.)

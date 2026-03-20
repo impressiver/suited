@@ -12,14 +12,16 @@ import {
   SelectList,
   Spinner,
   TextInput,
+  TextViewport,
 } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
-import { panelInnerWidth } from '../panelContentWidth.ts';
+import { panelFramedTextWidth, panelInnerWidth } from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
+import { linesToWrappedRows } from '../utils/wrapTextRows.ts';
 
 export interface ImportScreenProps {
   profileDir: string;
@@ -36,8 +38,6 @@ type SourcePreviewState =
   | { status: 'absent' }
   | { status: 'err'; msg: string }
   | { status: 'ok'; lines: string[] };
-
-const PREVIEW_SCROLL_ROWS = 8;
 
 function buildSourcePreviewLines(profile: Profile): string[] {
   const lines: string[] = [];
@@ -57,14 +57,14 @@ function buildSourcePreviewLines(profile: Profile): string[] {
   );
   const cap = 5;
   for (const p of profile.positions.slice(0, cap)) {
-    lines.push(`  · ${p.title.value} @ ${p.company.value}`);
+    lines.push(`- ${p.title.value} @ ${p.company.value}`);
   }
   if (profile.positions.length > cap) {
-    lines.push(`  · … +${profile.positions.length - cap} more roles`);
+    lines.push(`- … +${profile.positions.length - cap} more roles`);
   }
   const sum = profile.summary?.value?.replace(/\s+/g, ' ').trim();
   if (sum) {
-    lines.push(sum.length > 140 ? `${sum.slice(0, 137)}…` : sum);
+    lines.push(sum);
   }
   return lines;
 }
@@ -77,8 +77,18 @@ export function ImportScreen({
 }: ImportScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const [termCols] = useTerminalSize();
+  const [termCols, termRows] = useTerminalSize();
   const { focusTarget, activeScreen, inTextInput } = useAppState();
+  const panelW = panelInnerWidth(termCols);
+  const textW = panelFramedTextWidth(termCols);
+  const { pasteEditorH, sourcePreviewH } = useMemo(() => {
+    const chrome = 15;
+    const inner = Math.max(8, termRows - chrome);
+    const pasteEditorH = Math.max(6, Math.min(40, Math.floor(inner * 0.55)));
+    const sourcePreviewH = Math.max(3, Math.min(14, termRows - chrome - pasteEditorH));
+    return { pasteEditorH, sourcePreviewH };
+  }, [termRows]);
+
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>('idle');
   const [mode, setMode] = useState<'line' | 'paste'>('line');
@@ -93,8 +103,17 @@ export function ImportScreen({
   const [doneContactGap, setDoneContactGap] = useState<string | null>(null);
   const lastRawInputRef = useRef('');
   const [sourcePreview, setSourcePreview] = useState<SourcePreviewState>({ status: 'loading' });
+  const [sourcePreviewScroll, setSourcePreviewScroll] = useState(0);
+
+  const sourcePreviewDisplayRows = useMemo(() => {
+    if (sourcePreview.status !== 'ok') {
+      return null;
+    }
+    return linesToWrappedRows(sourcePreview.lines, textW);
+  }, [sourcePreview, textW]);
 
   const reloadSourcePreview = useCallback(async () => {
+    setSourcePreviewScroll(0);
     setSourcePreview({ status: 'loading' });
     try {
       if (!(await fileExists(sourceJsonPath(profileDir)))) {
@@ -131,9 +150,11 @@ export function ImportScreen({
     const modeHint =
       mode === 'line'
         ? 'Enter submit · Esc sidebar · h headed browser toggle · p paste mode'
-        : 'Ctrl+D or Ctrl+S submit · Esc sidebar · h headed toggle · p single-line mode';
-    return `Import · ${modeHint}${sb}`;
-  }, [mode, phase]);
+        : 'Ctrl+D or Ctrl+S submit · PgUp/PgDn · ↑↓ scroll · Esc sidebar · h headed · p line mode';
+    const previewScroll =
+      sourcePreview.status === 'ok' && !inTextInput ? ' · ↑↓ PgUp/PgDn scroll on-disk preview' : '';
+    return `Import · ${modeHint}${previewScroll}${sb}`;
+  }, [mode, phase, sourcePreview.status, inTextInput]);
 
   useRegisterPanelFooterHint(importFooterHint);
 
@@ -223,21 +244,62 @@ export function ImportScreen({
     { isActive: active && phase !== 'running' },
   );
 
+  useInput(
+    (_input, key) => {
+      if (!active || phase === 'running' || inTextInput || sourcePreview.status !== 'ok') {
+        return;
+      }
+      if (sourcePreviewDisplayRows == null) {
+        return;
+      }
+      const maxScroll = Math.max(0, sourcePreviewDisplayRows.length - sourcePreviewH);
+      const step = Math.max(1, sourcePreviewH - 1);
+      if (key.pageUp) {
+        setSourcePreviewScroll((s) => Math.max(0, s - step));
+      }
+      if (key.pageDown) {
+        setSourcePreviewScroll((s) => Math.min(maxScroll, s + step));
+      }
+      if (key.upArrow) {
+        setSourcePreviewScroll((s) => Math.max(0, s - 1));
+      }
+      if (key.downArrow) {
+        setSourcePreviewScroll((s) => Math.min(maxScroll, s + 1));
+      }
+    },
+    {
+      isActive: active && phase !== 'running' && !inTextInput && sourcePreview.status === 'ok',
+    },
+  );
+
   const showSettings = apiFailureStreak >= 3 && phase === 'error';
 
   const sourcePreviewBlock = (
     <Box marginTop={1} flexDirection="column">
-      <Text bold>Current source (source.json)</Text>
+      <Text bold>On disk (source.json)</Text>
       {sourcePreview.status === 'loading' && <Text dimColor>Loading…</Text>}
       {sourcePreview.status === 'absent' && (
-        <Text dimColor>No profile on disk yet — import below to create source.json.</Text>
+        <Text dimColor>No profile yet — submit an import above to create source.json.</Text>
       )}
       {sourcePreview.status === 'err' && (
         <Text color="yellow">Could not load source: {sourcePreview.msg}</Text>
       )}
-      {sourcePreview.status === 'ok' && (
-        <Box marginTop={1} flexDirection="column">
-          <ScrollView lines={sourcePreview.lines} height={PREVIEW_SCROLL_ROWS} />
+      {sourcePreview.status === 'ok' && sourcePreviewDisplayRows != null && (
+        <Box marginTop={1} flexDirection="column" width={panelW}>
+          <TextViewport
+            panelWidth={panelW}
+            viewportHeight={sourcePreviewH}
+            scrollOffset={sourcePreviewScroll}
+            totalRows={sourcePreviewDisplayRows.length}
+            kind="Profile preview"
+          >
+            <ScrollView
+              displayLines={sourcePreviewDisplayRows}
+              height={sourcePreviewH}
+              scrollOffset={sourcePreviewScroll}
+              padToWidth={textW}
+            />
+          </TextViewport>
         </Box>
       )}
     </Box>
@@ -256,8 +318,40 @@ export function ImportScreen({
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexGrow={1}>
       <Text bold>Import</Text>
+      <Box marginTop={1} flexDirection="column">
+        <Text bold>{mode === 'line' ? 'Import from URL or file' : 'Import from pasted text'}</Text>
+        <Text dimColor>
+          {mode === 'line'
+            ? 'Enter runs import · p switch to paste · h headed browser · Esc sidebar'
+            : 'Ctrl+D or Ctrl+S runs import · p line mode · h headed · Esc sidebar'}
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          {mode === 'line' ? (
+            <TextInput
+              value={lineValue}
+              onChange={setLineValue}
+              focus={active && mode === 'line' && phase !== 'error'}
+              placeholder="https://linkedin.com/in/… or path to .zip"
+              onSubmit={(v) => {
+                void runImport(v);
+              }}
+            />
+          ) : (
+            <MultilineInput
+              value={pasteValue}
+              onChange={setPasteValue}
+              focus={active && mode === 'paste' && phase !== 'error'}
+              width={textW}
+              height={pasteEditorH}
+              onSubmit={(v) => {
+                void runImport(v);
+              }}
+            />
+          )}
+        </Box>
+      </Box>
       {sourcePreviewBlock}
       {detectedKind != null && phase === 'done' && (
         <Text dimColor>
@@ -325,29 +419,6 @@ export function ImportScreen({
           )}
         </Box>
       )}
-      <Box marginTop={1} flexDirection="column">
-        {mode === 'line' ? (
-          <TextInput
-            value={lineValue}
-            onChange={setLineValue}
-            focus={active && mode === 'line' && phase !== 'error'}
-            placeholder="https://linkedin.com/in/… or path to .zip"
-            onSubmit={(v) => {
-              void runImport(v);
-            }}
-          />
-        ) : (
-          <MultilineInput
-            value={pasteValue}
-            onChange={setPasteValue}
-            focus={active && mode === 'paste' && phase !== 'error'}
-            width={panelInnerWidth(termCols)}
-            onSubmit={(v) => {
-              void runImport(v);
-            }}
-          />
-        )}
-      </Box>
     </Box>
   );
 }

@@ -2,28 +2,22 @@ import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob, TemplateName } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
-import { runTuiGeneratePdf } from '../../services/generateResume.ts';
-import { ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
+import {
+  runTuiGenerateBuildPhase,
+  runTuiGenerateRenderPhase,
+  type TuiGenerateBuiltState,
+} from '../../services/generateResume.ts';
+import {
+  buildSectionCheckboxItems,
+  collectDefaultSectionKeys,
+  MIN_VISIBLE_RESUME_POSITIONS,
+} from '../../services/sectionSelection.ts';
+import { CheckboxList, ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
-
-type Phase =
-  | { p: 'pick-source' }
-  | { p: 'pick-saved'; jobs: SavedJob[]; idx: number }
-  | {
-      p: 'pick-flair';
-      jd?: string;
-      jobId?: string;
-      title: string;
-      company: string;
-      idx: number;
-    }
-  | { p: 'run' }
-  | { p: 'done'; path: string }
-  | { p: 'err'; msg: string; kind: 'preflight' | 'generate' };
 
 type PickFlairSnapshot = {
   jd?: string;
@@ -37,6 +31,23 @@ type GenerateRunCtx = PickFlairSnapshot & {
   flair: FlairLevel;
   templateOverride?: TemplateName;
 };
+
+type Phase =
+  | { p: 'pick-source' }
+  | { p: 'pick-saved'; jobs: SavedJob[]; idx: number }
+  | {
+      p: 'pick-flair';
+      jd?: string;
+      jobId?: string;
+      title: string;
+      company: string;
+      idx: number;
+    }
+  | { p: 'building'; ctx: GenerateRunCtx }
+  | { p: 'pick-sections'; ctx: GenerateRunCtx }
+  | { p: 'run' }
+  | { p: 'done'; path: string }
+  | { p: 'err'; msg: string; kind: 'preflight' | 'generate' };
 
 const JOB_PROGRESS_LABELS = [
   'Job prep (analyze & curate)',
@@ -96,6 +107,15 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
 
   const recoverFlairRef = useRef<PickFlairSnapshot | null>(null);
   const lastGenCtxRef = useRef<GenerateRunCtx | null>(null);
+  const builtForRenderRef = useRef<TuiGenerateBuiltState | null>(null);
+  /** Last successful PDF section keys (restores checkboxes on regenerate). */
+  const lastSectionSelectionRef = useRef<string[] | null>(null);
+  /** Keys chosen before the latest render attempt (for retry after render-only failures). */
+  const lastPickedSectionSelectionRef = useRef<string[] | null>(null);
+  const [sectionItems, setSectionItems] = useState<
+    Array<{ value: string; label: string; checked: boolean }>
+  >([]);
+  const [sectionFocusIdx, setSectionFocusIdx] = useState(0);
 
   const active = activeScreen === 'generate' && focusTarget === 'content';
 
@@ -107,7 +127,11 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
       case 'pick-saved':
         return `Generate · ↑↓ · Enter choose job${sb}`;
       case 'pick-flair':
-        return `Generate · ↑↓ flair · Enter run${sb}`;
+        return `Generate · ↑↓ flair · Enter continue${sb}`;
+      case 'building':
+        return `Generate · building resume… · Esc cancels when supported${sb}`;
+      case 'pick-sections':
+        return `Generate · Space toggle · Enter PDF · Esc back${sb}`;
       case 'done':
         return `Generate · ↑↓ Enter next step · letter keys / sidebar still work${sb}`;
       case 'err':
@@ -149,6 +173,11 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         }
         setSourceIdx(0);
         setPhase({ p: 'pick-source' });
+        return;
+      }
+      if (phase.p === 'pick-sections') {
+        builtForRenderRef.current = null;
+        setPhase({ p: 'pick-flair', ...phase.ctx });
         return;
       }
       if (phase.p === 'done') {
@@ -203,32 +232,19 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
     [],
   );
 
-  const runGenerate = useCallback(
-    async (ctx: GenerateRunCtx) => {
-      recoverFlairRef.current = {
-        jd: ctx.jd,
-        jobId: ctx.jobId,
-        title: ctx.title,
-        company: ctx.company,
-        idx: ctx.idx,
-      };
-      lastGenCtxRef.current = ctx;
-      setRunStepIndex(0);
+  const runRenderPhase = useCallback(
+    async (built: TuiGenerateBuiltState, sectionSelection: string[]) => {
+      lastPickedSectionSelectionRef.current = sectionSelection;
       setPhase({ p: 'run' });
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
       const ac = createController();
       try {
-        const { outputPath } = await runTuiGeneratePdf({
-          profileDir,
-          flair: ctx.flair,
-          templateOverride: ctx.templateOverride,
-          jd: ctx.jd,
-          jobId: ctx.jobId,
-          jobTitle: ctx.title,
-          company: ctx.company,
+        const { outputPath, config } = await runTuiGenerateRenderPhase(built, {
+          sectionSelection,
           signal: ac.signal,
           onProgress: setRunStepIndex,
         });
+        lastSectionSelectionRef.current = config.sectionSelection ?? sectionSelection;
         setApiFailureStreak(0);
         setDoneMenuIdx(0);
         setPhase({ p: 'done', path: outputPath });
@@ -250,18 +266,123 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
+    [createController, dispatch, releaseController],
+  );
+
+  const startBuildPhase = useCallback(
+    async (ctx: GenerateRunCtx) => {
+      recoverFlairRef.current = {
+        jd: ctx.jd,
+        jobId: ctx.jobId,
+        title: ctx.title,
+        company: ctx.company,
+        idx: ctx.idx,
+      };
+      lastGenCtxRef.current = ctx;
+      lastPickedSectionSelectionRef.current = null;
+      setRunStepIndex(0);
+      setPhase({ p: 'building', ctx });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      const ac = createController();
+      try {
+        const built = await runTuiGenerateBuildPhase({
+          profileDir,
+          flair: ctx.flair,
+          templateOverride: ctx.templateOverride,
+          jd: ctx.jd,
+          jobId: ctx.jobId,
+          jobTitle: ctx.title,
+          company: ctx.company,
+          signal: ac.signal,
+          onProgress: setRunStepIndex,
+        });
+        builtForRenderRef.current = built;
+        const items = buildSectionCheckboxItems(
+          built.resumeDocFull,
+          lastSectionSelectionRef.current ?? undefined,
+        );
+        setSectionItems(items);
+        setSectionFocusIdx(0);
+        setPhase({ p: 'pick-sections', ctx });
+      } catch (e) {
+        if (isUserAbort(e)) {
+          const snap = recoverFlairRef.current;
+          if (snap) {
+            setPhase({ p: 'pick-flair', ...snap });
+          } else {
+            setPhase({ p: 'pick-source' });
+          }
+          return;
+        }
+        setApiFailureStreak((n) => n + 1);
+        setErrMenuIdx(0);
+        setPhase({ p: 'err', msg: (e as Error).message, kind: 'generate' });
+      } finally {
+        releaseController(ac);
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
     [createController, dispatch, profileDir, releaseController],
   );
 
-  if (phase.p === 'run') {
-    const labels = lastGenCtxRef.current?.jd ? [...JOB_PROGRESS_LABELS] : [...FULL_PROGRESS_LABELS];
+  if (phase.p === 'building' || phase.p === 'run') {
+    const jd = phase.p === 'building' ? phase.ctx.jd : (lastGenCtxRef.current?.jd ?? undefined);
+    const labels = jd ? [...JOB_PROGRESS_LABELS] : [...FULL_PROGRESS_LABELS];
     const cap = Math.max(0, Math.min(runStepIndex, labels.length));
+    const spin =
+      phase.p === 'building' ? 'Building resume (analyze, curate, assemble)…' : 'Running pipeline…';
     return (
       <Box flexDirection="column">
         <Text bold>Generate</Text>
         <ProgressSteps steps={labels} currentIndex={cap} />
         <Box marginTop={1}>
-          <Spinner label="Running pipeline…" />
+          <Spinner label={spin} />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (phase.p === 'pick-sections') {
+    const built = builtForRenderRef.current;
+    return (
+      <Box flexDirection="column">
+        <Text bold>Generate</Text>
+        {phase.ctx.jd ? (
+          <Text>
+            Job: {phase.ctx.title} @ {phase.ctx.company}
+          </Text>
+        ) : (
+          <Text dimColor>Full resume</Text>
+        )}
+        <Text dimColor>
+          Include in PDF — first {MIN_VISIBLE_RESUME_POSITIONS} roles (when you have that many) stay
+          on for a full experience block; gaps between selected roles are filled automatically.
+        </Text>
+        <Box marginTop={1}>
+          {built == null ? (
+            <Text color="red">Internal error — no built document. Esc to go back.</Text>
+          ) : sectionItems.length === 0 ? (
+            <Text dimColor>Nothing to toggle — Enter to continue.</Text>
+          ) : (
+            <CheckboxList
+              items={sectionItems}
+              focusedIndex={sectionFocusIdx}
+              onFocusChange={setSectionFocusIdx}
+              onItemsChange={setSectionItems}
+              isActive={active}
+              onConfirm={() => {
+                const b = builtForRenderRef.current;
+                if (!b) {
+                  return;
+                }
+                const selected =
+                  sectionItems.length === 0
+                    ? collectDefaultSectionKeys(b.resumeDocFull)
+                    : sectionItems.filter((i) => i.checked).map((i) => i.value);
+                void runRenderPhase(b, selected);
+              }}
+            />
+          )}
         </Box>
       </Box>
     );
@@ -289,7 +410,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
               if (item.value === 'again') {
                 const ctx = lastGenCtxRef.current;
                 if (ctx) {
-                  void runGenerate(ctx);
+                  void startBuildPhase(ctx);
                 }
                 return;
               }
@@ -388,9 +509,15 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
                 return;
               }
               setErrMenuIdx(0);
-              const ctx = lastGenCtxRef.current;
-              if (ctx) {
-                void runGenerate(ctx);
+              const built = builtForRenderRef.current;
+              const picked = lastPickedSectionSelectionRef.current;
+              if (built != null && picked != null) {
+                void runRenderPhase(built, picked);
+              } else {
+                const ctx = lastGenCtxRef.current;
+                if (ctx) {
+                  void startBuildPhase(ctx);
+                }
               }
             }}
           />
@@ -425,7 +552,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
               if (!choice) {
                 return;
               }
-              void runGenerate({
+              void startBuildPhase({
                 jd: phase.jd,
                 jobId: phase.jobId,
                 title: phase.title,

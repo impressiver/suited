@@ -10,4 +10,13 @@ describe('ScrollView', () => {
     expect(out).toContain('c');
     expect(out).not.toContain('a');
   });
+
+  it('wraps long logical lines when wrapWidth is set', () => {
+    const lines = ['abcdefghijklmnop'];
+    const out = renderToString(
+      <ScrollView lines={lines} height={2} scrollOffset={0} wrapWidth={4} />,
+    );
+    expect(out).toContain('abcd');
+    expect(out).toContain('efgh');
+  });
 });

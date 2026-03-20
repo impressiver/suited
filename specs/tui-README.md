@@ -30,7 +30,7 @@ The same files are **grouped by phase** in [`specs/README.md`](./README.md). Use
 | [Build](./tui-build.md) | deps, tsconfig, Vitest glob |
 | [Implementation order](./tui-implementation-order.md) | **Sequential** rollout steps (single implementer); parallel lanes → [`AGENTS.md`](./AGENTS.md) |
 | [Definition of done](./tui-definition-of-done.md) | Phases A–C + **post–Phase C** polish list |
-| [Open questions](./tui-open-questions.md) | Decisions to lock |
+| [Open questions](./tui-open-questions.md) | Resolved decisions archive; empty **Unresolved** until a new fork |
 | [Scope estimate](./tui-scope.md) | File counts, LOC ballpark |
 
 ---
@@ -65,7 +65,7 @@ When multiple handlers could apply, order is:
 3. **Async / streaming** (Esc → cancel if `AbortSignal` wired; navigation locked if `operationInProgress`)
 4. **Global navigation** (sidebar, screen jumps, `q`)
 
-Per-screen shortcuts (e.g. `a`/`d` on Jobs) **MUST** be documented per screen and **SHOULD NOT** fire when a text field has focus; resolve conflicts in [Open questions](./tui-open-questions.md) during implementation.
+Per-screen shortcuts (e.g. `a`/`d` on Jobs) **MUST** be documented per screen and **SHOULD NOT** fire when a text field has focus. Conflict resolutions: [Open questions — resolved](./tui-open-questions.md).
 
 ---
 

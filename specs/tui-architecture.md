@@ -45,7 +45,7 @@ Start simple. Cross-screen state growth is an implementation detail.
 | `Enter` | Confirm / activate; submit single-line input |
 | `Esc` | Pop one level: blur input → cancel sub-state → go back → (only then) quit prompt |
 | `1–n` | Direct screen jump for sidebar `SCREEN_ORDER` (`n` = row count; suppressed when `operationInProgress` or `inTextInput`) |
-| Letter shortcuts | Screen jump per implementation map (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred). *(Planned:* assign a letter for **Curate** when that row ships.) |
+| Letter shortcuts | Screen jump per implementation map (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred). **Planned:** **`u` → Curate** when that sidebar row ships ([resolved list](./tui-open-questions.md#resolved)). |
 | `:` or `/` | Open command palette |
 | `q` | Quit (suppressed during any text input) |
 | `Ctrl+C` | Hard exit (always works; documented in footer when relevant) |
@@ -61,7 +61,7 @@ Ink 6's `useInput` fires for **every** keypress on **every** registered handler 
 
 ```typescript
 useInput((input, key) => {
-  // 1. Modal / confirm — always wins; handled by ConfirmPrompt's own useInput
+  // 1. Modal / confirm — see "Modal vs global input" below (Ink has no real priority)
   // 2. Text input mode — suppress global shortcuts
   if (state.inTextInput) return; // q, 1–n screen jumps, letter jumps do nothing
   // 3. Async lock — suppress navigation
@@ -80,7 +80,14 @@ All other components **MUST NOT** call `useInput` for navigation keys. They may 
 
 **`inTextInput` update rule:** Every `<TextInput>` and `<MultilineInput>` component **MUST** dispatch `SET_IN_TEXT_INPUT(true)` when it receives focus (`isFocused=true` from `ink-text-input`) and `SET_IN_TEXT_INPUT(false)` when it loses focus. This is the mechanism the global handler uses — it does **not** query Ink's focus internals.
 
-**Per-screen shortcuts** (`a`/`d` on Jobs, `s` for save on Contact/Profile) are handled inside their screen components' `useInput`, **only** when `!state.inTextInput && !state.operationInProgress`. They **MUST** be documented per screen and listed in [Open questions](./tui-open-questions.md) if they risk conflict.
+**Per-screen shortcuts** (`a`/`d`/`g`/`p` on Jobs; **`a`/`d`/`s` on Profile**; **`s` on Contact** browse save-all) are handled in screen `useInput`, **only** when `!state.inTextInput && !state.operationInProgress` (unless a screen documents Esc-before-guard for wizards). Global **`s`→settings** is **deferred** on **Profile** and **Contact** content focus (`App.tsx`) so **`s`** means save there. They **MUST** be documented per screen. Conflicts resolved: see [Open questions — resolved](./tui-open-questions.md).
+
+### Modal vs global input (`ConfirmPrompt`)
+
+Ink **dispatches every active `useInput` handler** for each key; there is no built-in capture or bubbling.
+
+- **Implemented:** **Profile unsaved navigate-away** — `App` disables its global `useInput` while `pendingNav !== null`, so **q** / **1–n** / letter jumps do not run during that confirm.
+- **Gap:** Other **`ConfirmPrompt`** instances do **not** automatically block global shortcuts; **q** may still quit. **SHOULD** fix with a **`modalOpen` (or `blockingOverlay`) flag** in store that `App` checks before global navigation — **do not** overload `inTextInput` for this.
 
 ### Esc double-press during streaming
 
@@ -139,7 +146,7 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 | Concept | Notes |
 |---------|--------|
 | Dashboard, Import, Contact, Jobs, Refine, Generate, Settings | Current top-level destinations |
-| **Curate** *(planned)* | New row: **job list → per-job curate hub** (polish, consultant, edit sections, direct edit, clear & restart). Insert **after Refine, before Generate** when implemented; renumber keys in the same PR. See [CurateScreen](./tui-screens.md#curatescreen-planned). |
+| **Curate** *(planned)* | New row: **job list → per-job curate hub** (polish, consultant, edit sections, direct edit, clear & restart). **Letter `u`.** Insert **after Refine, before Generate** when implemented; renumber keys in the same PR. See [CurateScreen](./tui-screens.md#curatescreen-planned). |
 | ProfileEditorScreen | Not in sidebar; opened from Refine or *(planned)* Curate with `profileEditorReturnTo`. |
 
 ---

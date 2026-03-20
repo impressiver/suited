@@ -11,6 +11,7 @@ import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppState } from '../store.tsx';
 import { suggestedNextLine } from '../suggestedNext.ts';
+import { SCREEN_ORDER } from '../types.ts';
 
 export interface DashboardScreenProps {
   snapshot: ProfileSnapshot;
@@ -24,7 +25,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
   const panelActive = activeScreen === 'dashboard' && focusTarget === 'content';
 
   useRegisterPanelFooterHint(
-    'Dashboard · ↑↓ change screen · Tab sidebar · 1–7 · d i c j r g s · q quit',
+    `Dashboard · ↑↓ change screen · Tab sidebar · 1–${SCREEN_ORDER.length} · d i c j r g s · q quit`,
   );
   const api = hasApiKey();
   const variant = getDashboardVariant(snapshot, api);

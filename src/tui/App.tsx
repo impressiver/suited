@@ -76,7 +76,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (panelFooterHint != null && panelFooterHint !== '') {
       return panelFooterHint;
     }
-    return `${NAV_LABELS[activeScreen]} · Tab sidebar · 1–8 · letter keys · q quit`;
+    return `${NAV_LABELS[activeScreen]} · Tab sidebar · 1–${nScreens} · letter keys · q quit`;
   }, [activeScreen, focusTarget, panelFooterHint, state.inTextInput, state.operationInProgress]);
 
   const panelFocusBanner = useMemo(() => {
@@ -181,13 +181,23 @@ export function App({ profileDir, flowOptions }: AppProps) {
         return;
       }
 
-      /** Profile editor uses a/d on positions/bullets; do not steal `d`→dashboard. */
-      const profileLetterDefer = new Set(['a', 'd']);
+      /** Profile editor: a/d lists, s save — do not steal global letter jumps (d→dashboard, s→settings). */
+      const profileLetterDefer = new Set(['a', 'd', 's']);
       if (
         profileLetterDefer.has(input.toLowerCase()) &&
         activeScreen === 'profile' &&
         focusTarget === 'content' &&
         !state.inTextInput
+      ) {
+        return;
+      }
+
+      /** Contact browse: s save-all — do not steal s→settings. */
+      if (
+        activeScreen === 'contact' &&
+        focusTarget === 'content' &&
+        !state.inTextInput &&
+        (input === 's' || input === 'S')
       ) {
         return;
       }

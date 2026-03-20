@@ -8,7 +8,7 @@ The CLI mental model is **Import → Refine → (optional per-job Curate) → Ge
 - **Suggested next step** — Dashboard highlights one primary action from state; secondary actions via sidebar.
 - **First-run / blocked** — No API key → banner + path to Settings. No source → suggest Import. Avoid dead-end dashboards.
 
-**Discoverability:** `1–n` screen jumps (`n` = sidebar row count) + letter shortcuts for sidebar targets (exact map lives with `SCREEN_ORDER` in code). **`p` is not a global jump** (reserved for **Jobs** → prepare when that screen defers shortcuts). **Manual profile sections:** Refine → *Edit profile sections* (global refined); *(planned)* Curate → *Edit profile sections* (job-scoped store). Optional command palette (`:` or `/`).
+**Discoverability:** `1–n` screen jumps (`n` = sidebar row count) + letter shortcuts for sidebar targets (exact map lives with `SCREEN_ORDER` in `App.tsx`). Today: **`d i c j r g s`**. **`p` is not a global jump** (reserved for **Jobs** → prepare when that screen defers shortcuts). **Planned Curate row:** add **`u` → Curate** (see [`tui-open-questions.md`](./tui-open-questions.md)). **Manual profile sections:** Refine → *Edit profile sections* (global refined); *(planned)* Curate → *Edit profile sections* (job-scoped store). **Command palette** (`:` / `/`) is specified in architecture but **not implemented** yet; when added, it **MUST** take key precedence while open.
 
 **Contextual footer:** The bottom hint line reflects the **focused panel**’s current screen and step (lists, scroll panes, confirms, etc.). Inline “nav” dim lines under menus were removed so shortcuts are not duplicated in the body.
 

@@ -121,7 +121,7 @@ already-refined:
 
 **Components:** `SelectList`, `CheckboxList` (polish scope), `MultilineInput`, `DiffView`, `Spinner`, `ScrollView`, `ConfirmPrompt`, `ProfileEditorScreen` (nested).
 
-**Letter shortcut / sidebar index:** When implemented, add **Curate** as a **main sidebar row** (recommended order: after **Refine**, before **Generate**). Assign **`SCREEN_ORDER` index** and footer copy (`1–n`) in the same PR as the screen. **Renumbering:** Inserting a row **rebinds number keys** for every screen after the insertion point — document the new order in **footer hints** and release notes; users relearning `4 = Jobs` vs `5 = Jobs` is an explicit UX cost of the change.
+**Letter shortcut / sidebar index:** When implemented, add **Curate** as a **main sidebar row** (recommended order: after **Refine**, before **Generate**). **Letter jump: `u`** (see [`tui-open-questions.md`](./tui-open-questions.md)). Assign **`SCREEN_ORDER` index** and footer copy (`1–n`) in the same PR as the screen. **Renumbering:** Inserting a row **rebinds number keys** for every screen after the insertion point — document the new order in **footer hints** and release notes; users relearning `4 = Jobs` vs `5 = Jobs` is an explicit UX cost of the change.
 
 ### GenerateScreen
 
@@ -222,7 +222,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 - `skills` — CheckboxList of all skills; space to toggle; s to save
 - `education-list`, `certifications-list`, `projects-list` — similar pattern
 
-**Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, number keys, Esc to sidebar / return screen), if unsaved changes exist, a `<ConfirmPrompt>` overlays the current state: "Unsaved changes — save before leaving? (Enter=save / n=discard / Esc=stay)". This is the resolved policy (see [Open questions](./tui-open-questions.md) — question 3). Writes via `saveRefined()`, `saveSource()`, or *(planned)* `saveJobRefinedProfile` when the active target is job-scoped.
+**Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, number keys, Esc to sidebar / return screen), if unsaved changes exist, **`App`** shows `<ConfirmPrompt>` and **disables global `useInput`** until the user resolves it (see [Architecture — Modal vs global input](./tui-architecture.md#modal-vs-global-input-confirmprompt)). Writes via `saveRefined()`, `saveSource()`, or *(planned)* `saveJobRefinedProfile` when the active target is job-scoped. **Global `s`→Settings** is **deferred** on Profile content focus so **`s`** means save here.
 
 **No `$EDITOR`:** Profile editing is entirely inline. If a user wants to open the markdown in their editor, they do it via the CLI (`suited refine --edit`), not the TUI.
 
@@ -242,7 +242,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and writes `contact.json`. Does **not** call inquirer. Lives in `src/services/contact.ts`.
 
-**Save:** `s` or "Save all" button saves all fields at once. Enter on a field saves that field and advances focus. Do not rely on blur.
+**Save:** `s` saves all fields at once (browse mode). **`App`** defers global **`s`→Settings** on Contact content focus so **`s`** is not stolen. Enter on a field saves that field and advances focus. Do not rely on blur.
 
 **Components:** `TextInput`, `Spinner`, `StatusBadge`.
 
@@ -264,7 +264,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 - **Purpose:** Confirm the key is accepted by the selected provider before writing `.env`, without sending the user's resume or profile text.
 - **Anthropic:** Use a **minimal** official API call (e.g. list models or the smallest supported request). **MUST NOT** embed user profile content in the validation request.
 - **OpenRouter:** Same principle — document the exact endpoint in code comments; avoid high-token calls.
-- **Latency / failure:** If the probe fails (401/403, invalid key), **SHOULD** show a clear inline error and **SHOULD NOT** write the key unless the user explicitly confirms "Save anyway" (optional escape hatch — decide in [Open questions](./tui-open-questions.md)).
-- **Offline / timeout:** If the network is down, **SHOULD** distinguish "cannot reach API" from "key rejected"; **MAY** offer save-with-warning for offline development.
+- **Latency / failure:** If the probe fails (401/403, invalid key, timeout), show a clear inline status message and **do not** write `.env`. **No "Save anyway"** in the current TUI — avoids persisting keys that failed validation. (Optional offline-only escape hatch remains a future explicit product choice.)
+- **Offline / timeout:** Distinguish "cannot reach API" vs "key rejected" in copy where feasible; still **block write** until probe succeeds (today).
 
-**Components:** `TextInput` (masked mode for key), `SelectList`, `ConfirmPrompt` (for overwriting `.env`), `Spinner`, `StatusBadge`.
+**Components:** `TextInput` (masked mode for key), `SelectList`, `Spinner`, status lines (no confirm overlay for save today).

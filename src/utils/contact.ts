@@ -10,6 +10,16 @@ import {
 import { c } from './colors.ts';
 import { fileExists } from './fs.ts';
 
+/** Same fields as `ensureContactDetails` prompts for (human-readable labels). */
+export function missingContactDetailPromptLabels(profile: Profile): string[] {
+  const missing: string[] = [];
+  if (!profile.contact.headline) missing.push('job title');
+  if (!profile.contact.email) missing.push('email');
+  if (!profile.contact.phone) missing.push('phone');
+  if (!profile.contact.linkedin) missing.push('LinkedIn URL');
+  return missing;
+}
+
 /**
  * Prompts for any missing contact fields (headline, email, phone, LinkedIn),
  * saves them to the active profile and to contact.json for future imports.
@@ -21,11 +31,7 @@ export async function ensureContactDetails(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   inquirer: any,
 ): Promise<Profile> {
-  const missing: string[] = [];
-  if (!profile.contact.headline) missing.push('job title');
-  if (!profile.contact.email) missing.push('email');
-  if (!profile.contact.phone) missing.push('phone');
-  if (!profile.contact.linkedin) missing.push('LinkedIn URL');
+  const missing = missingContactDetailPromptLabels(profile);
   if (missing.length === 0) return profile;
 
   console.log(`\n${c.warn} ${c.warning(`Missing contact info: ${missing.join(', ')}`)}`);

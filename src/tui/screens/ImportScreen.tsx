@@ -2,6 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearLinkedInSession } from '../../ingestion/linkedin-scraper.ts';
 import { importProfileFromInput } from '../../services/importProfile.ts';
+import { missingContactDetailPromptLabels } from '../../utils/contact.ts';
 import { MultilineInput, SelectList, Spinner, TextInput } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
@@ -29,6 +30,7 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
   const [detectedKind, setDetectedKind] = useState<string | null>(null);
   const [apiFailureStreak, setApiFailureStreak] = useState(0);
   const [errMenuIdx, setErrMenuIdx] = useState(0);
+  const [doneContactGap, setDoneContactGap] = useState<string | null>(null);
   const lastRawInputRef = useRef('');
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
       }
       lastRawInputRef.current = raw;
       setErr(null);
+      setDoneContactGap(null);
       setPhase('running');
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
       const ac = createController();
@@ -66,6 +69,8 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
           `${profile.education.length} education`,
         ].join(' · ');
         setSummary(`${profile.contact.name.value} — ${stats}`);
+        const gaps = missingContactDetailPromptLabels(profile);
+        setDoneContactGap(gaps.length > 0 ? gaps.join(', ') : null);
         setApiFailureStreak(0);
         setPhase('done');
       } catch (e) {
@@ -172,8 +177,16 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
         </Box>
       )}
       {phase === 'done' && (
-        <Box marginTop={1}>
+        <Box marginTop={1} flexDirection="column">
           <Text color="green">Saved source profile and markdown under {profileDir}</Text>
+          {doneContactGap != null && (
+            <Box marginTop={1}>
+              <Text color="yellow">
+                Missing contact: {doneContactGap}. Open Contact (c from Dashboard, or sidebar) to add
+                these — same fields the CLI prompts after import.
+              </Text>
+            </Box>
+          )}
         </Box>
       )}
       <Box marginTop={1} flexDirection="column">

@@ -7,9 +7,9 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 ### Infrastructure / cross-cutting
 
 - [x] **`callWithToolStreaming`** — Anthropic: real `messages.stream()`; yields `text` / `tool_start` / `tool_end` / `done`; optional `AbortSignal`. OpenRouter: still delegates to `callWithTool` (single `done`) until a streaming tool path exists.
-- [ ] **`useAsyncOp` + `AbortSignal`** — **`useOperationAbort`** (`src/tui/hooks/useOperationAbort.ts`) + `operationCancelSeq` tie Esc to local `AbortController`s on **Refine** (Q&A / apply), **Import** (scrape + Claude parse), **Generate** (`runTuiGeneratePdf` checks signal between major steps). Shared **`useAsyncOp`** state machine hook from [architecture](./tui-architecture.md) is still optional / future. Still open: Jobs prepare LLM, Profile long saves, mid–single-call cancel inside Claude requests beyond existing client `signal`.
-- [ ] **Retry limit** — **Refine**, **Import**, **Generate**: after **3** consecutive failures, error UI offers **Check Settings**. Still open: Jobs, Profile, global policy.
-- [ ] **Errors** — **Refine**, **Import**, **Generate**: mapped message + **Retry** / **Back** (or dismiss) / optional **Settings**. Still open: Jobs, Profile, Contact edge cases.
+- [ ] **`useAsyncOp` + `AbortSignal`** — **`useOperationAbort`** + `operationCancelSeq` on **Refine**, **Import**, **Generate** — **done** for those flows. Shared **`useAsyncOp`** hook from [architecture](./tui-architecture.md) remains optional. Still open: Jobs prepare LLM, Profile long saves, mid–single-call cancel inside long single Claude requests beyond existing client `signal`.
+- [ ] **Retry limit** — **Refine**, **Import**, **Generate**: **Check Settings** after **3** failures — **done**. Still open: Jobs, Profile, global policy.
+- [ ] **Errors** — **Refine**, **Import**, **Generate**: mapped message + recovery — **done** for primary async paths. Still open: Jobs, Profile polish, Contact edge cases.
 
 ### Refine
 
@@ -84,8 +84,8 @@ Add to Phase B:
 - [ ] **Refine** — full parity with [RefineScreen](./tui-screens.md#refinescreen) (see backlog).
 - [ ] **Generate** — full pipeline (see backlog).
 - [x] **`isMdNewerThanJson`** — done in Refine (see backlog for other Refine gaps).
-- [ ] **Retry limit** (see backlog; Refine / Import / Generate have “Check Settings” after 3 failures).
-- [ ] Errors always show mapped message + Retry/Edit/Back; no frozen UI. *(Refine / Import / Generate covered for primary async paths.)*
+- [ ] **Retry limit** — extend “Check Settings after 3” to Jobs / Profile / global policy (Refine / Import / Generate done).
+- [ ] Errors always show mapped message + Retry/Edit/Back; no frozen UI. *(Refine / Import / Generate primary paths done.)*
 - [ ] Validate and improve surfaced via Dashboard (health score, validation status). No standalone screens needed.
 
 ---

@@ -41,7 +41,7 @@ For tailored output, the pipeline builds a **reference map** of profile items wi
 
 Today, the default experience is the **inquirer-based dashboard** (`dashboard.ts`).
 
-A **full-screen TUI** (Ink/React) is **specified** in [`specs/tui/README.md`](../specs/tui/README.md) (split docs under `specs/tui/`) as a future replacement for the interactive layer only — **core logic stays** in `generate/`, `profile/`, `claude/`, and `ingestion/`. Until that ships, all behavior above applies to both paths.
+A **full-screen TUI** (Ink/React) is **specified** in [`specs/tui-README.md`](../specs/tui-README.md) (split docs: `specs/tui-*.md`) as a future replacement for the interactive layer only — **core logic stays** in `generate/`, `profile/`, `claude/`, and `ingestion/`. Until that ships, all behavior above applies to both paths.
 
 ## Build artifacts
 

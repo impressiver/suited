@@ -17,4 +17,4 @@ Estimated new code: **6,000–9,000** lines (service extraction + full state mac
 
 ## Note on Phase A
 
-A **navigation shell** with subprocess delegation is **much smaller** than the full table above; treat [Phased delivery](./phased-delivery.md) as the scope gate for each milestone.
+A **navigation shell** with subprocess delegation is **much smaller** than the full table above; treat [Phased delivery](./tui-phased-delivery.md) as the scope gate for each milestone.

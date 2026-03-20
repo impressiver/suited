@@ -2,7 +2,7 @@
 
 ## Goals
 
-- **Zero breakout (Phase C)** — After the TUI launches, the user never sees a raw Inquirer prompt, chalk banner, or bare `console.log` output from command drivers. Every interaction stays in the Ink render tree. *(Phase A may temporarily delegate; see [Phased delivery](./phased-delivery.md).)*
+- **Zero breakout (Phase C)** — After the TUI launches, the user never sees a raw Inquirer prompt, chalk banner, or bare `console.log` output from command drivers. Every interaction stays in the Ink render tree. *(Phase A may temporarily delegate; see [Phased delivery](./tui-phased-delivery.md).)*
 - **Complete coverage (Phase C)** — Every flow reachable via subcommands is reachable inside the TUI with equivalent outcomes.
 - **Keyboard-first** — Every flow completable without a mouse; keys behave predictably per mode (navigation vs text vs async).
 - **Pipeline legible** — User always sees where they are in Import → Refine → Generate.

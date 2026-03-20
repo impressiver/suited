@@ -6,7 +6,7 @@
 - **TypeScript** ESM, `jsx: react-jsx`.
 - **ink-text-input** (or equivalent) for focused text fields.
 
-**Invariant (Phase C):** The TUI is a UI shell over **`src/services/`** and domain modules. See [Phased delivery](./phased-delivery.md) for Phase A allowances.
+**Invariant (Phase C):** The TUI is a UI shell over **`src/services/`** and domain modules. See [Phased delivery](./tui-phased-delivery.md) for Phase A allowances.
 
 ---
 
@@ -64,7 +64,7 @@ src/
 
 | File | Change |
 |------|--------|
-| `src/index.ts` | Default action invokes `runFlow()` (TTY vs non-TTY); keep in sync with [README](./README.md#canonical-non-tty-behavior-single-source-of-truth) |
+| `src/index.ts` | Default action invokes `runFlow()` (TTY vs non-TTY); keep in sync with [README](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth) |
 | `src/commands/flow.ts` | **`runTui()`** dynamic import when interactive; **one-line stderr + exit** when not (canonical behavior) |
 | `src/claude/client.ts` | `callWithToolStreaming()` export alongside `callWithTool` |
 | `src/commands/refine.ts` | Refactor to `src/services/refine.ts` |

@@ -1,6 +1,6 @@
 # Terminal & environment
 
-Canonical non-TTY behavior is defined in [README](./README.md#canonical-non-tty-behavior-single-source-of-truth).
+Canonical non-TTY behavior is defined in [README](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth).
 
 - **TTY gate:** `runTui()` only when both `stdin.isTTY` and `stdout.isTTY`. When not interactive, **do not** block on input; follow the README’s stderr + exit-code rules (implementation: `src/commands/flow.ts`).
 - **Size:** Full sidebar + content layout at ≥80×24. Below 80 columns: Jobs and similar two-panel screens switch to stacked layout. Below 24 rows: shorten Header/Footer to one-liners.

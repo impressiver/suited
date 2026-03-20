@@ -45,7 +45,7 @@ Start simple. Cross-screen state growth is an implementation detail.
 | `Ctrl+C` | Hard exit (always works; documented in footer when relevant) |
 | `Ctrl+D` | Submit MultilineInput (the "done" key for multi-line fields) |
 
-**Precedence:** See [README — Key handling precedence](./README.md#key-handling-precedence).
+**Precedence:** See [README — Key handling precedence](./tui-README.md#key-handling-precedence).
 
 ---
 
@@ -101,7 +101,7 @@ export async function* callWithToolStreaming<T>(
 
 `useStreaming` hook accumulates text + tool events. `AbortSignal` from the screen so Esc can cancel.
 
-**Buffer:** See [README — Streaming buffer](./README.md#streaming-buffer-should).
+**Buffer:** See [README — Streaming buffer](./tui-README.md#streaming-buffer-should).
 
 ---
 

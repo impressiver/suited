@@ -6,13 +6,13 @@
 - **No subprocess** for core flows: Import, Refine, Generate, Jobs, Profile, Contact run via **`src/services/`** + domain modules, not `spawn(suited …)`.
 - **Complete coverage:** Every flow available via subcommands is available in the TUI with equivalent outcomes.
 
-See [Goals & constraints](./goals-and-constraints.md) and [Screen details](./screens.md).
+See [Goals & constraints](./tui-goals-and-constraints.md) and [Screen details](./tui-screens.md).
 
 ---
 
 ## Phase B — services + real screens
 
-- Extract logic from `src/commands/*.ts` into **`src/services/`** (see [Goals & constraints](./goals-and-constraints.md)).
+- Extract logic from `src/commands/*.ts` into **`src/services/`** (see [Goals & constraints](./tui-goals-and-constraints.md)).
 - CLI commands **refactor** to call services; behavior preserved (tests / scripted QA).
 - TUI screens call services and shared components (SelectList, DiffView, etc.).
 - `callWithToolStreaming` fully wired with `tool_start` / `tool_end` for stable UI.
@@ -37,6 +37,6 @@ See [Goals & constraints](./goals-and-constraints.md) and [Screen details](./scr
 
 ## How to read the rest of the spec
 
-- **[Definition of done](./definition-of-done.md)** splits **MVP (Phase A/B)** from **full vision (Phase C)**.
-- **[Architecture](./architecture.md)** describes the target; Phase A may omit `store` complexity until needed.
-- **[UI mockups](./ui-mockups.md)** show the **target** UI; Phase A may simplify visually but should not contradict [Terminal](./terminal.md) or non-TTY rules.
+- **[Definition of done](./tui-definition-of-done.md)** splits **MVP (Phase A/B)** from **full vision (Phase C)**.
+- **[Architecture](./tui-architecture.md)** describes the target; Phase A may omit `store` complexity until needed.
+- **[UI mockups](./tui-ui-mockups.md)** show the **target** UI; Phase A may simplify visually but should not contradict [Terminal](./tui-terminal.md) or non-TTY rules.

@@ -1,6 +1,6 @@
 # State machines (Mermaid)
 
-High-level diagrams for the two largest flows. **Screen details** in [screens.md](./screens.md) are authoritative for edge cases.
+High-level diagrams for the two largest flows. **Screen details** in [screens.md](./tui-screens.md) are authoritative for edge cases.
 
 ## RefineScreen (not refined — happy path)
 
@@ -62,4 +62,4 @@ stateDiagram-v2
   error --> [*]
 ```
 
-*(Step names are illustrative; exact states match [screens.md](./screens.md#generatescreen).)*
+*(Step names are illustrative; exact states match [screens.md](./tui-screens.md#generatescreen).)*

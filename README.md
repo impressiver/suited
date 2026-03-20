@@ -96,7 +96,7 @@ Use **`refine`** when you are moving from raw import to a refined profile. Use *
 
 ### Interactive UI (dashboard vs TUI)
 
-With no subcommand, suited runs an **interactive dashboard** (terminal menus). A **full-screen TUI** is [specified under `specs/tui/`](specs/tui/README.md) as a future replacement for that layer; core pipeline behavior is the same. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit together.
+With no subcommand, suited runs an **interactive dashboard** (terminal menus). A **full-screen TUI** is [specified in `specs/`](specs/tui-README.md) (files `tui-*.md`) as a future replacement for that layer; core pipeline behavior is the same. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit together.
 
 ### Import options
 

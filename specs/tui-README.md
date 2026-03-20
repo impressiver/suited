@@ -4,7 +4,7 @@ These documents are the **product + engineering contract** for the full-screen I
 
 **Bookmark:** [`specs/tui.md`](./tui.md) remains a one-line pointer to this README.
 
-**Related:** [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+**Related:** [`specs/project.md`](./project.md) (whole product), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
 
 ---
 

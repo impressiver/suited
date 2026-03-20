@@ -2,6 +2,8 @@
 
 suited is a **Node.js CLI** (`commander`) that orchestrates **profile data**, **LLM calls**, **optional browser automation** (LinkedIn import), and **PDF export**.
 
+For **product scope, pipeline stages, and accuracy invariants**, see [`specs/project.md`](../specs/project.md).
+
 ## Entry and commands
 
 | Layer | Role |

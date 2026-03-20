@@ -213,7 +213,7 @@ pnpm build:bundle     # Build esbuild CJS bundle (for testing)
 pnpm build:binary     # Build SEA binary for current platform → dist-bin/
 ```
 
-Contributing notes: [`CONTRIBUTING.md`](CONTRIBUTING.md). Module layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Security: [`SECURITY.md`](SECURITY.md).
+Contributing notes: [`CONTRIBUTING.md`](CONTRIBUTING.md). Module layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Project specification: [`specs/project.md`](specs/project.md) ([`specs/README.md`](specs/README.md)). Security: [`SECURITY.md`](SECURITY.md).
 
 ## License
 

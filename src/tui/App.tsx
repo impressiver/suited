@@ -53,6 +53,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (activeScreen === 'contact' && focusTarget === 'content') {
       return 'Contact · ↑↓ Tab field · Enter edit · s save all · Esc sidebar (from browse)';
     }
+    if (activeScreen === 'jobs' && focusTarget === 'content') {
+      return 'Jobs · a add · d delete · p prepare · g generate · Esc back · Tab sidebar';
+    }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
   }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);
 
@@ -60,11 +63,11 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (focusTarget !== 'content') {
       return null;
     }
-    return 'Tab or Esc → return to sidebar · On Dashboard/Contact, ↑↓ may move lists or fields instead of changing screen';
+    return 'Tab or Esc → return to sidebar · On Dashboard/Contact/Jobs, ↑↓ may move lists instead of changing screen';
   }, [focusTarget]);
 
   const screenUsesContentArrows = (screen: ScreenId): boolean =>
-    screen === 'dashboard' || screen === 'contact';
+    screen === 'dashboard' || screen === 'contact' || screen === 'jobs';
 
   useInput(
     (input, key) => {
@@ -91,6 +94,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
       }
 
       if (key.escape) {
+        if (focusTarget === 'content' && activeScreen === 'jobs') {
+          return;
+        }
         if (focusTarget === 'content') {
           dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
         }
@@ -135,6 +141,16 @@ export function App({ profileDir, flowOptions }: AppProps) {
         if (next && next !== activeScreen) {
           dispatch({ type: 'SET_SCREEN', screen: next });
         }
+        return;
+      }
+
+      const jobsDeferred = new Set(['a', 'd', 'g', 'p']);
+      if (
+        jobsDeferred.has(input.toLowerCase()) &&
+        state.deferLetterShortcutsFor === 'jobs' &&
+        activeScreen === 'jobs' &&
+        focusTarget === 'content'
+      ) {
         return;
       }
 

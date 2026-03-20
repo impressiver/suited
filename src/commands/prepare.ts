@@ -5,16 +5,11 @@ import {
   evaluateForJob,
   printJobEvaluation,
 } from '../generate/consultant.ts';
-import { buildRefMapForProfile, type CuratorResult, curateForJob } from '../generate/curator.ts';
-import { analyzeJobDescription } from '../generate/job-analyzer.ts';
+import { buildRefMapForProfile } from '../generate/curator.ts';
 import { assembleResumeDocument, getFlairInfo } from '../generate/resume-builder.ts';
-import type { CurationPlan, JobRefinement, Profile, ResumeDocument } from '../profile/schema.ts';
-import {
-  loadActiveProfile,
-  loadJobRefinement,
-  loadJobs,
-  saveJobRefinement,
-} from '../profile/serializer.ts';
+import type { CurationPlan, Profile, ResumeDocument } from '../profile/schema.ts';
+import { loadActiveProfile, loadJobRefinement, loadJobs } from '../profile/serializer.ts';
+import { runJobRefinementPipeline } from '../services/jobRefinement.ts';
 import { c } from '../utils/colors.ts';
 import { createSpinner } from '../utils/spinner.ts';
 import { isUserExit } from '../utils/user-exit.ts';
@@ -104,64 +99,6 @@ function printCurationPreview(
 }
 
 // ---------------------------------------------------------------------------
-// Run curation for a job
-// ---------------------------------------------------------------------------
-
-async function runCuration(
-  profile: Profile,
-  job: { id: string; company: string; title: string; text: string },
-  existingRefinement: JobRefinement | null,
-  profileDir: string,
-): Promise<JobRefinement> {
-  // Step 1: analyze JD if we don't have an analysis
-  let jobAnalysis = existingRefinement?.jobAnalysis ?? null;
-
-  if (!jobAnalysis) {
-    const analyzeSpinner = createSpinner('Analyzing job description...');
-    try {
-      jobAnalysis = await analyzeJobDescription(job.text);
-      analyzeSpinner.succeed(
-        `${c.ok} Job analyzed: ${jobAnalysis.industry}, ${jobAnalysis.seniority}`,
-      );
-    } catch (err) {
-      analyzeSpinner.stop();
-      console.log(c.muted(`  Could not analyze JD: ${(err as Error).message}. Using defaults.`));
-      jobAnalysis = {
-        company: job.company,
-        title: job.title,
-        industry: 'general',
-        seniority: 'mid',
-        keySkills: [],
-        mustHaves: [],
-        niceToHaves: [],
-        summary: job.text.slice(0, 200),
-      };
-    }
-  }
-
-  // Step 2: curate
-  const curateSpinner = createSpinner('Curating profile for this role...');
-  let curatorResult: CuratorResult;
-  try {
-    curatorResult = await curateForJob(profile, jobAnalysis);
-    curateSpinner.succeed(`${c.ok} Curation complete.`);
-  } catch (err) {
-    curateSpinner.stop();
-    throw new Error(`Curation failed: ${(err as Error).message}`);
-  }
-
-  const newRefinement: JobRefinement = {
-    jobId: job.id,
-    createdAt: new Date().toISOString(),
-    jobAnalysis,
-    plan: curatorResult.plan,
-  };
-
-  await saveJobRefinement(newRefinement, profileDir);
-  return newRefinement;
-}
-
-// ---------------------------------------------------------------------------
 // Main command
 // ---------------------------------------------------------------------------
 
@@ -228,7 +165,7 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
       // Auto-run curation
       console.log(`\nPreparing for ${c.value(`${job.title} @ ${job.company}`)}...`);
       try {
-        refinement = await runCuration(profile, job, null, profileDir);
+        refinement = await runJobRefinementPipeline(profileDir, job, null);
         statusEntry.refinement = refinement;
       } catch (err) {
         console.error(`\n${c.fail} ${c.error((err as Error).message)}`);
@@ -273,7 +210,7 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
       if (action === 'recurate') {
         console.log(`\nRe-curating for ${c.value(`${job.title} @ ${job.company}`)}...`);
         try {
-          refinement = await runCuration(profile, job, refinement, profileDir);
+          refinement = await runJobRefinementPipeline(profileDir, job, refinement);
           statusEntry.refinement = refinement;
         } catch (err) {
           console.error(`\n${c.fail} ${c.error((err as Error).message)}`);

@@ -30,7 +30,7 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import (inline via `importProfileFromInput`), Contact (`mergeContactMeta`), and Jobs (read-only list) are functional in-tree. Refine, Generate, and Profile show inline stubs per Phase A. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import, Contact, and **Jobs** (list, add, delete, view JD, prepare via `runJobRefinementPipeline`, generate hand-off via `pendingJobId`) are functional in-tree. Refine, Generate (beyond stub + pending job id), and Profile remain stubs. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 ---
 

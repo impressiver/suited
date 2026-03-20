@@ -25,4 +25,12 @@ describe('appReducer', () => {
     const s = appReducer(base, { type: 'SET_PENDING_JOB', jobId: 'job-1' });
     expect(s.pendingJobId).toBe('job-1');
   });
+
+  it('defers letter shortcuts for a screen', () => {
+    const s = appReducer(base, {
+      type: 'SET_DEFER_LETTER_SHORTCUTS',
+      screen: 'jobs',
+    });
+    expect(s.deferLetterShortcutsFor).toBe('jobs');
+  });
 });

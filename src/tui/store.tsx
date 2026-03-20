@@ -20,6 +20,10 @@ export interface AppState {
   operationInProgress: boolean;
   lastError: string | null;
   pendingJobId: string | null;
+  /**
+   * When set to the active screen, App defers `a`/`d`/`g`/`p` to that screen (Jobs per tui-screens.md).
+   */
+  deferLetterShortcutsFor: ScreenId | null;
 }
 
 export type AppAction =
@@ -32,6 +36,7 @@ export type AppAction =
   | { type: 'SET_OPERATION_IN_PROGRESS'; value: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_PENDING_JOB'; jobId: string | null }
+  | { type: 'SET_DEFER_LETTER_SHORTCUTS'; screen: ScreenId | null }
   /** Clears async lock (Esc during `operationInProgress`); extend later for AbortSignal. */
   | { type: 'CANCEL_OPERATION' };
 
@@ -46,6 +51,7 @@ export function createInitialAppState(profileDir: string): AppState {
     operationInProgress: false,
     lastError: null,
     pendingJobId: null,
+    deferLetterShortcutsFor: null,
   };
 }
 
@@ -67,6 +73,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, lastError: action.error };
     case 'SET_PENDING_JOB':
       return { ...state, pendingJobId: action.jobId };
+    case 'SET_DEFER_LETTER_SHORTCUTS':
+      return { ...state, deferLetterShortcutsFor: action.screen };
     case 'CANCEL_OPERATION':
       return { ...state, operationInProgress: false };
   }

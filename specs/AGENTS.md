@@ -103,7 +103,8 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | **Done** (2026-03-19) |
 | **4** | **T2 — Dashboard + Settings** (variants, health, quick actions; API key probe + `.env`) | **Done** (2026-03-19) |
 | **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Refine/Generate/Profile stubs) | **Done** (2026-03-19) |
-| **6+** | Jobs CRUD, full Refine/Generate/Profile screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §8–15 |
+| **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
+| **7+** | Full Generate/Refine/Profile screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §9–15 |
 
 ### Phase 1 — completed work
 
@@ -152,6 +153,13 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/components/Layout.tsx`** — main row `flexGrow={1}` for usable height.
 - **Removed** — `DelegateScreen.tsx`, `cliArgs.ts`, **`TuiExitBag`**.
 
-### What’s next (Phase 6 preview)
+### Phase 6 — completed work
 
-- **T2 / implementation order §8+** — Jobs CRUD, full Refine/Generate/Profile per [`tui-screens.md`](./tui-screens.md); L1 streaming where applicable.
+- **`src/services/jobRefinement.ts`** — `runJobRefinementPipeline()` (analyze + curate + `saveJobRefinement`); **`commands/prepare.ts`** delegates curation to it (CLI spinners removed for that path; behavior preserved).
+- **`src/tui/store.tsx`** — `deferLetterShortcutsFor` + `SET_DEFER_LETTER_SHORTCUTS` so Jobs can own **a / d / g / p** without colliding with global **`p`→profile** / **`g`→generate**.
+- **`src/tui/App.tsx`** — Jobs content: defer those letters; **Esc** chain owned by Jobs (not forced to sidebar); **↑↓** screen-cycle suppressed on Jobs like Dashboard.
+- **`src/tui/screens/JobsScreen.tsx`** — Full Phase-A jobs flow per [`tui-screens.md`](./tui-screens.md) (minus prepare streaming UI and two-panel layout polish).
+
+### What’s next (Phase 7 preview)
+
+- **Generate / Refine / Profile** — full screens per [`tui-screens.md`](./tui-screens.md); L1 streaming; optional CI forbidden-import gates.

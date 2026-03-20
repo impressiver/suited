@@ -13,14 +13,15 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 
 ### Refine
 
-- [ ] **`isMdNewerThanJson`** on mount — banner + `ConfirmPrompt` → `markdownToProfile()` + `saveRefined()` when user confirms (see [screens](./tui-screens.md#refinescreen)).
+- [x] **`isMdNewerThanJson`** on mount — banner + `ConfirmPrompt` → `markdownToProfile()` + `saveRefined()` when user confirms (see [screens](./tui-screens.md#refinescreen); implemented in `RefineScreen`).
 - [ ] **Already-refined sub-menu (full)** — today: new Q&A pass + “stay”. Still missing per spec: consultant review, polish (+ section/position pickers), direct edit (`MultilineInput` → `applyDirectEdit`), prepare for saved job (job picker + curation), streaming panes where applicable.
 - [ ] **Diff review** — spec: accept / **edit-inline** / discard; current UI is accept / discard.
 
 ### Profile editor
 
 - [ ] **Sections** — Education, Certifications, Projects, Skills (`CheckboxList` / patterns in spec); **not** only Summary + Experience.
-- [ ] **Bullets** — reorder (`↑↓`), add, delete in TUI (spec [ProfileEditorScreen](./tui-screens.md#profileeditorscreen)).
+- [ ] **Bullets** — reorder (`↑↓`) within the bullet list (spec [ProfileEditorScreen](./tui-screens.md#profileeditorscreen)).
+- [x] **Bullets** — add (`a`) and delete (`d`, `ConfirmPrompt`) on the experience bullet list; `App` defers `a`/`d` so `d` does not jump to Dashboard.
 - [ ] **Navigate-away confirm** — when dirty, intercept sidebar / `1–8` / screen-cycle (not only in-screen Esc stack); policy in [open questions](./tui-open-questions.md).
 
 ### Generate
@@ -80,7 +81,7 @@ Add to Phase B:
 - [ ] **Profile editor:** full parity with [ProfileEditorScreen](./tui-screens.md#profileeditorscreen) (see backlog).
 - [ ] **Refine** — full parity with [RefineScreen](./tui-screens.md#refinescreen) (see backlog).
 - [ ] **Generate** — full pipeline (see backlog).
-- [ ] **`isMdNewerThanJson`** (see backlog).
+- [x] **`isMdNewerThanJson`** — done in Refine (see backlog for other Refine gaps).
 - [ ] **Retry limit** (see backlog).
 - [ ] Errors always show mapped message + Retry/Edit/Back; no frozen UI.
 - [ ] Validate and improve surfaced via Dashboard (health score, validation status). No standalone screens needed.

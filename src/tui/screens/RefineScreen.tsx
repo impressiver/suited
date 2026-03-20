@@ -1,9 +1,11 @@
 import { Box, Text } from 'ink';
 import { useCallback, useEffect, useState } from 'react';
-import { profileToMarkdown } from '../../profile/markdown.ts';
+import { markdownToProfile, profileToMarkdown } from '../../profile/markdown.ts';
 import type { Profile, RefinementQuestion, RefinementSession } from '../../profile/schema.ts';
 import {
   hashSource,
+  isMdNewerThanJson,
+  loadRefined,
   loadSource,
   refinedJsonPath,
   refinedMdPath,
@@ -27,7 +29,8 @@ import { useAppDispatch, useAppState } from '../store.tsx';
 type Phase =
   | { k: 'loading' }
   | { k: 'no-source'; msg: string }
-  | { k: 'has-refined-menu' }
+  | { k: 'has-refined-menu'; syncPrompt: boolean }
+  | { k: 'syncing-md' }
   | { k: 'gen-questions' }
   | { k: 'qa'; questions: RefinementQuestion[]; index: number }
   | { k: 'apply' }
@@ -78,6 +81,21 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     [dispatch, profileDir],
   );
 
+  const syncRefinedFromMarkdown = useCallback(async () => {
+    setPhase({ k: 'syncing-md' });
+    dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+    try {
+      const existing = await loadRefined(profileDir);
+      const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      setPhase({ k: 'has-refined-menu', syncPrompt: false });
+    } catch (e) {
+      setPhase({ k: 'err', msg: (e as Error).message });
+    } finally {
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+    }
+  }, [dispatch, profileDir]);
+
   const beginQaFlow = useCallback(async () => {
     if (!source) {
       return;
@@ -118,7 +136,11 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         setSource(src);
         const refined = await fileExists(refinedJsonPath(profileDir));
         if (refined) {
-          setPhase({ k: 'has-refined-menu' });
+          const mdNewer = await isMdNewerThanJson(
+            refinedMdPath(profileDir),
+            refinedJsonPath(profileDir),
+          );
+          setPhase({ k: 'has-refined-menu', syncPrompt: mdNewer });
         } else {
           setAutoStartQa(true);
         }
@@ -180,6 +202,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       { value: 'start', label: 'Run Q&A from source (new refinement pass)' },
       { value: 'cancel', label: 'Stay — use sidebar to navigate away' },
     ];
+    const syncPrompt = phase.syncPrompt;
     return (
       <Box flexDirection="column">
         <Text bold>Refine</Text>
@@ -187,12 +210,37 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           You already have refined data. A new pass uses source.json and replaces refined.json after
           you accept the diff.
         </Text>
+        {syncPrompt && (
+          <Box
+            marginTop={1}
+            flexDirection="column"
+            borderStyle="round"
+            borderColor="yellow"
+            paddingX={1}
+          >
+            <Text color="yellow">
+              refined.md is newer than refined.json (edited outside the TUI).
+            </Text>
+            <Box marginTop={1}>
+              <ConfirmPrompt
+                message="Reload refined.json from the edited markdown?"
+                active={active && syncPrompt}
+                onConfirm={() => {
+                  void syncRefinedFromMarkdown();
+                }}
+                onCancel={() => {
+                  setPhase({ k: 'has-refined-menu', syncPrompt: false });
+                }}
+              />
+            </Box>
+          </Box>
+        )}
         <Box marginTop={1}>
           <SelectList
             items={items}
             selectedIndex={menuIdx}
             onChange={(i) => setMenuIdx(i)}
-            isActive={active}
+            isActive={active && !syncPrompt}
             onSubmit={(item) => {
               if (item.value === 'start') {
                 void beginQaFlow();
@@ -200,6 +248,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
             }}
           />
         </Box>
+      </Box>
+    );
+  }
+
+  if (phase.k === 'syncing-md') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Refine</Text>
+        <Spinner label="Syncing refined.json from refined.md…" />
       </Box>
     );
   }

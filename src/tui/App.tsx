@@ -63,7 +63,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
       return 'Refine · ↑↓ menu · Enter · Q&A Enter submit · y/n on diff · Tab sidebar';
     }
     if (activeScreen === 'profile' && focusTarget === 'content') {
-      return 'Profile · ↑↓ · Enter · Esc back · s save · Tab sidebar';
+      return 'Profile · ↑↓ · Enter · Esc · s save · a/d on bullet list · Tab sidebar';
     }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
   }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);
@@ -164,6 +164,17 @@ export function App({ profileDir, flowOptions }: AppProps) {
         state.deferLetterShortcutsFor === 'jobs' &&
         activeScreen === 'jobs' &&
         focusTarget === 'content'
+      ) {
+        return;
+      }
+
+      /** Profile editor uses a/d on positions/bullets; do not steal `d`→dashboard. */
+      const profileLetterDefer = new Set(['a', 'd']);
+      if (
+        profileLetterDefer.has(input.toLowerCase()) &&
+        activeScreen === 'profile' &&
+        focusTarget === 'content' &&
+        !state.inTextInput
       ) {
         return;
       }

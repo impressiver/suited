@@ -13,7 +13,7 @@ import {
   sourceMdPath,
 } from '../../profile/serializer.ts';
 import { fileExists } from '../../utils/fs.ts';
-import { InlineEditor, SelectList, Spinner } from '../components/shared/index.ts';
+import { ConfirmPrompt, InlineEditor, SelectList, Spinner } from '../components/shared/index.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 function cloneProfile(p: Profile): Profile {
@@ -70,6 +70,10 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
   const [unsaved, setUnsaved] = useState<UnsavedAction | null>(null);
+  const [bulletDeletePrompt, setBulletDeletePrompt] = useState<{
+    posIdx: number;
+    bulletIdx: number;
+  } | null>(null);
   const top = stack.at(-1);
 
   useEffect(() => {
@@ -166,6 +170,9 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       if (!active || phase !== 'ready' || unsaved || !profile) {
         return;
       }
+      if (bulletDeletePrompt) {
+        return;
+      }
       if (editingSummary && key.escape) {
         setEditingSummary(false);
         setSummaryDraft(profile?.summary?.value ?? '');
@@ -183,6 +190,35 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       }
       if (inTextInput) {
         return;
+      }
+      if (top?.k === 'bullets') {
+        if (input === 'a' || input === 'A') {
+          let newIdx = 0;
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const np = next.positions[top.posIdx];
+            if (!np) {
+              return p;
+            }
+            np.bullets.push(userEdit(''));
+            newIdx = np.bullets.length - 1;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(newIdx);
+          return;
+        }
+        if (input === 'd' || input === 'D') {
+          const pos = profile.positions[top.posIdx];
+          if (pos && pos.bullets.length > 0) {
+            const bi = Math.min(menuIdx, pos.bullets.length - 1);
+            setBulletDeletePrompt({ posIdx: top.posIdx, bulletIdx: bi });
+          }
+          return;
+        }
       }
       if (input === 's' || input === 'S') {
         void save();
@@ -405,14 +441,55 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         }));
         return (
           <Box marginTop={1} flexDirection="column">
+            <Text dimColor>a add · d delete selected · Enter edit</Text>
+            {bulletDeletePrompt && (
+              <Box marginTop={1}>
+                <ConfirmPrompt
+                  message="Delete this bullet?"
+                  active={active && bulletDeletePrompt !== null}
+                  onConfirm={() => {
+                    const ctx = bulletDeletePrompt;
+                    setBulletDeletePrompt(null);
+                    if (!ctx) {
+                      return;
+                    }
+                    setProfile((p) => {
+                      if (!p) {
+                        return p;
+                      }
+                      const next = cloneProfile(p);
+                      const np = next.positions[ctx.posIdx];
+                      if (!np || ctx.bulletIdx < 0 || ctx.bulletIdx >= np.bullets.length) {
+                        return p;
+                      }
+                      np.bullets.splice(ctx.bulletIdx, 1);
+                      return next;
+                    });
+                    setDirty(true);
+                    setMenuIdx((i) => {
+                      if (i > ctx.bulletIdx) {
+                        return i - 1;
+                      }
+                      if (i === ctx.bulletIdx) {
+                        return Math.max(0, ctx.bulletIdx - 1);
+                      }
+                      return i;
+                    });
+                  }}
+                  onCancel={() => {
+                    setBulletDeletePrompt(null);
+                  }}
+                />
+              </Box>
+            )}
             {bulletItems.length === 0 ? (
-              <Text dimColor>No bullets — add via CLI or a future editor.</Text>
+              <Text dimColor>No bullets — press a to add.</Text>
             ) : (
               <SelectList
                 items={bulletItems}
                 selectedIndex={menuIdx}
                 onChange={(i) => setMenuIdx(i)}
-                isActive={active && !unsaved}
+                isActive={active && !unsaved && !bulletDeletePrompt}
                 onSubmit={(item) => {
                   const bi = Number.parseInt(item.value, 10);
                   if (!Number.isNaN(bi)) {

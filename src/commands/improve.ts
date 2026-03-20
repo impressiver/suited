@@ -9,6 +9,7 @@ import {
   saveSource,
   sourceJsonPath,
 } from '../profile/serializer.js';
+import { computeHealthScore } from '../services/improve.js';
 import { c, healthQuip, healthStars } from '../utils/colors.js';
 import { ensureContactDetails } from '../utils/contact.js';
 import { fileExists } from '../utils/fs.js';
@@ -127,35 +128,8 @@ async function loadActiveProfile(profileDir: string): Promise<Profile> {
 }
 
 function printHealthScore(profile: Profile, isRefined: boolean): void {
-  let score = 0;
-
-  // 1. Contact complete: name + at least 2 of (email, phone, LinkedIn)
-  const contactFieldCount = [
-    profile.contact.email,
-    profile.contact.phone,
-    profile.contact.linkedin,
-  ].filter(Boolean).length;
-  const contactOk = !!profile.contact.name && contactFieldCount >= 2;
-  if (contactOk) score++;
-
-  // 2. Skills count >= 10
-  const skillsOk = profile.skills.length >= 10;
-  if (skillsOk) score++;
-
-  // 3. Is refined (refined.json exists)
-  if (isRefined) score++;
-
-  // 4. Has professional summary
-  const hasSummary = !!profile.summary?.value?.trim();
-  if (hasSummary) score++;
-
-  // 5. All positions with content have >= 1 bullet
-  const contentPositions = profile.positions.filter(
-    (p) => p.bullets.length > 0 || (p.description?.value ?? '').trim().length > 0,
-  );
-  const noBulletsPositions = contentPositions.filter((p) => p.bullets.length === 0);
-  const positionsOk = noBulletsPositions.length === 0;
-  if (positionsOk) score++;
+  const { score, contactOk, skillsOk, hasSummary, positionsOk, skillCount, noBulletCompanyNames } =
+    computeHealthScore(profile, isRefined);
 
   const stars = healthStars(score);
   console.log(`\nProfile Health: ${stars}  ${healthQuip(score)}\n`);
@@ -178,8 +152,8 @@ function printHealthScore(profile: Profile, isRefined: boolean): void {
 
   console.log(
     skillsOk
-      ? ok(`${profile.skills.length} skills documented`)
-      : warn(`Only ${profile.skills.length} skills documented (10+ recommended)`),
+      ? ok(`${skillCount} skills documented`)
+      : warn(`Only ${skillCount} skills documented (10+ recommended)`),
   );
 
   console.log(
@@ -197,8 +171,8 @@ function printHealthScore(profile: Profile, isRefined: boolean): void {
   if (positionsOk) {
     console.log(ok('All positions have content'));
   } else {
-    const names = noBulletsPositions.map((p) => p.company.value).join(', ');
-    console.log(warn(`${noBulletsPositions.length} position(s) have no bullets (${names})`));
+    const names = noBulletCompanyNames.join(', ');
+    console.log(warn(`${noBulletCompanyNames.length} position(s) have no bullets (${names})`));
   }
 
   console.log('');

@@ -2,8 +2,8 @@
  * `resume validate` — re-run accuracy guard on the current profile
  */
 
-import { buildRefList } from '../claude/prompts/curate.js';
 import { loadActiveProfile, sourceJsonPath } from '../profile/serializer.js';
+import { validateProfile } from '../services/validate.js';
 import { c } from '../utils/colors.js';
 import { fileExists } from '../utils/fs.js';
 
@@ -21,9 +21,9 @@ export async function runValidate(options: ValidateOptions): Promise<void> {
   const profile = await loadActiveProfile(profileDir);
   console.log(`\n${c.ok} Loaded profile: ${c.value(profile.contact.name.value)}`);
 
-  const { refMap } = buildRefList(profile);
+  const { referenceCount, refMap } = validateProfile(profile);
 
-  console.log(`\n${c.muted(`Reference list: ${refMap.size} entries`)}`);
+  console.log(`\n${c.muted(`Reference list: ${referenceCount} entries`)}`);
   let count = 0;
   for (const [id, entry] of refMap) {
     if (count++ >= 5) break;

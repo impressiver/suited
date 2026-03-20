@@ -87,3 +87,36 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 ## 6. Full file index
 
 See [`README.md`](./README.md) in this folder for a grouped list of all spec files.
+
+---
+
+## 7. Implementation progress (living)
+
+**Norm:** One **phase** at a time. Update this section in the same PR as code changes so agents and humans share one queue.
+
+### Phases (see [`tui-implementation-order.md`](./tui-implementation-order.md))
+
+| Phase | Scope | Status |
+|-------|--------|--------|
+| **1** | **S1 — Service extraction** (`src/services/*`, commands delegate; `computeRefinementDiff`, CLI parity tests) | **Done** (2026-03-19) |
+| **2** | **T0 — TUI infrastructure hardening** (`store.ts`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | Not started |
+| **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | Not started |
+| **4+** | Screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §4–15 |
+
+### Phase 1 — completed work
+
+- Added **`src/services/validate.ts`** — `validateProfile()` (+ `refMap` for CLI listing).
+- Added **`src/services/improve.ts`** — `computeHealthScore()`; `commands/improve.ts` delegates display logic.
+- Added **`src/services/contact.ts`** — `mergeContactMeta()`; `commands/contact.ts` delegates persistence.
+- Added **`src/services/refine.ts`** — `computeRefinementDiff`, `applyRefinementsFromTool`, `generateRefinementQuestions`, `applyRefinements` (Q&A apply), `polishProfile`, `applyDirectEdit` (streaming-shaped generators); **`commands/refine.ts`** delegates non-interactive core.
+- Unit tests: `src/services/improve.test.ts`, `src/services/refine.test.ts`.
+
+### Coordination rules (avoid clobbering)
+
+1. **While Phase N is open:** prefer edits only in the **files that phase owns** (see table above).  
+2. **Do not** run parallel agents on the same command file + the same service file without splitting (e.g. one agent on `commands/refine.ts`, another on `commands/import.ts`). **Phase 1 was S1-only** — no parallel T0/T1 on `App.tsx` / `store.ts` until Phase 2 starts.  
+3. After each phase, merge or rebase before starting the next so `main` reflects the new boundaries (`src/services/**` is shared infrastructure for later T2).
+
+### What’s next (Phase 2 preview)
+
+- Introduce global **`store.ts`** + **`store.test.ts`** per [`tui-architecture.md`](./tui-architecture.md) and [`tui-implementation-order.md`](./tui-implementation-order.md) §2; migrate `App.tsx` off ad-hoc `useState` where spec requires (`inTextInput`, `operationInProgress`, etc.).

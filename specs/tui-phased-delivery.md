@@ -30,7 +30,7 @@ See [Goals & constraints](./tui-goals-and-constraints.md) and [Screen details](.
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Ink TUI with global navigation, Dashboard/Jobs/Settings-style data, **delegate** flows that run `node <argv[1]> <subcommand> …` with stdio inherited, then return to the TUI.
+- **Branch / main:** Ink TUI with global navigation, Dashboard/Jobs/Settings-style data, **delegate** flows that run `node <argv[1]> <subcommand> …` with stdio inherited, then return to the TUI. Core refine / validate / improve / contact logic also lives in **`src/services/`** (Phase 1 extraction; CLI delegates there).
 - This is **Phase A** behavior, **not** Phase C. Treat subprocess delegation as **technical debt** toward Phase B/C.
 
 ---

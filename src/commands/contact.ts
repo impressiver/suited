@@ -1,49 +1,11 @@
-import { profileToMarkdown } from '../profile/markdown.js';
-import type { ContactMeta, Profile, Sourced } from '../profile/schema.js';
-import {
-  loadActiveProfile,
-  loadRefined,
-  refinedJsonPath,
-  refinedMdPath,
-  saveContactMeta,
-  saveRefined,
-  saveSource,
-  sourceMdPath,
-} from '../profile/serializer.js';
+import type { Profile, Sourced } from '../profile/schema.js';
+import { loadActiveProfile } from '../profile/serializer.js';
+import { type ContactFields, mergeContactMeta } from '../services/contact.js';
 import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
 import { isUserExit } from '../utils/user-exit.js';
 
 export interface ContactOptions {
   profileDir?: string;
-}
-
-function userEdit(value: string): Sourced<string> {
-  return { value, source: { kind: 'user-edit' as const, editedAt: new Date().toISOString() } };
-}
-
-async function persistProfileAndContact(profile: Profile, profileDir: string): Promise<void> {
-  // Save to active profile (refined or source)
-  if (await fileExists(refinedJsonPath(profileDir))) {
-    const refined = await loadRefined(profileDir);
-    await saveRefined({ ...refined, profile }, profileDir);
-    await profileToMarkdown(profile, refinedMdPath(profileDir));
-  } else {
-    await saveSource(profile, profileDir);
-    await profileToMarkdown(profile, sourceMdPath(profileDir));
-  }
-
-  // Also persist contact fields to contact.json
-  const meta: ContactMeta = {
-    headline: profile.contact.headline?.value,
-    email: profile.contact.email?.value,
-    phone: profile.contact.phone?.value,
-    location: profile.contact.location?.value,
-    linkedin: profile.contact.linkedin?.value,
-    website: profile.contact.website?.value,
-    github: profile.contact.github?.value,
-  };
-  await saveContactMeta(meta, profileDir);
 }
 
 function displayContactFields(profile: Profile): void {
@@ -155,36 +117,10 @@ export async function runContact(options: ContactOptions): Promise<void> {
       continue;
     }
 
-    const contact = { ...profile.contact };
-    switch (field) {
-      case 'name':
-        contact.name = userEdit(trimmed || contact.name.value);
-        break;
-      case 'headline':
-        contact.headline = trimmed ? userEdit(trimmed) : undefined;
-        break;
-      case 'email':
-        contact.email = trimmed ? userEdit(trimmed) : undefined;
-        break;
-      case 'phone':
-        contact.phone = trimmed ? userEdit(trimmed) : undefined;
-        break;
-      case 'location':
-        contact.location = trimmed ? userEdit(trimmed) : undefined;
-        break;
-      case 'linkedin':
-        contact.linkedin = trimmed ? userEdit(trimmed) : undefined;
-        break;
-      case 'website':
-        contact.website = trimmed ? userEdit(trimmed) : undefined;
-        break;
-      case 'github':
-        contact.github = trimmed ? userEdit(trimmed) : undefined;
-        break;
-    }
-
-    profile = { ...profile, contact };
-    await persistProfileAndContact(profile, profileDir);
+    const patch: ContactFields =
+      field === 'name' ? { name: trimmed || profile.contact.name.value } : { [field]: trimmed };
+    await mergeContactMeta(patch, profileDir);
+    profile = await loadActiveProfile(profileDir);
     console.log(`\n${c.ok} ${c.success(`${field} updated.`)}`);
   }
 }

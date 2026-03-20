@@ -61,7 +61,7 @@ When `stdin` or `stdout` is **not** a TTY and the user runs `suited` with **no s
 When multiple handlers could apply, order is:
 
 1. **Modal / confirm** (blocking prompt)
-2. **Text / multiline input** (suppress global `q`, `1–8`, letter jumps)
+2. **Text / multiline input** (suppress global `q`, screen-jump number keys, letter jumps)
 3. **Async / streaming** (Esc → cancel if `AbortSignal` wired; navigation locked if `operationInProgress`)
 4. **Global navigation** (sidebar, screen jumps, `q`)
 

@@ -28,6 +28,8 @@ export interface AppState {
   deferLetterShortcutsFor: ScreenId | null;
   /** True while Profile editor has unsaved local edits (Phase C navigate-away guard). */
   profileEditorDirty: boolean;
+  /** When set, ProfileEditorScreen root Esc (no dirty) navigates here instead of focusing sidebar. */
+  profileEditorReturnTo: ScreenId | null;
 }
 
 export type AppAction =
@@ -43,7 +45,8 @@ export type AppAction =
   | { type: 'SET_DEFER_LETTER_SHORTCUTS'; screen: ScreenId | null }
   /** Clears async lock (Esc during `operationInProgress`); extend later for AbortSignal. */
   | { type: 'CANCEL_OPERATION' }
-  | { type: 'SET_PROFILE_EDITOR_DIRTY'; value: boolean };
+  | { type: 'SET_PROFILE_EDITOR_DIRTY'; value: boolean }
+  | { type: 'SET_PROFILE_EDITOR_RETURN_TO'; screen: ScreenId | null };
 
 export function createInitialAppState(profileDir: string): AppState {
   return {
@@ -59,13 +62,18 @@ export function createInitialAppState(profileDir: string): AppState {
     pendingJobId: null,
     deferLetterShortcutsFor: null,
     profileEditorDirty: false,
+    profileEditorReturnTo: null,
   };
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_SCREEN':
-      return { ...state, activeScreen: action.screen };
+      return {
+        ...state,
+        activeScreen: action.screen,
+        profileEditorReturnTo: action.screen === 'profile' ? state.profileEditorReturnTo : null,
+      };
     case 'SET_PROFILE':
       return { ...state, profile: action.profile, hasRefined: action.hasRefined };
     case 'SET_HAS_REFINED':
@@ -90,6 +98,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'SET_PROFILE_EDITOR_DIRTY':
       return { ...state, profileEditorDirty: action.value };
+    case 'SET_PROFILE_EDITOR_RETURN_TO':
+      return { ...state, profileEditorReturnTo: action.screen };
   }
 }
 

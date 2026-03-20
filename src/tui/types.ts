@@ -8,13 +8,13 @@ export type ScreenId =
   | 'contact'
   | 'settings';
 
+/** Sidebar order only. `profile` (manual section editor) is opened from Refine, not listed here. */
 export const SCREEN_ORDER: ScreenId[] = [
   'dashboard',
   'import',
   'contact',
   'jobs',
   'refine',
-  'profile',
   'generate',
   'settings',
 ];
@@ -27,7 +27,7 @@ export const NAV_LABELS: Record<ScreenId, string> = {
   refine: 'Refine',
   generate: 'Generate',
   jobs: 'Jobs',
-  profile: 'Improve',
+  profile: 'Edit sections',
   contact: 'Contact',
   settings: 'Settings',
 };

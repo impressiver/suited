@@ -84,7 +84,7 @@ In a normal **interactive terminal** (TTY):
 suited
 ```
 
-This launches the **Ink-based TUI**: sidebar + eight screens — **Dashboard**, **Import**, **Contact**, **Jobs**, **Refine**, **Profile** (improve), **Generate**, and **Settings**. Keyboard shortcuts (`1–8`, letter keys, `Tab`, `Esc`, `q`) navigate; see [`specs/tui-README.md`](specs/tui-README.md) for rules (non-TTY behavior, focus, forbidden imports).
+This launches the **Ink-based TUI**: sidebar + **seven** top-level screens — **Dashboard**, **Import**, **Contact**, **Jobs**, **Refine**, **Generate**, and **Settings**. **Manual section editing** (`ProfileEditorScreen`, the old “Improve” flow) opens from **Refine** → *Edit profile sections (manual)*, not from the sidebar. Keyboard shortcuts (`1–7`, letter keys — **`p` is for Jobs → prepare**, not a global jump — plus `Tab`, `Esc`, `q`) navigate; see [`specs/tui-README.md`](specs/tui-README.md) for rules (non-TTY behavior, focus, forbidden imports).
 
 Core work runs through **`src/services/`** (shared with CLI subcommands). The TUI does **not** spawn subprocesses for those flows.
 
@@ -101,7 +101,7 @@ The same pipeline is available as **subcommands** using **Inquirer**-style promp
 | **Curate** your profile for one **saved job** (before generating a PDF) | `suited prepare` |
 | Export a **PDF** for a job (paste or saved JD) | `suited generate` |
 
-In the **TUI**, use **Dashboard** (health + validation summary), **Refine**, **Profile**, **Jobs** (prepare + curation preview + job-fit feedback), and **Generate** instead of `improve` / `prepare` / `validate` for most day-to-day work.
+In the **TUI**, use **Dashboard** (health + validation summary), **Refine** (Q&A, polish, consultant, **manual section edit**), **Jobs** (prepare + curation preview + job-fit feedback), and **Generate** instead of `improve` / `prepare` / `validate` for most day-to-day work.
 
 Use **`refine`** (or the Refine screen) when moving from raw import to refined data. Use **`improve`** or the **Profile** screen for ongoing edits. Use **`prepare`** or **Jobs → Prepare** after saving job descriptions. **`generate`** (or the Generate screen) produces the PDF.
 

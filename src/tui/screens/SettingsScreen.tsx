@@ -99,6 +99,19 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
 
   useInput(
     (_input, key) => {
+      if (activeScreen !== 'settings' || focusTarget !== 'content' || !key.escape) {
+        return;
+      }
+      if (!inTextInput) {
+        return;
+      }
+      setFieldFocus('provider');
+    },
+    { isActive: activeScreen === 'settings' && focusTarget === 'content' && inTextInput },
+  );
+
+  useInput(
+    (_input, key) => {
       if (!shortcutsActive) return;
       if (key.ctrl || key.meta) return;
 

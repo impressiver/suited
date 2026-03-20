@@ -14,7 +14,7 @@ describe('JobsScreen layout', () => {
     mockUseTerminalSize.mockReset();
   });
 
-  it('renders stacked label at 79 columns (no Preview pane)', () => {
+  it('renders Preview below job list at narrow width', () => {
     mockUseTerminalSize.mockReturnValue([79, 30]);
     const out = renderToString(
       <AppStoreProvider profileDir="/tmp/suited-test-jobs">
@@ -22,10 +22,10 @@ describe('JobsScreen layout', () => {
       </AppStoreProvider>,
     );
     expect(out).toContain('Saved jobs');
-    expect(out).not.toContain('Preview');
+    expect(out).toContain('Preview');
   });
 
-  it('renders two-column hint at 80+ columns', () => {
+  it('renders Preview below job list at wide width', () => {
     mockUseTerminalSize.mockReturnValue([100, 30]);
     const out = renderToString(
       <AppStoreProvider profileDir="/tmp/suited-test-jobs">

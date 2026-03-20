@@ -42,4 +42,13 @@ describe('appReducer', () => {
     s = appReducer(s, { type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
     expect(s.profileEditorDirty).toBe(false);
   });
+
+  it('sets profile editor return screen and clears when leaving profile', () => {
+    let s = appReducer(base, { type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: 'refine' });
+    expect(s.profileEditorReturnTo).toBe('refine');
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'profile' });
+    expect(s.profileEditorReturnTo).toBe('refine');
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'refine' });
+    expect(s.profileEditorReturnTo).toBe(null);
+  });
 });

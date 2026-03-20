@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
@@ -65,7 +65,7 @@ export interface GenerateScreenProps {
 export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { pendingJobId, activeScreen, focusTarget } = useAppState();
+  const { pendingJobId, activeScreen, focusTarget, inTextInput } = useAppState();
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ p: 'pick-source' });
   const [sourceIdx, setSourceIdx] = useState(0);
@@ -102,6 +102,56 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   }, [phase]);
 
   useRegisterPanelFooterHint(generateFooterHint);
+
+  useInput(
+    (_input, key) => {
+      if (!active || !key.escape) {
+        return;
+      }
+      if (inTextInput) {
+        return;
+      }
+      if (phase.p === 'pick-source') {
+        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
+        return;
+      }
+      if (phase.p === 'pick-saved') {
+        setSourceIdx(0);
+        setPhase({ p: 'pick-source' });
+        return;
+      }
+      if (phase.p === 'pick-flair') {
+        if (phase.jobId) {
+          void loadJobs(profileDir).then((jobs) => {
+            setPhase({ p: 'pick-saved', jobs, idx: 0 });
+          });
+          return;
+        }
+        setSourceIdx(0);
+        setPhase({ p: 'pick-source' });
+        return;
+      }
+      if (phase.p === 'done') {
+        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
+        return;
+      }
+      if (phase.p === 'err' && phase.kind === 'preflight') {
+        setSourceIdx(0);
+        setPhase({ p: 'pick-source' });
+        return;
+      }
+      if (phase.p === 'err') {
+        setApiFailureStreak(0);
+        const snap = recoverFlairRef.current;
+        if (snap) {
+          setPhase({ p: 'pick-flair', ...snap });
+        } else {
+          setPhase({ p: 'pick-source' });
+        }
+      }
+    },
+    { isActive: active },
+  );
 
   useEffect(() => {
     const id = pendingJobId;

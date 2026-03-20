@@ -15,7 +15,7 @@ Every screen documents: what loads on mount, the full state machine (every state
 - `refined` — suggest Generate or manage jobs; show health score from `computeHealthScore()`
 - `ready` — has jobs + refined; suggest Generate; show last PDF details
 
-**Components:** `StatusBadge` (pipeline), `ScrollView` (pipeline + activity). Navigation matches the left sidebar (`1–8` and letter keys).
+**Components:** `StatusBadge` (pipeline), `ScrollView` (pipeline + activity). Navigation matches the left sidebar (`1–7` and letter keys; no eighth sidebar row — manual profile edit is under **Refine**).
 
 ### ImportScreen
 
@@ -32,30 +32,36 @@ Every screen documents: what loads on mount, the full state machine (every state
 
 ### RefineScreen
 
-**Loads on mount:** `loadRefined()`. If refined, start at `already-refined`; else start at `not-refined`.
+**Loads on mount:** `loadRefined()` / `loadSource()`. If `refined.json` exists, start at **`already-refined`** menu; else start at **`first-refine-menu`** (Q&A pass **or** manual section edit on `source.json` — no auto-start Q&A until the user picks).
 
-**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **Professional consultant review (hiring manager, whole profile)**, **Direct edit**. No duplicate “open Jobs” / “stay” rows — use the **sidebar** for navigation.
+**Current TUI — `first-refine-menu`:** **Run Q&A from source (first refinement pass)** | **Edit profile sections (manual — source.json)** → sets `SET_PROFILE_EDITOR_RETURN_TO('refine')` and navigates to `ProfileEditorScreen`.
+
+**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **Professional consultant review (hiring manager, whole profile)**, **Edit profile sections (manual)** → same navigation to `ProfileEditorScreen` (return **Esc** at section root returns to Refine when launched from here), **Direct edit**. No duplicate “open Jobs” / “stay” rows — use the **sidebar** for navigation.
+
+**Esc while a text field owns stdin:** **Q&A** answer draft and **Direct edit** input handle **Esc** locally (exit to the refine hub / cancel edit) even when `inTextInput` is true, so users are not stuck behind the global “suppress nav while typing” rule.
 
 **External edit detection (`isMdNewerThanJson`):** The CLI checks whether `refined.md` has been externally edited (newer mtime than `refined.json`) and prompts sync. The TUI **MUST** replicate this check on mount. If `refined.md` is newer, show an inline banner inside the `already-refined` sub-menu: "Your `refined.md` was edited outside the TUI. Sync changes now?" with `<ConfirmPrompt>` → on yes, call `markdownToProfile()` + `saveRefined()`. This **must not** silently drop the external edits.
 
 **States (implemented):**
 ```
-not-refined:
+no refined.json yet:
+  → first-refine-menu         (SelectList: Q&A vs manual edit)
+  → (Q&A path same as below from gen-questions onward)
+
+not-refined (after choosing Q&A from first-refine-menu):
   → generating-questions      (spinner; generateRefinementQuestions)
   → qa-phase                  (TextInput per question)
   → generating-refinements    (spinner; applyRefinements)
   → diff-review               (DiffView; accept / edit proposed summary / discard)
   → saving                    (spinner; saveRefined)
-  → error / retry             (retryKind-specific)
+  → error / retry             (retryKind-specific; back uses disk check → first-refine-menu vs already-refined)
 
 already-refined:
   → sub-menu (SelectList):
       Run Q&A from source
       Polish sections (AI)     → polish-pick → polish-run → diff-review (keep-session) → saving
-      Professional consultant  → consultant-run (spinner; evaluateProfile on refined profile)
-                               → consultant-view (ScrollView + apply / back)
-                               → consultant-apply (spinner; applyConsultantFindingsToProfile)
-                               → diff-review (keep-session) or done if empty diff
+      Professional consultant  → consultant-run → consultant-view → consultant-apply → diff-review or done
+      Edit profile sections    → navigate to ProfileEditorScreen (return via Esc at section root)
       Direct edit              → MultilineInput → direct-edit-run → diff-review (keep-session)
 ```
 
@@ -78,6 +84,8 @@ already-refined:
 **Loads on mount:** If `pendingJobId` is set in `AppState`, clear it and jump to flair picker with that job’s JD.
 
 **Current implementation (MVP):** source picker (**saved job** / **full resume** only — ad-hoc JD paste lives on **Jobs** when adding a job) → flair **`SelectList`** → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
+
+**Esc (non-running phases):** Like **Jobs**, **`App.tsx`** does not map **Esc** → sidebar while **Generate** content is focused — **`GenerateScreen`** owns **Esc** to step back through source / saved-job / flair / done / error states (including when a paste **`MultilineInput`** is focused). After the field blurs, a further **Esc** can return to the sidebar via the global handler.
 
 **States (target / north star):**
 ```
@@ -121,7 +129,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **Loads on mount:** `loadJobs()`.
 
-**Layout:** Below **80** terminal columns, list is **stacked** (full width). At **80+** columns, **list + Preview** (`jobsUseSplitPane` / `jobsListPaneWidth` in `src/tui/jobsLayout.ts`). **Detail** mode on wide layouts keeps the job list visible on the left (read-only) with actions on the right.
+**Layout:** Job **list** and **Preview** are **always stacked** (preview below the list). **Detail** mode on wide layouts (**80+** cols, `jobsUseSplitPane`) keeps the job list visible on the left (read-only) with actions on the right (`jobsListPaneWidth` in `src/tui/jobsLayout.ts`).
 
 **Errors:** Prepare failures offer **Retry prepare**, **Check Settings** after repeated failures, **Back to list** (`SelectList`); Esc still returns to list.
 
@@ -141,11 +149,15 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **Per-screen shortcuts active only in `list` state:** `a`, `d`, `g`, `p` fire only when the screen is in `list` state (not during any active text input sub-state like `add-title`, `add-company`, `add-jd`). In those sub-states, the global `inTextInput` flag already suppresses them, but the screen handler must also check its own state.
 
+**Esc during add job (`add-title` / `add-company` / `add-jd`):** **`JobsScreen`** handles **Esc** *before* deferring to “text field owns keys” so **Esc** always backs out one wizard step (or to the list) even while **`TextInput`** / **`MultilineInput`** is focused. Global **App** **Esc** → sidebar is suppressed for **Jobs** content focus (same pattern as **Generate**).
+
 **Components:** `SelectList`, `TextInput`, `MultilineInput`, `ConfirmPrompt`, `ScrollView`, `Spinner`, `ProgressSteps`, `StatusBadge`.
 
 ### ProfileEditorScreen
 
-**Loads on mount:** `loadRefined()` or `loadSource()`.
+**Not in the sidebar.** Reached from **Refine** → *Edit profile sections (manual)*. Store flag **`profileEditorReturnTo`** (typically `'refine'`) so **Esc** at the section list (no unsaved edits) navigates back to Refine instead of only focusing the sidebar.
+
+**Loads on mount:** `loadRefined()` or `loadSource()` (same rule as before: refined.json wins).
 
 **Navigation model:** local stack. Each level is a state: `section-list → section → position-list → position → bullets`. `Esc` pops; `Enter` pushes. Breadcrumb shown in content area header.
 
@@ -159,11 +171,11 @@ pipeline (all cancellable via Esc + AbortSignal):
 - `skills` — CheckboxList of all skills; space to toggle; s to save
 - `education-list`, `certifications-list`, `projects-list` — similar pattern
 
-**Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, `1–8`, Esc to sidebar), if unsaved changes exist, a `<ConfirmPrompt>` overlays the current state: "Unsaved changes — save before leaving? (Enter=save / n=discard / Esc=stay)". This is the resolved policy (see [Open questions](./tui-open-questions.md) — question 3). Writes via `saveRefined()` or `saveSource()`.
+**Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, number keys, Esc to sidebar / return screen), if unsaved changes exist, a `<ConfirmPrompt>` overlays the current state: "Unsaved changes — save before leaving? (Enter=save / n=discard / Esc=stay)". This is the resolved policy (see [Open questions](./tui-open-questions.md) — question 3). Writes via `saveRefined()` or `saveSource()`.
 
 **No `$EDITOR`:** Profile editing is entirely inline. If a user wants to open the markdown in their editor, they do it via the CLI (`suited refine --edit`), not the TUI.
 
-**Improve vs Refine:** Improve (`ProfileEditorScreen`) is **manual** structured editing. **General** hiring-consultant feedback on the refined profile is **Refine → Professional consultant review** (not on Improve).
+**Manual edit vs AI on Refine:** Structured editing is **Refine → Edit profile sections (manual)**. **General** hiring-consultant feedback stays **Refine → Professional consultant review**.
 
 **Components:** `InlineEditor`, `SelectList`, `CheckboxList`, `ConfirmPrompt`, `ScrollView`.
 
@@ -186,6 +198,8 @@ pipeline (all cancellable via Esc + AbortSignal):
 ### SettingsScreen
 
 **Loads on mount:** read `<project-root>/.env` (same path `dotenv` uses — resolve relative to the binary or `process.cwd()`) and `process.env` for API keys + output dir. If `.env` does not exist, treat all fields as empty — do not throw. Note: writing `.env` via the TUI does **not** hot-reload `process.env` in the running process; the user must restart `suited` for env changes to take effect. Show a notice: "Changes take effect on next launch."
+
+**Esc with API key field focused:** First **Esc** moves focus back to the **provider** list (so **`inTextInput`** clears); second **Esc** (with content focus, not in a field) returns to the **sidebar** via **`App`**.
 
 **States:**
 - `form` — API key (masked input), provider toggle (Anthropic/OpenRouter), output dir (TextInput), default flair (SelectList 1–5), headed browser toggle

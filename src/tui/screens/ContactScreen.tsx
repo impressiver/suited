@@ -179,19 +179,11 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
           const sel = i === fieldIndex;
           const v = values[key] ?? '';
           const showMenuCaret = active && phase === 'browse' && sel;
-          const labelMuted = !active || !sel;
           return (
             <Box key={key} flexDirection="row">
               <Box width={12}>
-                <Text bold={showMenuCaret} dimColor={labelMuted}>
-                  {showMenuCaret ? (
-                    <>
-                      <Text color="white">›</Text>
-                      <Text> </Text>
-                    </>
-                  ) : (
-                    '  '
-                  )}
+                <Text bold={showMenuCaret} color="white">
+                  {showMenuCaret ? '› ' : '  '}
                   {label}
                 </Text>
               </Box>
@@ -208,7 +200,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
                   }}
                 />
               ) : (
-                <Text dimColor={!active || !sel}>{v || '—'}</Text>
+                <Text dimColor>{v || '—'}</Text>
               )}
             </Box>
           );

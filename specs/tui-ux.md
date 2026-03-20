@@ -1,12 +1,12 @@
 # UX & workflow
 
-The CLI mental model is **Import → Refine → Generate**. The TUI exposes **eight peer screens** with **Dashboard** for suggested next step.
+The CLI mental model is **Import → Refine → Generate**. The TUI exposes **seven sidebar destinations** plus **manual section editing** under **Refine**, with **Dashboard** for suggested next step.
 
 - **Pipeline status** — Derived from profile data (source, `refined.json`, jobs, last PDF). Compact indicators in the **Header** on every screen (when implemented).
 - **Suggested next step** — Dashboard highlights one primary action from state; secondary actions via sidebar.
 - **First-run / blocked** — No API key → banner + path to Settings. No source → suggest Import. Avoid dead-end dashboards.
 
-**Discoverability:** `1–8` screen jumps + letter shortcuts (`g` `j` `i` `d` `r` `p` `c` `s`). Finalize conflicts with text fields at implementation. Optional command palette (`:` or `/`).
+**Discoverability:** `1–7` screen jumps + letter shortcuts (`g` `j` `i` `d` `r` `c` `s`) for sidebar targets. **`p` is not a global jump** (reserved for **Jobs** → prepare when that screen defers shortcuts). **Manual profile sections:** Refine menu → *Edit profile sections*. Optional command palette (`:` or `/`).
 
 **Contextual footer:** The bottom hint line reflects the **focused panel**’s current screen and step (lists, scroll panes, confirms, etc.). Inline “nav” dim lines under menus were removed so shortcuts are not duplicated in the body.
 

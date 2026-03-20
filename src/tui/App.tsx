@@ -58,8 +58,8 @@ export function App({ profileDir, flowOptions }: AppProps) {
   }, [snapshot.loading, snapshot.hasRefined, snapshot.error, dispatch]);
 
   const footerHint = useMemo(() => {
-    const base =
-      '↑↓ change screen (most views) · Tab sidebar ↔ panel · 1–8 · d i c j r p g s · q quit';
+    const nScreens = SCREEN_ORDER.length;
+    const base = `↑↓ change screen (most views) · Tab sidebar ↔ panel · 1–${nScreens} · d i c j r g s · q quit`;
     if (state.operationInProgress) {
       return `${base} · locked · Esc cancels op`;
     }
@@ -121,6 +121,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
         if (focusTarget === 'content' && activeScreen === 'jobs') {
           return;
         }
+        if (focusTarget === 'content' && activeScreen === 'generate') {
+          return;
+        }
         if (focusTarget === 'content') {
           dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
         }
@@ -154,8 +157,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
         return;
       }
 
-      if (input >= '1' && input <= '8') {
-        const idx = parseInt(input, 10) - 1;
+      const digit = parseInt(input, 10);
+      if (digit >= 1 && digit <= SCREEN_ORDER.length) {
+        const idx = digit - 1;
         const next = SCREEN_ORDER[idx];
         if (next && next !== activeScreen) {
           goToScreen(next);
@@ -184,13 +188,12 @@ export function App({ profileDir, flowOptions }: AppProps) {
         return;
       }
 
-      const letterMap: Record<string, (typeof SCREEN_ORDER)[number]> = {
+      const letterMap: Record<string, ScreenId> = {
         d: 'dashboard',
         i: 'import',
         r: 'refine',
         g: 'generate',
         j: 'jobs',
-        p: 'profile',
         c: 'contact',
         s: 'settings',
       };

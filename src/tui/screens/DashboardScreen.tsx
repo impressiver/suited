@@ -24,7 +24,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
   const panelActive = activeScreen === 'dashboard' && focusTarget === 'content';
 
   useRegisterPanelFooterHint(
-    'Dashboard · ↑↓ change screen · Tab sidebar · 1–8 · d i c j r p g s · q quit',
+    'Dashboard · ↑↓ change screen · Tab sidebar · 1–7 · d i c j r g s · q quit',
   );
   const api = hasApiKey();
   const variant = getDashboardVariant(snapshot, api);
@@ -114,13 +114,14 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
     }
   }, [variant]);
 
-  const pipelineLines = useMemo(
-    () => [
-      `Source      [${snapshot.hasSource ? '●' : '○'}]`,
-      `Refined     [${snapshot.hasRefined ? '●' : '○'}]`,
-      `Jobs        [${snapshot.jobsCount > 0 ? '●' : '○'}]`,
-      `Last PDF    [${snapshot.lastPdfLine ? '●' : '○'}]`,
-    ],
+  const pipelineRows = useMemo(
+    () =>
+      [
+        { label: 'Source', done: snapshot.hasSource },
+        { label: 'Refined', done: snapshot.hasRefined },
+        { label: 'Jobs', done: snapshot.jobsCount > 0 },
+        { label: 'Last PDF', done: Boolean(snapshot.lastPdfLine) },
+      ] as const,
     [snapshot.hasSource, snapshot.hasRefined, snapshot.jobsCount, snapshot.lastPdfLine],
   );
 
@@ -154,7 +155,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
             ! API key or provider not configured.
           </Text>
           <Text dimColor>
-            Open Settings (8) or set ANTHROPIC_API_KEY / OPENROUTER_API_KEY in your environment.
+            Open Settings (7) or set ANTHROPIC_API_KEY / OPENROUTER_API_KEY in your environment.
           </Text>
         </Box>
       )}
@@ -186,10 +187,12 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       {validationRefCount != null && (
         <Box marginBottom={1} flexDirection="column">
           <Text bold>Validation</Text>
-          <Text>
-            {validationRefCount} reference anchor{validationRefCount === 1 ? '' : 's'} — accuracy
-            guard ready (same as suited validate).
-          </Text>
+          <Box flexDirection="row">
+            <Text dimColor>
+              {validationRefCount} reference anchor{validationRefCount === 1 ? '' : 's'}
+            </Text>
+            <Text color="green"> ✓</Text>
+          </Box>
         </Box>
       )}
       {validationErr != null && (
@@ -201,7 +204,16 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       <Text>{next}</Text>
       <Box marginTop={1} flexDirection="column">
         <Text bold>Pipeline</Text>
-        <ScrollView lines={pipelineLines} height={4} />
+        {pipelineRows.map(({ label, done }) => (
+          <Box key={label} flexDirection="row">
+            <Box width={12}>
+              <Text>{label}</Text>
+            </Box>
+            <Text color={done ? 'green' : undefined} dimColor={!done}>
+              {done ? '●' : '○'}
+            </Text>
+          </Box>
+        ))}
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text bold>Activity</Text>

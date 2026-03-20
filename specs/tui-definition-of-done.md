@@ -18,12 +18,12 @@ Residual gaps vs an ideal CLI pixel-match (optional follow-ups):
 Ship when **all** of the following are true:
 
 - [x] `suited` with no args in a **non-TTY** does not hang; behavior matches [README — Canonical non-TTY](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth) (stderr message + exit code). Covered in `src/commands/flow.test.ts` (stdin non-TTY, stdout non-TTY, both non-TTY).
-- [x] All **eight screens** render as inline Ink components (no `DelegateScreen`, no subprocess). Functional screens are full implementations; none spawn subprocesses for the main flow.
-- [x] All **eight screens** reachable from sidebar navigation and `1–8` keys; pressing a key navigates without crash.
+- [x] All **screens** (including `ProfileEditorScreen`) render as inline Ink components (no `DelegateScreen`, no subprocess). Functional screens are full implementations; none spawn subprocesses for the main flow.
+- [x] **Seven** top-level screens reachable from sidebar navigation and **`1–7`** keys; **manual section edit** opens from **Refine** (not a sidebar row). Pressing a key navigates without crash.
 - [x] **Dashboard** shows correct state variant (`no-api-key`, `no-source`, `source-only`, `refined`, `ready`) for each real file condition. `getDashboardVariant` unit tests + `fetchProfileSnapshot` **fixture integration** tests under `src/tui/profileSnapshot.integration.test.ts` (temp dirs with `saveSource` / `saveRefined` / `saveJob`).
 - [x] **Settings** reachable; saves API key to `.env`; **masked display** — `maskApiKeyForDisplay` in `src/tui/settings/maskApiKey.ts` + `maskApiKey.test.ts` (visual copy still worth a quick manual check).
 - [x] **`q`** does not quit while a `<TextInput>` is focused (`inTextInput` guard in `App` + `TextInput` wiring). Automated coverage: store + component tests; manual spot-check on Contact still recommended.
-- [x] **Jobs** — stacked list below **80** cols; **80+** uses list + **Preview** column (`jobsUseSplitPane` / `jobsListPaneWidth`). `src/tui/jobsLayout.test.ts` + `src/tui/screens/JobsScreen.test.tsx` (mocked `useTerminalSize`).
+- [x] **Jobs** — list + **Preview** stacked (preview always below list); **80+** cols **detail** view uses list + actions columns (`jobsUseSplitPane` / `jobsListPaneWidth`). `src/tui/jobsLayout.test.ts` + `src/tui/screens/JobsScreen.test.tsx` (mocked `useTerminalSize`).
 - [x] Errors from async ops show a **mapped message** + at least one recovery action: Import / Generate / Refine / **Jobs**; **Contact** (load **r** retry); **Profile** (load **r**, save menu + Settings streak); **Dashboard** health (**r**).
 - [x] `pnpm test` is green; `pnpm ci` includes build + forbidden-import check for TUI.
 
@@ -51,7 +51,7 @@ Add to Phase B:
 
 - [x] **Subcommand-equivalent actions** in TUI without subprocess. **Permanent CLI-only:** `--jd`, `--all-templates`, and any flag not surfaced in Settings/Generate. **`suited validate`** → Dashboard reference count. **`suited improve`** → Dashboard health + Refine / Profile / Contact. **`suited prepare`** → Jobs: prepare, **view curation** (`formatCurationPreviewLines`), **professional feedback** (`evaluateForJob` / `applyJobFeedback` simplified path).
 - [x] **Jobs:** Curation summary after prepare + scrollable preview; view prep + job-fit feedback from job menu when refinement exists (see [tui-screens.md](./tui-screens.md#jobsscreen)).
-- [x] **Profile editor:** Structured lists + save; navigate-away guard; save failure **Retry / Settings / Dismiss** (multi-field forms: see post–Phase C polish).
+- [x] **Profile editor:** Structured lists + save; opened from **Refine** (not sidebar); navigate-away guard; save failure **Retry / Settings / Dismiss** (multi-field forms: see post–Phase C polish).
 - [x] **Refine** — Already-refined menu: Q&A, **polish** (section presets), **direct edit**; diff save keeps or replaces Q&A session as appropriate. (Jobs / other screens: sidebar only.)
 - [x] **Generate** — Progress steps, post-done actions (see post–Phase C for JD checkpoints + streaming).
 - [x] **`isMdNewerThanJson`** — Refine banner + confirm.

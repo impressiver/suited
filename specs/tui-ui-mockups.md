@@ -10,16 +10,15 @@ ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional c
 ├───────────────┬──────────────────────────────────────────────────────────────┤
 │ ► 1 Dashboard │  Suggested next: Run refine on your profile                  │
 │   2 Import    │  ────────────────────────────────────────────────────────    │
-│   3 Refine    │  Pipeline                                                    │
-│   4 Generate  │    Source [●]  Refined [●]  Jobs [●]  Last PDF [●]          │
-│   5 Jobs      │  Activity                                                  │
-│   6 Profile   │    Jobs saved: 3 · Last PDF: …                              │
-│   7 Contact   │                                                              │
-│   8 Settings  │                                                              │
+│   3 Contact   │  Pipeline                                                    │
+│   4 Jobs      │    Source [●]  Refined [●]  Jobs [●]  Last PDF [●]          │
+│   5 Refine    │  Activity                                                  │
+│   6 Generate  │    Jobs saved: 3 · Last PDF: …                              │
+│   7 Settings  │    (Manual section edit: Refine → Edit profile sections)     │
 │               │                                                              │
 │               │                                                              │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
-│ Tab focus  ·  ↑↓ select  ·  Enter open  ·  1–8 screen  ·  q quit           │
+│ Tab focus  ·  ↑↓ select  ·  Enter open  ·  1–7 screen  ·  q quit           │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -30,7 +29,7 @@ ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional c
 │ Suited  ·  (no profile)                                                      │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
 │ ► 1 Dashboard │  ! API key not configured.                                   │
-│   2 Import    │    Set ANTHROPIC_API_KEY or open Settings (8).               │
+│   2 Import    │    Set ANTHROPIC_API_KEY or open Settings (7).               │
 │   …           │  ────────────────────────────────────────────────────────    │
 │               │  Suggested next: Configure API access                        │
 │               │  ► Open Settings                                             │
@@ -312,20 +311,20 @@ Ad-hoc JD paste happens when **adding a job** on **Jobs** (`MultilineInput`), no
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Jobs — two-panel (≥80 cols) / stacked (<80 cols)
+### Jobs — list + preview stacked (preview below)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ Suited  ·  Jane Smith  ·  4 jobs                                            │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
-│   4 Generate  │  Saved jobs               │  Arize · Sr Platform Engineer   │
-│ ► 5 Jobs      │  ─────────────────────    │  ──────────────────────────     │
-│   6 Profile   │  ► arize-sr-platform [✓]  │  Saved: Mar 10, 2026           │
-│   …           │    acme-staff-eng  [draft] │  PDF: ✓ generated              │
-│               │    old-co-contract [✓]    │                                 │
-│               │                           │  JD preview (↑↓ to scroll)      │
-│               │  a: Add  d: Delete        │  We are looking for a seasoned  │
-│               │  g: Generate  p: Prepare  │  engineer to own…               │
+│ ► 4 Jobs      │  Saved jobs                                                  │
+│   …           │  ► arize-sr-platform [✓]                                     │
+│               │    acme-staff-eng  [draft]                                   │
+│               │    old-co-contract [✓]                                     │
+│               │  a: Add  d: Delete  g: Generate  p: Prepare                  │
+│               │  Preview                                                     │
+│               │    Arize · Sr Platform Engineer                              │
+│               │    prepared Mar 10, 2026                                     │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
 │ Tab: sidebar ↔ list ↔ detail  ·  ↑↓ select  ·  Enter view full JD  ·  q quit│
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -337,33 +336,33 @@ Jobs actions (`a`, `d`, `g`, `p`) all stay inside the TUI — no breakout:
 - **`g`** → navigate to GenerateScreen with job pre-selected
 - **`p`** → run curation inline (spinner → summary → action row)
 
-### Profile editor — section list
+### Edit sections (from Refine) — section list
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ Suited  ·  Jane Smith  ·  profile                                           │
+│ Suited  ·  Jane Smith  ·  edit sections                                     │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
-│   5 Jobs      │  Profile  >  (section)                                      │
-│ ► 6 Profile   │  ────────────────────────────────────────────────────────    │
-│   7 Contact   │    Summary                                                   │
+│   4 Jobs      │  Edit sections  >  (pick a section)                          │
+│ ► 5 Refine    │  ────────────────────────────────────────────────────────    │
+│   6 Generate  │    Summary                                                   │
 │   …           │  ► Experience                                               │
 │               │    Skills                                                    │
 │               │    Education                                                 │
 │               │    Certifications                                            │
 │               │    Projects                                                  │
-│               │    Contact (→ screen 7)                                      │
+│               │    Contact (→ Contact screen)                                │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
-│ ↑↓ choose  ·  Enter open  ·  Esc back to sidebar                            │
+│ ↑↓ choose  ·  Enter open  ·  Esc back to Refine (when opened from Refine)   │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Profile editor — bullets
+### Edit sections — bullets
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ Suited  ·  Jane Smith  ·  profile                                           │
+│ Suited  ·  Jane Smith  ·  edit sections                                      │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
-│ ► 6 Profile   │  Profile  >  Experience  >  Acme  >  bullets                │
+│ ► 5 Refine    │  Edit sections  >  Experience  >  Acme  >  bullets          │
 │   …           │  ────────────────────────────────────────────────────────    │
 │               │  Staff Engineer @ Acme Corp  (2021 – present)               │
 │               │                                                              │
@@ -385,9 +384,9 @@ Pressing Enter on a bullet opens `<InlineEditor>` pre-filled with the bullet tex
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ Suited  ·  Jane Smith  ·  contact                                           │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
-│   6 Profile   │  Contact info                                               │
-│ ► 7 Contact   │  ────────────────────────────────────────────────────────    │
-│   8 Settings  │  Name       [ Jane Smith_______________________________ ]   │
+│   6 Generate  │  Contact info                                               │
+│ ► 3 Contact   │  ────────────────────────────────────────────────────────    │
+│   7 Settings  │  Name       [ Jane Smith_______________________________ ]   │
 │               │  Email      [ jane@example.com_________________________ ]   │
 │               │  Phone      [ +1 555-555-5555_________________________ ]   │
 │               │  Location   [ San Francisco, CA______________________ ]   │
@@ -407,8 +406,8 @@ Pressing Enter on a bullet opens `<InlineEditor>` pre-filled with the bullet tex
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ Suited  ·  settings                                                         │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
-│   7 Contact   │  Settings                                                   │
-│ ► 8 Settings  │  ────────────────────────────────────────────────────────    │
+│   6 Generate  │  Settings                                                   │
+│ ► 7 Settings  │  ────────────────────────────────────────────────────────    │
 │               │  API key      [ sk-ant-api03-•••••••••••••••••••••••••• ]  │
 │               │  Provider     ► Anthropic  /  OpenRouter                   │
 │               │  Output dir   [ ./output________________________________ ]  │

@@ -45,7 +45,7 @@ For tailored output, the pipeline builds a **reference map** of profile items wi
 
 ## Interactive UI: default TUI vs CLI subcommands
 
-- **Default (`suited` in a TTY):** **Ink TUI** under `src/tui/` — eight screens, shared **`src/services/`** for import, refine, generate, jobs prepare, etc. Specs: [`specs/tui-README.md`](../specs/tui-README.md), checklists in [`specs/tui-definition-of-done.md`](../specs/tui-definition-of-done.md).
+- **Default (`suited` in a TTY):** **Ink TUI** under `src/tui/` — **seven** sidebar screens plus **ProfileEditorScreen** (manual sections) opened from **Refine**; shared **`src/services/`** for import, refine, generate, jobs prepare, etc. Specs: [`specs/tui-README.md`](../specs/tui-README.md), checklists in [`specs/tui-definition-of-done.md`](../specs/tui-definition-of-done.md).
 - **Subcommands (`suited refine`, …):** **Inquirer**-based prompts in `src/commands/*`; they call the same services where Phase B+ extraction applies.
 - **Legacy:** `src/commands/dashboard.ts` (`runDashboard`) is **not** wired as the default Commander action; keep it only if you still need the old menu for comparison or migration.
 

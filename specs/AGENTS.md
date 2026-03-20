@@ -126,7 +126,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 ### Phase 2 — completed work
 
 - **`src/tui/store.tsx`** — `AppState` / `appReducer` / `AppStoreProvider` / `useAppState` / `useAppDispatch` (aligned with [`tui-architecture.md`](./tui-architecture.md); `SET_HAS_REFINED` for snapshot sync until full `SET_PROFILE` loads).
-- **`src/tui/App.tsx`** — single top-level `useInput`: suppresses global nav when `inTextInput` or `operationInProgress`; `Esc` → `CANCEL_OPERATION` while op locked; footer hints for locked / text-input modes.
+- **`src/tui/App.tsx`** — single top-level `useInput`: suppresses global nav when `inTextInput` or `operationInProgress`; `Esc` → `CANCEL_OPERATION` while op locked; footer hints for locked / text-input modes. With **Jobs** or **Generate** content focused, global **Esc** → sidebar is **skipped** so those screens handle back navigation (including while paste/title fields hold stdin).
 - **`src/tui/runTui.tsx`** — wraps the app with `AppStoreProvider`.
 - **`src/tui/store.test.ts`** — reducer unit tests.
 - **`src/commands/flow.test.ts`** — non-TTY `runFlow` stderr + `exitCode` (canonical behavior per [`tui-README.md`](./tui-README.md)).
@@ -143,7 +143,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/settings/`** — `probeProvider.ts` (Anthropic / OpenRouter key probes), `upsertEnvFile.ts` (+ test) for `.env` merges.
 - **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant; health (`computeHealthScore`) when refined; **validation** (`validateProfile` reference count) when source exists; `ScrollView` pipeline/activity (navigation is the sidebar only).
 - **`src/tui/screens/SettingsScreen.tsx`** — provider list + masked `TextInput`, **`s`** save (probe + write `.env`), shortcuts **`a`/`A`**, **`o`/`O`**, **`e`**, **`l`**.
-- **`src/tui/App.tsx`** — **1–8** / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save). **↑↓** screen-cycle on Dashboard **content** focus (no in-panel list).
+- **`src/tui/App.tsx`** — number-key screen jumps / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save). **↑↓** screen-cycle on Dashboard **content** focus (no in-panel list).
 
 **Imports:** local modules **always** use **`.ts` / `.tsx`** on relative paths (not `.js`, not extensionless). `allowImportingTsExtensions` + `rewriteRelativeImportExtensions` make **`pnpm build`** emit resolvable Node ESM. Extensionless relatives + plain **`tsc` → `node dist/`** do not work; **Biome `useImportExtensions`** enforces the rule so you do not have to remember it by hand.
 
@@ -151,7 +151,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/services/importProfile.ts`** — `importProfileFromInput()` (detect/scrape/parse/save); **`commands/import.ts`** delegates the core path and keeps CLI logging + `ensureContactDetails`.
 - **`src/tui/runTui.tsx`** — single `render` + `waitUntilExit` (removed `exitBag` / `spawnSync` loop).
-- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); **NavigateProvider** + Profile dirty guard on global nav; all eight screens inline (**Import**, **Contact**, **Jobs**, **Generate**, **Refine**, **Profile**, **Dashboard**, **Settings**); **Tab** / **↑↓** / letter keys per [`tui-screens.md`](./tui-screens.md).
+- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); **NavigateProvider** + Profile dirty guard on global nav; **seven** sidebar screens + **`ProfileEditorScreen`** from Refine; **Tab** / **↑↓** / letter keys per [`tui-screens.md`](./tui-screens.md).
 - **`src/tui/hooks/useTerminalSize.ts`** — listens to `stdout` `resize`.
 - **`src/tui/components/Layout.tsx`** — main row `flexGrow={1}` for usable height.
 - **Removed** — `DelegateScreen.tsx`, `cliArgs.ts`, **`TuiExitBag`**.
@@ -159,7 +159,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 ### Phase 6 — completed work
 
 - **`src/services/jobRefinement.ts`** — `runJobRefinementPipeline()` (analyze + curate + `saveJobRefinement`); **`commands/prepare.ts`** delegates curation to it (CLI spinners removed for that path; behavior preserved).
-- **`src/tui/store.tsx`** — `deferLetterShortcutsFor` + `SET_DEFER_LETTER_SHORTCUTS` so Jobs can own **a / d / g / p** without colliding with global **`p`→profile** / **`g`→generate**.
+- **`src/tui/store.tsx`** — `deferLetterShortcutsFor` + `SET_DEFER_LETTER_SHORTCUTS` so Jobs can own **a / d / g / p** without colliding with global **`g`→generate**. **`profileEditorReturnTo`** so **Refine → Edit sections** can return via Esc. Sidebar **`SCREEN_ORDER`** excludes **`profile`**; manual edit is not a top-level row.
 - **`src/tui/App.tsx`** — Jobs content: defer those letters; **Esc** chain owned by Jobs (not forced to sidebar); **↑↓** screen-cycle suppressed on Jobs when lists/detail own arrows.
 - **`src/tui/screens/JobsScreen.tsx`** — Jobs list/detail, prepare (`runJobRefinementPipeline`), **curation preview** (`formatCurationPreviewLines`), **job-fit feedback** (`evaluateForJob` / `applyJobFeedback`), generate hand-off, split layout at 80+ cols.
 

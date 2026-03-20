@@ -64,7 +64,7 @@ src/
 | Area | What to assert |
 |------|----------------|
 | `store` reducer | All transitions; `pendingJobId` set/clear; `inTextInput` set/clear; invalid combos impossible by type |
-| Keymap / input mode | `q` and `1–8` suppressed when `inTextInput=true`; fire when `inTextInput=false` |
+| Keymap / input mode | `q` and screen-jump number keys suppressed when `inTextInput=true`; fire when `inTextInput=false` |
 | `useOperationAbort` / `throwIfAborted` | `operationCancelSeq` bumps abort active controller; `throwIfAborted` throws `AbortError` when aborted |
 | `useAsyncOp` (future) | `run()` → running; success clears error; AbortSignal cancels; concurrent `run()` rejected (document chosen behavior) |
 | `DiffView` helpers | Given old/new pairs → required `-`/`+` prefixes; blocks have boundaries; accessible without color |

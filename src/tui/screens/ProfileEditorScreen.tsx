@@ -82,7 +82,7 @@ export interface ProfileEditorScreenProps {
 export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { activeScreen, focusTarget, inTextInput } = useAppState();
+  const { activeScreen, focusTarget, inTextInput, profileEditorReturnTo } = useAppState();
   const active = activeScreen === 'profile' && focusTarget === 'content';
 
   const [phase, setPhase] = useState<'loading' | 'no-source' | 'ready' | 'saving' | 'err'>(
@@ -115,25 +115,25 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const profileFooterHint = useMemo(() => {
     const sb = ' · Tab sidebar';
     if (phase === 'loading') {
-      return `Improve · loading…${sb}`;
+      return `Refine · edit sections · loading…${sb}`;
     }
     if (phase === 'no-source') {
-      return `Improve · import a profile first${sb}`;
+      return `Refine · edit sections · import a profile first${sb}`;
     }
     if (phase === 'err' && !profile) {
-      return `Improve · r retry${sb}`;
+      return `Refine · edit sections · r retry${sb}`;
     }
     if (phase === 'err' && profile) {
-      return `Improve · ↑↓ Enter · retry / settings / dismiss${sb}`;
+      return `Refine · edit sections · ↑↓ Enter · retry / settings / dismiss${sb}`;
     }
     if (phase === 'saving') {
-      return `Improve · saving…${sb}`;
+      return `Refine · edit sections · saving…${sb}`;
     }
     if (!profile) {
-      return `Improve${sb}`;
+      return `Refine · edit sections${sb}`;
     }
     if (unsaved) {
-      return `Improve · s save and continue · d/n discard · Esc stay`;
+      return `Refine · edit sections · s save and continue · d/n discard · Esc stay`;
     }
     if (
       bulletDeletePrompt ||
@@ -143,53 +143,53 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       projDeletePrompt ||
       positionDeletePrompt
     ) {
-      return `Improve · Enter confirm · Esc cancel${sb}`;
+      return `Refine · edit sections · Enter confirm · Esc cancel${sb}`;
     }
     if (!top) {
-      return `Improve${sb}`;
+      return `Refine · edit sections${sb}`;
     }
     if (top.k === 'sections') {
-      return `Improve · ↑↓ Enter section · Esc back · s save${sb}`;
+      return `Refine · edit sections · ↑↓ Enter section · Esc back · s save${sb}`;
     }
     if (top.k === 'summary') {
       return editingSummary
-        ? `Improve · Enter save · Esc cancel edit${sb}`
-        : `Improve · Enter edit summary · Esc back · s save${sb}`;
+        ? `Refine · edit sections · Enter save · Esc cancel edit${sb}`
+        : `Refine · edit sections · Enter edit summary · Esc back · s save${sb}`;
     }
     if (top.k === 'positions') {
-      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter → bullets${sb}`;
+      return `Refine · edit sections · ↑↓ · [ ] reorder · a add · d delete · Enter → bullets${sb}`;
     }
     if (top.k === 'skills') {
-      return `Improve · ↑↓ · [ ] move · a add · d delete · Enter edit name${sb}`;
+      return `Refine · edit sections · ↑↓ · [ ] move · a add · d delete · Enter edit name${sb}`;
     }
     if (top.k === 'skill-edit') {
-      return `Improve · Enter save · Esc back${sb}`;
+      return `Refine · edit sections · Enter save · Esc back${sb}`;
     }
     if (top.k === 'education') {
-      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter edit institution${sb}`;
+      return `Refine · edit sections · ↑↓ · [ ] reorder · a add · d delete · Enter edit institution${sb}`;
     }
     if (top.k === 'education-edit') {
-      return `Improve · Enter save · Esc back · institution only${sb}`;
+      return `Refine · edit sections · Enter save · Esc back · institution only${sb}`;
     }
     if (top.k === 'certifications') {
-      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter edit name${sb}`;
+      return `Refine · edit sections · ↑↓ · [ ] reorder · a add · d delete · Enter edit name${sb}`;
     }
     if (top.k === 'cert-edit') {
-      return `Improve · Enter save · Esc back${sb}`;
+      return `Refine · edit sections · Enter save · Esc back${sb}`;
     }
     if (top.k === 'projects') {
-      return `Improve · ↑↓ · [ ] reorder · a add · d delete · Enter edit title${sb}`;
+      return `Refine · edit sections · ↑↓ · [ ] reorder · a add · d delete · Enter edit title${sb}`;
     }
     if (top.k === 'project-edit') {
-      return `Improve · Enter save · Esc back${sb}`;
+      return `Refine · edit sections · Enter save · Esc back${sb}`;
     }
     if (top.k === 'bullets') {
-      return `Improve · ↑↓ · [ ] move · a add · d delete · Enter edit bullet${sb}`;
+      return `Refine · edit sections · ↑↓ · [ ] move · a add · d delete · Enter edit bullet${sb}`;
     }
     if (top.k === 'bullet-edit') {
-      return `Improve · Enter save · Esc cancel${sb}`;
+      return `Refine · edit sections · Enter save · Esc cancel${sb}`;
     }
-    return `Improve${sb}`;
+    return `Refine · edit sections${sb}`;
   }, [
     phase,
     profile,
@@ -321,8 +321,12 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       popStack();
       return;
     }
+    if (profileEditorReturnTo) {
+      navigate(profileEditorReturnTo);
+      return;
+    }
     dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
-  }, [dirty, dispatch, popStack, stack.length]);
+  }, [dirty, dispatch, navigate, popStack, profileEditorReturnTo, stack.length]);
 
   useInput(
     (input, key) => {
@@ -846,7 +850,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   if (phase === 'loading') {
     return (
       <Box flexDirection="column">
-        <Text bold>Improve profile</Text>
+        <Text bold>Edit sections</Text>
         <Spinner label="Loading…" />
       </Box>
     );
@@ -855,7 +859,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   if (phase === 'no-source') {
     return (
       <Box flexDirection="column">
-        <Text bold>Improve profile</Text>
+        <Text bold>Edit sections</Text>
         <Text color="yellow">No source.json — import a profile first.</Text>
       </Box>
     );
@@ -864,7 +868,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   if (phase === 'err' && !profile) {
     return (
       <Box flexDirection="column">
-        <Text bold>Improve profile</Text>
+        <Text bold>Edit sections</Text>
         <Text color="red">{errMsg ?? 'Unknown error'}</Text>
       </Box>
     );
@@ -881,7 +885,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     ];
     return (
       <Box flexDirection="column">
-        <Text bold>Improve profile — save failed</Text>
+        <Text bold>Edit sections — save failed</Text>
         <Text color="red">{errMsg ?? 'Unknown error'}</Text>
         {showSettings && (
           <Box marginTop={1}>
@@ -927,7 +931,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   if (phase === 'saving') {
     return (
       <Box flexDirection="column">
-        <Text bold>Improve profile</Text>
+        <Text bold>Edit sections</Text>
         <Spinner label="Saving…" />
       </Box>
     );
@@ -1008,7 +1012,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
 
   return (
     <Box flexDirection="column">
-      <Text bold>Improve profile</Text>
+      <Text bold>Edit sections</Text>
       <Text dimColor>
         {session ? 'Editing refined.json' : 'Editing source.json'}
         {dirty ? ' · unsaved changes' : ''}
@@ -1016,7 +1020,8 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       <Text dimColor>{breadcrumb.join(' › ')}</Text>
       {session && (
         <Text dimColor>
-          AI hiring-manager feedback on the whole profile: Refine → Professional consultant review.
+          Hiring-manager feedback on the whole profile: Refine menu → Professional consultant
+          review.
         </Text>
       )}
 

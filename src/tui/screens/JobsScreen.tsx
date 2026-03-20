@@ -149,9 +149,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     const sb = ' · Tab sidebar';
     switch (mode.m) {
       case 'list':
-        return splitPane
-          ? `Jobs · ↑↓ list · Enter open · a add · d delete · p prepare · g generate${sb} · Preview shows selected job`
-          : `Jobs · ↑↓ · Enter open · a add · d delete · p prepare · g generate${sb}`;
+        return `Jobs · ↑↓ · Enter open · a add · d delete · p prepare · g generate · preview below list${sb}`;
       case 'detail':
         return `Jobs · ↑↓ · Enter · a d g p · Esc list${sb}`;
       case 'addTitle':
@@ -176,7 +174,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       default:
         return `Jobs${sb}`;
     }
-  }, [mode.m, splitPane]);
+  }, [mode.m]);
 
   useRegisterPanelFooterHint(jobsFooterHint);
 
@@ -372,19 +370,10 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
 
   useInput(
     (_input, key) => {
-      if (!active || inTextInput) {
+      if (!active || !key.escape) {
         return;
       }
-      if (!key.escape) {
-        return;
-      }
-      if (mode.m === 'viewJd') {
-        setMode({ m: 'detail', job: mode.job });
-        return;
-      }
-      if (mode.m === 'deleteAsk') {
-        return;
-      }
+      // Add-job wizard: Esc backs out even while TextInput / MultilineInput holds stdin.
       if (mode.m === 'addTitle') {
         setMode({ m: 'list' });
         return;
@@ -396,6 +385,16 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       if (mode.m === 'addJd') {
         setMode({ m: 'addCompany', title: mode.title });
         setCompanyDraft(mode.company);
+        return;
+      }
+      if (inTextInput) {
+        return;
+      }
+      if (mode.m === 'viewJd') {
+        setMode({ m: 'detail', job: mode.job });
+        return;
+      }
+      if (mode.m === 'deleteAsk') {
         return;
       }
       if (mode.m === 'detail') {
@@ -853,45 +852,37 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   const previewJob = listJob();
-  const listColumn = (
-    <Box flexDirection="column" width={splitPane ? listPaneW : undefined}>
-      <Text bold>Saved jobs</Text>
-      <Box marginTop={1}>
-        <SelectList
-          items={listItems}
-          selectedIndex={listIndex}
-          onChange={(i) => setListIndex(i)}
-          isActive={active && mode.m === 'list'}
-          onSubmit={openListJob}
-        />
+  return (
+    <Box flexDirection="column" width={cols}>
+      <Box flexDirection="column">
+        <Text bold>Saved jobs</Text>
+        <Box marginTop={1}>
+          <SelectList
+            items={listItems}
+            selectedIndex={listIndex}
+            onChange={(i) => setListIndex(i)}
+            isActive={active && mode.m === 'list'}
+            onSubmit={openListJob}
+          />
+        </Box>
+      </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text bold dimColor>
+          Preview
+        </Text>
+        {previewJob ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text>
+              {previewJob.title} @ {previewJob.company}
+            </Text>
+            <Text dimColor>{prepLabel[previewJob.id] ?? '…'}</Text>
+          </Box>
+        ) : (
+          <Box marginTop={1}>
+            <Text dimColor>No job selected (move ↑↓ on the list)</Text>
+          </Box>
+        )}
       </Box>
     </Box>
   );
-
-  if (splitPane) {
-    return (
-      <Box flexDirection="row" width={cols}>
-        {listColumn}
-        <Box marginLeft={1} flexDirection="column" flexGrow={1} minWidth={12}>
-          <Text bold dimColor>
-            Preview
-          </Text>
-          {previewJob ? (
-            <Box flexDirection="column" marginTop={1}>
-              <Text>
-                {previewJob.title} @ {previewJob.company}
-              </Text>
-              <Text dimColor>{prepLabel[previewJob.id] ?? '…'}</Text>
-            </Box>
-          ) : (
-            <Box marginTop={1}>
-              <Text dimColor>No job selected</Text>
-            </Box>
-          )}
-        </Box>
-      </Box>
-    );
-  }
-
-  return listColumn;
 }

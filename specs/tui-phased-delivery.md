@@ -20,17 +20,17 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 ## Phase A — shell
 
-**Purpose:** Shippable navigation shell that renders all eight screens inline within the Ink render tree.
+**Purpose:** Shippable navigation shell that renders the full set of screens inline within the Ink render tree (sidebar lists **seven** top-level targets; **ProfileEditorScreen** may be reached from **Refine**).
 
 **Required:**
 
-- Ink **Layout**, **Sidebar**, and all **eight screens** rendered as Ink components — no subprocess delegation, no `DelegateScreen` placeholders.
+- Ink **Layout**, **Sidebar**, and all primary screens rendered as Ink components — no subprocess delegation, no `DelegateScreen` placeholders.
 - Screens that are not yet fully functional **MUST** render an inline "not yet implemented" message rather than spawning a subprocess or breaking out to CLI.
 - The `runTui` loop / `exitBag` / `cliArgs.ts` subprocess-delegation pattern is **not allowed** at any phase.
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, direct edit, md sync), **Profile** (editor + dirty nav guard + save error menu). **NavigateProvider** for guarded navigation. Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, consultant, **manual section edit** → ProfileEditorScreen, direct edit, md sync). **ProfileEditorScreen** is not a sidebar row; **NavigateProvider** + **`profileEditorReturnTo`** for guarded navigation. Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 ---
 

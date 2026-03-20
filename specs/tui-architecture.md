@@ -44,8 +44,8 @@ Start simple. Cross-screen state growth is an implementation detail.
 | `↑↓` | Move selection in focused list or diff block |
 | `Enter` | Confirm / activate; submit single-line input |
 | `Esc` | Pop one level: blur input → cancel sub-state → go back → (only then) quit prompt |
-| `1–8` | Direct screen jump (suppressed when `operationInProgress` or `inTextInput`) |
-| Letter shortcuts | `g/j/i/d/r/p/c/s` screen jump (same suppression rules as `1–8`) |
+| `1–7` | Direct screen jump for sidebar `SCREEN_ORDER` (suppressed when `operationInProgress` or `inTextInput`) |
+| Letter shortcuts | `g/j/i/d/r/c/s` screen jump (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred) |
 | `:` or `/` | Open command palette |
 | `q` | Quit (suppressed during any text input) |
 | `Ctrl+C` | Hard exit (always works; documented in footer when relevant) |
@@ -71,7 +71,7 @@ useInput((input, key) => {
   }
   // 4. Global navigation
   if (input === 'q') { /* quit */ }
-  if (/^[1-8]$/.test(input)) { /* SET_SCREEN */ }
+  if (/^[1-7]$/.test(input)) { /* SET_SCREEN via SCREEN_ORDER */ }
   // ... letter shortcuts
 });
 ```
@@ -104,7 +104,7 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 | Mode | Footer content |
 |------|----------------|
-| Navigation | `↑↓ select · Enter open · Tab focus · 1–8 jump · q quit` |
+| Navigation | `↑↓ select · Enter open · Tab focus · 1–7 jump · q quit` |
 | Single-line input | `Enter: submit · Esc: cancel · q does NOT quit` |
 | Multi-line input | `Ctrl+D: done · Enter: newline · Esc: cancel · q does NOT quit` |
 | Async running (cancellable) | `⠋ working… · Esc: cancel · navigation locked` |
@@ -186,7 +186,7 @@ During `running`: `operationInProgress = true`, sidebar and screen-jump blocked,
 |--------|-----------|
 | Most screens | `sidebar` → `content` → (back to sidebar) |
 | Jobs | `sidebar` → `job-list` → `job-detail` → (back) |
-| Profile | `sidebar` → `section-list` → `editor` → (sub-levels via Enter/Esc, not Tab) |
+| Edit sections | **Refine menu** → `ProfileEditorScreen` → `section-list` → … (sub-levels via Enter/Esc, not Tab) |
 | Refine / Generate sub-states | Tab between `prompt`, `input`, `action-row` within the active sub-state |
 
 **Rules:**
@@ -194,7 +194,7 @@ During `running`: `operationInProgress = true`, sidebar and screen-jump blocked,
 - `Tab` advances within the current ordered region list.
 - `Esc` pops one level of focus before considering screen navigation: blur input → exit sub-state → (if at top level) prompt quit.
 - When `operationInProgress`, screen-jump and sidebar navigation are blocked; scrolling and Esc (for cancel) still work.
-- When `inTextInput` is true, `q`, `1–8`, and letter shortcuts do nothing (enforced by top-level `useInput` in App.tsx).
+- When `inTextInput` is true, `q`, number jumps, and letter shortcuts do nothing (enforced by top-level `useInput` in App.tsx). **Exception:** screens that must still pop on **Esc** (e.g. **Jobs** add-job wizard, **Refine** Q&A / direct edit, **Generate** non-run phases) register a **local** `useInput` that runs **before** their own `inTextInput` guard or that handles **Esc** explicitly while the text component is focused; **Settings** uses first **Esc** from the key field to blur back to the provider list.
 
 ---
 

@@ -56,6 +56,7 @@ function userEditSourced(value: string): Sourced<string> {
 type Phase =
   | { k: 'loading' }
   | { k: 'no-source'; msg: string }
+  | { k: 'first-refine-menu' }
   | { k: 'has-refined-menu'; syncPrompt: boolean }
   | { k: 'syncing-md' }
   | { k: 'gen-questions' }
@@ -106,7 +107,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ k: 'loading' });
   const [source, setSource] = useState<Profile | null>(null);
-  const [autoStartQa, setAutoStartQa] = useState(false);
   const [questions, setQuestions] = useState<RefinementQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerDraft, setAnswerDraft] = useState('');
@@ -130,6 +130,26 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [, rows] = useTerminalSize();
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
+
+  const goBackToRefineHub = useCallback(() => {
+    void (async () => {
+      const refined = await fileExists(refinedJsonPath(profileDir));
+      if (!refined) {
+        setPhase({ k: 'first-refine-menu' });
+        return;
+      }
+      const mdNewer = await isMdNewerThanJson(
+        refinedMdPath(profileDir),
+        refinedJsonPath(profileDir),
+      );
+      setPhase({ k: 'has-refined-menu', syncPrompt: mdNewer });
+    })();
+  }, [profileDir]);
+
+  const openManualSections = useCallback(() => {
+    dispatch({ type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: 'refine' });
+    navigate('profile');
+  }, [dispatch, navigate]);
 
   useEffect(() => {
     if (phase.k === 'diff') {
@@ -156,19 +176,22 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
 
   useInput(
     (_input, key) => {
-      if (!active || inTextInput) {
+      if (!active) {
         return;
       }
-      if (
-        key.escape &&
-        (phase.k === 'polish-pick' ||
-          phase.k === 'direct-edit-input' ||
-          phase.k === 'consultant-view')
-      ) {
+      if (key.escape && phase.k === 'direct-edit-input') {
+        setDirectEditDraft('');
+        goBackToRefineHub();
+        return;
+      }
+      if (inTextInput) {
+        return;
+      }
+      if (key.escape && (phase.k === 'polish-pick' || phase.k === 'consultant-view')) {
         if (phase.k === 'consultant-view') {
           consultantWorkRef.current = null;
         }
-        setPhase({ k: 'has-refined-menu', syncPrompt: false });
+        goBackToRefineHub();
       }
     },
     {
@@ -178,6 +201,17 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           phase.k === 'direct-edit-input' ||
           phase.k === 'consultant-view'),
     },
+  );
+
+  useInput(
+    (_input, key) => {
+      if (!active || phase.k !== 'qa' || !key.escape) {
+        return;
+      }
+      setAnswerDraft('');
+      goBackToRefineHub();
+    },
+    { isActive: active && phase.k === 'qa' },
   );
 
   useInput(
@@ -318,7 +352,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       setPhase({ k: 'qa', questions: qs, index: 0 });
     } catch (e) {
       if (isUserAbort(e)) {
-        setPhase({ k: 'has-refined-menu', syncPrompt: false });
+        goBackToRefineHub();
         return;
       }
       setApiFailureStreak((n) => n + 1);
@@ -332,7 +366,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       releaseController(ac);
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
-  }, [createController, dispatch, profileDir, releaseController, source]);
+  }, [createController, dispatch, goBackToRefineHub, profileDir, releaseController, source]);
 
   useEffect(() => {
     void (async () => {
@@ -347,20 +381,14 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           );
           setPhase({ k: 'has-refined-menu', syncPrompt: mdNewer });
         } else {
-          setAutoStartQa(true);
+          setMenuIdx(0);
+          setPhase({ k: 'first-refine-menu' });
         }
       } catch (e) {
         setPhase({ k: 'no-source', msg: (e as Error).message });
       }
     })();
   }, [profileDir]);
-
-  useEffect(() => {
-    if (autoStartQa && source) {
-      setAutoStartQa(false);
-      void beginQaFlow();
-    }
-  }, [autoStartQa, source, beginQaFlow]);
 
   const runApply = useCallback(async () => {
     if (!source) {
@@ -425,7 +453,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         });
       } catch (e) {
         if (isUserAbort(e)) {
-          setPhase({ k: 'has-refined-menu', syncPrompt: false });
+          goBackToRefineHub();
           return;
         }
         setApiFailureStreak((n) => n + 1);
@@ -440,7 +468,14 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
-    [createController, dispatch, persistRefinedKeepSession, profileDir, releaseController],
+    [
+      createController,
+      dispatch,
+      goBackToRefineHub,
+      persistRefinedKeepSession,
+      profileDir,
+      releaseController,
+    ],
   );
 
   const runDirectEdit = useCallback(
@@ -472,7 +507,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         });
       } catch (e) {
         if (isUserAbort(e)) {
-          setPhase({ k: 'has-refined-menu', syncPrompt: false });
+          goBackToRefineHub();
           return;
         }
         setApiFailureStreak((n) => n + 1);
@@ -487,7 +522,14 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
-    [createController, dispatch, persistRefinedKeepSession, profileDir, releaseController],
+    [
+      createController,
+      dispatch,
+      goBackToRefineHub,
+      persistRefinedKeepSession,
+      profileDir,
+      releaseController,
+    ],
   );
 
   const runConsultantReview = useCallback(async () => {
@@ -511,7 +553,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       setApiFailureStreak(0);
     } catch (e) {
       if (isUserAbort(e)) {
-        setPhase({ k: 'has-refined-menu', syncPrompt: false });
+        goBackToRefineHub();
         return;
       }
       setApiFailureStreak((n) => n + 1);
@@ -525,7 +567,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       releaseController(ac);
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
-  }, [createController, dispatch, profileDir, releaseController]);
+  }, [createController, dispatch, goBackToRefineHub, profileDir, releaseController]);
 
   const runConsultantApply = useCallback(async () => {
     const work = consultantWorkRef.current;
@@ -592,10 +634,12 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         return `Refine · ↑↓ Enter · Esc back to refined menu${sb}`;
       case 'direct-edit-input':
         return `Refine · Ctrl+D submit · Esc back to menu${sb}`;
+      case 'first-refine-menu':
+        return `Refine · ↑↓ Enter · Q&A pass or manual section edit${sb}`;
       case 'has-refined-menu':
         return phase.syncPrompt
           ? `Refine · Enter confirm md sync · Esc cancel${sb}`
-          : `Refine · ↑↓ Enter · Q&A, polish, consultant, direct edit${sb}`;
+          : `Refine · ↑↓ Enter · Q&A, polish, consultant, manual edit, direct edit${sb}`;
       case 'consultant-view':
         return `Refine · ↑↓ scroll & menu · Enter · Esc back to menu${sb}`;
       case 'gen-questions':
@@ -608,7 +652,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       case 'saving':
         return `Refine · working…${sb}`;
       case 'qa':
-        return `Refine · Enter submit answer (blank OK)${sb}`;
+        return `Refine · Enter submit answer (blank OK) · Esc exit Q&A to menu${sb}`;
       case 'diff':
         return `Refine · ↑↓ choose action · Enter confirm${sb}`;
       case 'diff-edit-summary':
@@ -642,6 +686,37 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     );
   }
 
+  if (phase.k === 'first-refine-menu') {
+    const firstItems = [
+      { value: 'qa', label: 'Run Q&A from source (first refinement pass)' },
+      { value: 'edit', label: 'Edit profile sections (manual — source.json)' },
+    ];
+    return (
+      <Box flexDirection="column">
+        <Text bold>Refine</Text>
+        <Text>
+          No refined.json yet. Run the Q&A pass to build refined data, or edit the imported source
+          manually first.
+        </Text>
+        <Box marginTop={1}>
+          <SelectList
+            items={firstItems}
+            selectedIndex={menuIdx}
+            onChange={(i) => setMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'qa') {
+                void beginQaFlow();
+                return;
+              }
+              openManualSections();
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
   if (phase.k === 'polish-pick') {
     const polishItems = [
       { value: 'all', label: 'Polish: summary + experience + skills' },
@@ -661,7 +736,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
             isActive={active}
             onSubmit={(item) => {
               if (item.value === 'back') {
-                setPhase({ k: 'has-refined-menu', syncPrompt: false });
+                goBackToRefineHub();
                 return;
               }
               const sections =
@@ -770,7 +845,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                 return;
               }
               consultantWorkRef.current = null;
-              setPhase({ k: 'has-refined-menu', syncPrompt: false });
+              goBackToRefineHub();
             }}
           />
         </Box>
@@ -786,6 +861,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         value: 'consultant',
         label: 'Professional consultant review (hiring manager, whole profile)',
       },
+      { value: 'edit', label: 'Edit profile sections (manual)' },
       { value: 'direct', label: 'Direct edit (instructions to Claude)' },
     ];
     const syncPrompt = phase.syncPrompt;
@@ -815,7 +891,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                   void syncRefinedFromMarkdown();
                 }}
                 onCancel={() => {
-                  setPhase({ k: 'has-refined-menu', syncPrompt: false });
+                  goBackToRefineHub();
                 }}
               />
             </Box>
@@ -839,6 +915,10 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
               }
               if (item.value === 'consultant') {
                 void runConsultantReview();
+                return;
+              }
+              if (item.value === 'edit') {
+                openManualSections();
                 return;
               }
               if (item.value === 'direct') {
@@ -1045,7 +1125,6 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                 setApiFailureStreak(0);
                 navigate('settings');
                 dispatch({ type: 'SET_FOCUS', target: 'content' });
-                setPhase({ k: 'has-refined-menu', syncPrompt: false });
                 return;
               }
               if (item.value === 'back') {
@@ -1067,7 +1146,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                     return;
                   }
                 }
-                setPhase({ k: 'has-refined-menu', syncPrompt: false });
+                goBackToRefineHub();
                 return;
               }
               if (item.value === 'retry') {

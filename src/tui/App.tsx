@@ -63,7 +63,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
       return 'Refine · ↑↓ menu · Enter · Q&A Enter submit · y/n on diff · Tab sidebar';
     }
     if (activeScreen === 'profile' && focusTarget === 'content') {
-      return 'Profile · ↑↓ · Enter · Esc · s save · a/d on bullet list · Tab sidebar';
+      return 'Profile · ↑↓ · [ ] reorder bullets · Enter · Esc · s save · a/d bullets · Tab sidebar';
     }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
   }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);

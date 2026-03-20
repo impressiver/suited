@@ -19,8 +19,9 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 
 ### Profile editor
 
-- [ ] **Sections** — Education, Certifications, Projects, Skills (`CheckboxList` / patterns in spec); **not** only Summary + Experience.
-- [ ] **Bullets** — reorder (`↑↓`) within the bullet list (spec [ProfileEditorScreen](./tui-screens.md#profileeditorscreen)).
+- [ ] **Sections** — Education, Certifications, Projects (lists + edit; patterns in [`tui-screens.md`](./tui-screens.md#profileeditorscreen)).
+- [x] **Skills** — list with **a**/**d**, reorder **`[`**/**`]`**, Enter → inline name edit (not the spec’s `CheckboxList` toggle UX; functional parity for editing the skill list).
+- [x] **Bullets** — reorder via **`[` / `]`** (swap with previous/next); `↑↓` is selection via `SelectList` (spec [ProfileEditorScreen](./tui-screens.md#profileeditorscreen)).
 - [x] **Bullets** — add (`a`) and delete (`d`, `ConfirmPrompt`) on the experience bullet list; `App` defers `a`/`d` so `d` does not jump to Dashboard.
 - [ ] **Navigate-away confirm** — when dirty, intercept sidebar / `1–8` / screen-cycle (not only in-screen Esc stack); policy in [open questions](./tui-open-questions.md).
 

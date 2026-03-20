@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { profileToMarkdown } from '../../profile/markdown.ts';
@@ -44,7 +45,9 @@ type Frame =
   | { k: 'summary' }
   | { k: 'positions' }
   | { k: 'bullets'; posIdx: number }
-  | { k: 'bullet-edit'; posIdx: number; bulletIdx: number };
+  | { k: 'bullet-edit'; posIdx: number; bulletIdx: number }
+  | { k: 'skills' }
+  | { k: 'skill-edit'; skillIdx: number };
 
 type UnsavedAction = { action: 'pop' | 'sidebar' };
 
@@ -74,6 +77,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     posIdx: number;
     bulletIdx: number;
   } | null>(null);
+  const [skillDeletePrompt, setSkillDeletePrompt] = useState<{ skillIdx: number } | null>(null);
   const top = stack.at(-1);
 
   useEffect(() => {
@@ -170,7 +174,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       if (!active || phase !== 'ready' || unsaved || !profile) {
         return;
       }
-      if (bulletDeletePrompt) {
+      if (bulletDeletePrompt || skillDeletePrompt) {
         return;
       }
       if (editingSummary && key.escape) {
@@ -179,6 +183,10 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         return;
       }
       if (top?.k === 'bullet-edit' && key.escape) {
+        popStack();
+        return;
+      }
+      if (top?.k === 'skill-edit' && key.escape) {
         popStack();
         return;
       }
@@ -217,6 +225,135 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
             const bi = Math.min(menuIdx, pos.bullets.length - 1);
             setBulletDeletePrompt({ posIdx: top.posIdx, bulletIdx: bi });
           }
+          return;
+        }
+        if (input === '[') {
+          const pos = profile.positions[top.posIdx];
+          if (!pos || pos.bullets.length < 2) {
+            return;
+          }
+          const bi = Math.min(menuIdx, pos.bullets.length - 1);
+          if (bi <= 0) {
+            return;
+          }
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const np = next.positions[top.posIdx];
+            if (!np?.bullets[bi - 1] || !np.bullets[bi]) {
+              return p;
+            }
+            const bs = np.bullets;
+            const tmp = bs[bi - 1]!;
+            bs[bi - 1] = bs[bi]!;
+            bs[bi] = tmp;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(bi - 1);
+          return;
+        }
+        if (input === ']') {
+          const pos = profile.positions[top.posIdx];
+          if (!pos || pos.bullets.length < 2) {
+            return;
+          }
+          const bi = Math.min(menuIdx, pos.bullets.length - 1);
+          if (bi >= pos.bullets.length - 1) {
+            return;
+          }
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const np = next.positions[top.posIdx];
+            if (!np?.bullets[bi] || !np.bullets[bi + 1]) {
+              return p;
+            }
+            const bs = np.bullets;
+            const tmp = bs[bi]!;
+            bs[bi] = bs[bi + 1]!;
+            bs[bi + 1] = tmp;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(bi + 1);
+          return;
+        }
+      }
+      if (top?.k === 'skills') {
+        if (input === 'a' || input === 'A') {
+          let newIdx = 0;
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            next.skills = [...next.skills, { id: `skill-${randomUUID()}`, name: userEdit('') }];
+            newIdx = next.skills.length - 1;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(newIdx);
+          return;
+        }
+        if (input === 'd' || input === 'D') {
+          const skills = profile.skills;
+          if (skills.length > 0) {
+            const si = Math.min(menuIdx, skills.length - 1);
+            setSkillDeletePrompt({ skillIdx: si });
+          }
+          return;
+        }
+        if (input === '[') {
+          const skills = profile.skills;
+          if (skills.length < 2) {
+            return;
+          }
+          const si = Math.min(menuIdx, skills.length - 1);
+          if (si <= 0) {
+            return;
+          }
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const sk = next.skills;
+            const tmp = sk[si - 1]!;
+            sk[si - 1] = sk[si]!;
+            sk[si] = tmp;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(si - 1);
+          return;
+        }
+        if (input === ']') {
+          const skills = profile.skills;
+          if (skills.length < 2) {
+            return;
+          }
+          const si = Math.min(menuIdx, skills.length - 1);
+          if (si >= skills.length - 1) {
+            return;
+          }
+          setProfile((p) => {
+            if (!p) {
+              return p;
+            }
+            const next = cloneProfile(p);
+            const sk = next.skills;
+            const tmp = sk[si]!;
+            sk[si] = sk[si + 1]!;
+            sk[si + 1] = tmp;
+            return next;
+          });
+          setDirty(true);
+          setMenuIdx(si + 1);
           return;
         }
       }
@@ -310,6 +447,13 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     if (f.k === 'positions') {
       return 'Experience';
     }
+    if (f.k === 'skills') {
+      return 'Skills';
+    }
+    if (f.k === 'skill-edit') {
+      const sk = profile.skills[f.skillIdx];
+      return `Skill · ${sk?.name.value ?? '?'}`;
+    }
     if (f.k === 'bullets') {
       const pos = profile.positions[f.posIdx];
       const title = pos ? `${pos.title.value} @ ${pos.company.value}` : '?';
@@ -323,6 +467,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const sectionItems = [
     { value: 'summary', label: 'Summary' },
     { value: 'experience', label: 'Experience (positions & bullets)' },
+    { value: 'skills', label: 'Skills' },
   ];
 
   const positionItems = profile.positions.map((p, i) => ({
@@ -361,6 +506,9 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                 setMenuIdx(0);
               } else if (item.value === 'experience') {
                 setStack((s) => [...s, { k: 'positions' }]);
+                setMenuIdx(0);
+              } else if (item.value === 'skills') {
+                setStack((s) => [...s, { k: 'skills' }]);
                 setMenuIdx(0);
               }
             }}
@@ -429,6 +577,112 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         </Box>
       )}
 
+      {top.k === 'skills' && (() => {
+        const skillItems = profile.skills.map((s, i) => ({
+          value: String(i),
+          label: s.name.value.length > 72 ? `${s.name.value.slice(0, 72)}…` : s.name.value || '(empty)',
+        }));
+        return (
+          <Box marginTop={1} flexDirection="column">
+            <Text dimColor>
+              ↑↓ select · [ ] move up/down · a add · d delete · Enter edit name
+            </Text>
+            {skillDeletePrompt && (
+              <Box marginTop={1}>
+                <ConfirmPrompt
+                  message="Delete this skill?"
+                  active={active && skillDeletePrompt !== null}
+                  onConfirm={() => {
+                    const ctx = skillDeletePrompt;
+                    setSkillDeletePrompt(null);
+                    if (!ctx) {
+                      return;
+                    }
+                    setProfile((p) => {
+                      if (!p) {
+                        return p;
+                      }
+                      const next = cloneProfile(p);
+                      if (ctx.skillIdx < 0 || ctx.skillIdx >= next.skills.length) {
+                        return p;
+                      }
+                      next.skills.splice(ctx.skillIdx, 1);
+                      return next;
+                    });
+                    setDirty(true);
+                    setMenuIdx((i) => {
+                      if (i > ctx.skillIdx) {
+                        return i - 1;
+                      }
+                      if (i === ctx.skillIdx) {
+                        return Math.max(0, ctx.skillIdx - 1);
+                      }
+                      return i;
+                    });
+                  }}
+                  onCancel={() => {
+                    setSkillDeletePrompt(null);
+                  }}
+                />
+              </Box>
+            )}
+            {skillItems.length === 0 ? (
+              <Text dimColor>No skills — press a to add.</Text>
+            ) : (
+              <SelectList
+                items={skillItems}
+                selectedIndex={menuIdx}
+                onChange={(i) => setMenuIdx(i)}
+                isActive={active && !unsaved && !skillDeletePrompt}
+                onSubmit={(item) => {
+                  const si = Number.parseInt(item.value, 10);
+                  if (!Number.isNaN(si)) {
+                    setStack((s) => [...s, { k: 'skill-edit', skillIdx: si }]);
+                  }
+                }}
+              />
+            )}
+          </Box>
+        );
+      })()}
+
+      {top.k === 'skill-edit' && (() => {
+        const sk = profile.skills[top.skillIdx];
+        if (!sk) {
+          return <Text color="red">Invalid skill.</Text>;
+        }
+        return (
+          <Box marginTop={1} flexDirection="column">
+            <InlineEditor
+              value={sk.name.value}
+              onChange={(v) => {
+                setProfile((p) => {
+                  if (!p) {
+                    return p;
+                  }
+                  const next = cloneProfile(p);
+                  const s = next.skills[top.skillIdx];
+                  if (!s) {
+                    return p;
+                  }
+                  s.name = userEdit(v);
+                  return next;
+                });
+                setDirty(true);
+              }}
+              isEditing
+              inputFocused={active}
+              onSubmit={() => {
+                popStack();
+              }}
+            />
+            <Box marginTop={1}>
+              <Text dimColor>Enter save · Esc back</Text>
+            </Box>
+          </Box>
+        );
+      })()}
+
       {top.k === 'bullets' && (() => {
         const pos = profile.positions[top.posIdx];
         if (!pos) {
@@ -441,7 +695,9 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         }));
         return (
           <Box marginTop={1} flexDirection="column">
-            <Text dimColor>a add · d delete selected · Enter edit</Text>
+            <Text dimColor>
+              ↑↓ select · [ ] move up/down · a add · d delete · Enter edit
+            </Text>
             {bulletDeletePrompt && (
               <Box marginTop={1}>
                 <ConfirmPrompt

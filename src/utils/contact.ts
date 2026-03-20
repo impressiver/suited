@@ -1,4 +1,4 @@
-import type { Profile } from '../profile/schema.js';
+import type { Profile } from '../profile/schema.ts';
 import {
   loadContactMeta,
   loadRefined,
@@ -6,9 +6,9 @@ import {
   saveContactMeta,
   saveRefined,
   saveSource,
-} from '../profile/serializer.js';
-import { c } from './colors.js';
-import { fileExists } from './fs.js';
+} from '../profile/serializer.ts';
+import { c } from './colors.ts';
+import { fileExists } from './fs.ts';
 
 /**
  * Prompts for any missing contact fields (headline, email, phone, LinkedIn),

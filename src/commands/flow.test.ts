@@ -21,7 +21,7 @@ describe('runFlow non-TTY', () => {
   });
 
   it('prints one-line stderr and sets exit 0 (canonical non-interactive)', async () => {
-    const { runFlow } = await import('./flow.js');
+    const { runFlow } = await import('./flow.ts');
     await runFlow({});
     expect(stderrSpy).toHaveBeenCalledWith(
       'suited: open an interactive terminal to use the dashboard, or run e.g. suited --help, suited refine',

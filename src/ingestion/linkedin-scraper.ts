@@ -15,8 +15,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import puppeteer, { type Browser, type CookieData, type Page } from 'puppeteer-core';
-import { findChromePath } from '../utils/chrome.js';
-import { fileExists } from '../utils/fs.js';
+import { findChromePath } from '../utils/chrome.ts';
+import { fileExists } from '../utils/fs.ts';
 
 const SESSION_DIR = join(homedir(), '.suited');
 const SESSION_FILE = join(SESSION_DIR, 'linkedin-session.json');

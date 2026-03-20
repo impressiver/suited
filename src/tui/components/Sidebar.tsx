@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import { NAV_LABELS, SCREEN_ORDER, type ScreenId } from '../types.js';
+import { NAV_LABELS, SCREEN_ORDER, type ScreenId } from '../types.ts';
 
 export interface SidebarProps {
   activeScreen: ScreenId;

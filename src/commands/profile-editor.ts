@@ -1,4 +1,4 @@
-import { profileToMarkdown } from '../profile/markdown.js';
+import { profileToMarkdown } from '../profile/markdown.ts';
 import type {
   Certification,
   Education,
@@ -6,7 +6,7 @@ import type {
   Profile,
   Project,
   Sourced,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 import {
   loadActiveProfile,
   loadRefined,
@@ -15,10 +15,10 @@ import {
   saveRefined,
   saveSource,
   sourceMdPath,
-} from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { isUserExit } from '../utils/user-exit.js';
+} from '../profile/serializer.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { isUserExit } from '../utils/user-exit.ts';
 
 export interface ProfileEditorOptions {
   profileDir?: string;

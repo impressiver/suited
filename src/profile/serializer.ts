@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileExists } from '../utils/fs.js';
+import { fileExists } from '../utils/fs.ts';
 import {
   type ContactMeta,
   type GenerationConfig,
@@ -10,7 +10,7 @@ import {
   ProfileSchema,
   type RefinedData,
   type SavedJob,
-} from './schema.js';
+} from './schema.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

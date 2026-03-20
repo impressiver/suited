@@ -1,19 +1,19 @@
-import { detectInput } from '../ingestion/detector.js';
-import { parseLinkedInExport } from '../ingestion/linkedin-export.js';
-import { parseLinkedInPaste } from '../ingestion/linkedin-paste.js';
-import { clearLinkedInSession, scrapeLinkedInProfile } from '../ingestion/linkedin-scraper.js';
-import { profileToMarkdown } from '../profile/markdown.js';
-import type { Profile } from '../profile/schema.js';
+import { detectInput } from '../ingestion/detector.ts';
+import { parseLinkedInExport } from '../ingestion/linkedin-export.ts';
+import { parseLinkedInPaste } from '../ingestion/linkedin-paste.ts';
+import { clearLinkedInSession, scrapeLinkedInProfile } from '../ingestion/linkedin-scraper.ts';
+import { profileToMarkdown } from '../profile/markdown.ts';
+import type { Profile } from '../profile/schema.ts';
 import {
   loadContactMeta,
   mergeContactMeta,
   saveSource,
   sourceJsonPath,
   sourceMdPath,
-} from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { ensureContactDetails } from '../utils/contact.js';
-import { extractZip, findCsvDir } from '../utils/zip.js';
+} from '../profile/serializer.ts';
+import { c } from '../utils/colors.ts';
+import { ensureContactDetails } from '../utils/contact.ts';
+import { extractZip, findCsvDir } from '../utils/zip.ts';
 
 export interface ImportOptions {
   input?: string;

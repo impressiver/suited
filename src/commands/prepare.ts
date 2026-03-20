@@ -1,23 +1,23 @@
-import type { JobEvaluation } from '../claude/prompts/consultant.js';
+import type { JobEvaluation } from '../claude/prompts/consultant.ts';
 import {
   applyJobFeedback,
   enrichFindingsWithUserInput,
   evaluateForJob,
   printJobEvaluation,
-} from '../generate/consultant.js';
-import { buildRefMapForProfile, type CuratorResult, curateForJob } from '../generate/curator.js';
-import { analyzeJobDescription } from '../generate/job-analyzer.js';
-import { assembleResumeDocument, getFlairInfo } from '../generate/resume-builder.js';
-import type { CurationPlan, JobRefinement, Profile, ResumeDocument } from '../profile/schema.js';
+} from '../generate/consultant.ts';
+import { buildRefMapForProfile, type CuratorResult, curateForJob } from '../generate/curator.ts';
+import { analyzeJobDescription } from '../generate/job-analyzer.ts';
+import { assembleResumeDocument, getFlairInfo } from '../generate/resume-builder.ts';
+import type { CurationPlan, JobRefinement, Profile, ResumeDocument } from '../profile/schema.ts';
 import {
   loadActiveProfile,
   loadJobRefinement,
   loadJobs,
   saveJobRefinement,
-} from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { createSpinner } from '../utils/spinner.js';
-import { isUserExit } from '../utils/user-exit.js';
+} from '../profile/serializer.ts';
+import { c } from '../utils/colors.ts';
+import { createSpinner } from '../utils/spinner.ts';
+import { isUserExit } from '../utils/user-exit.ts';
 
 export interface PrepareOptions {
   profileDir?: string;

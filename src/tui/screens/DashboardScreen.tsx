@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
-import { hasApiKey } from '../env.js';
-import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.js';
-import { suggestedNextLine } from '../suggestedNext.js';
+import { hasApiKey } from '../env.ts';
+import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
+import { suggestedNextLine } from '../suggestedNext.ts';
 
 export interface DashboardScreenProps {
   snapshot: ProfileSnapshot;

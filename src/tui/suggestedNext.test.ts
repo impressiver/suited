@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { suggestedNextLine } from './suggestedNext.js';
+import { suggestedNextLine } from './suggestedNext.ts';
 
 describe('suggestedNextLine', () => {
   it('asks for API key first', () => {

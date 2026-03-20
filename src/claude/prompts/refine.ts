@@ -1,5 +1,5 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import type { Profile, RefinementQuestion } from '../../profile/schema.js';
+import type { Profile, RefinementQuestion } from '../../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Profile serialisation for the prompt

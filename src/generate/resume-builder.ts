@@ -1,5 +1,5 @@
-import { resolvePath } from '../claude/accuracy-guard.js';
-import type { RefEntry } from '../claude/prompts/curate.js';
+import { resolvePath } from '../claude/accuracy-guard.ts';
+import type { RefEntry } from '../claude/prompts/curate.ts';
 import type {
   CurationPlan,
   FlairLevel,
@@ -9,7 +9,7 @@ import type {
   ResumeDocument,
   ResumePosition,
   TemplateName,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers

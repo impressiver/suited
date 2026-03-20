@@ -15,7 +15,7 @@ function isInteractiveTty(): boolean {
 
 export async function runFlow(options: FlowOptions): Promise<void> {
   if (isInteractiveTty()) {
-    const { runTui } = await import('../tui/runTui.js');
+    const { runTui } = await import('../tui/runTui.tsx');
     await runTui(options);
     return;
   }

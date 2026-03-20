@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Box, Text } from 'ink';
 import { useEffect, useState } from 'react';
-import { hasApiKey } from '../env.js';
+import { hasApiKey } from '../env.ts';
 
 function maskKey(key: string): string {
   if (key.length <= 8) return '••••••••';

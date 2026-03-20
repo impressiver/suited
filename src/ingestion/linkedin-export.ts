@@ -19,8 +19,8 @@ import type {
   Skill,
   Sourced,
   VolunteerRole,
-} from '../profile/schema.js';
-import { deduplicateSkills, normalizeDate, splitBullets } from './normalizer.js';
+} from '../profile/schema.ts';
+import { deduplicateSkills, normalizeDate, splitBullets } from './normalizer.ts';
 
 type Row = Record<string, string>;
 

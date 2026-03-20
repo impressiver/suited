@@ -1,6 +1,6 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { SelectList } from './SelectList.js';
+import { SelectList } from './SelectList.tsx';
 
 describe('SelectList', () => {
   it('renders items with selection marker', () => {

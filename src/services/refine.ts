@@ -1,4 +1,4 @@
-import { callWithTool, callWithToolStreaming } from '../claude/client.js';
+import { callWithTool, callWithToolStreaming } from '../claude/client.ts';
 import {
   buildQAContext,
   DIRECT_EDIT_SYSTEM,
@@ -8,8 +8,8 @@ import {
   REFINE_APPLY_SYSTEM,
   REFINE_QUESTIONS_SYSTEM,
   refinementsToolSchema,
-} from '../claude/prompts/refine.js';
-import type { Profile, RefinementQuestion } from '../profile/schema.js';
+} from '../claude/prompts/refine.ts';
+import type { Profile, RefinementQuestion } from '../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Tool payloads (same shapes as `commands/refine.ts`)

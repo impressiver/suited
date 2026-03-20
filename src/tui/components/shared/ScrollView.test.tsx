@@ -1,6 +1,6 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { ScrollView } from './ScrollView.js';
+import { ScrollView } from './ScrollView.tsx';
 
 describe('ScrollView', () => {
   it('shows a window of lines', () => {

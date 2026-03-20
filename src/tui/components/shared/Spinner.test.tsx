@@ -1,6 +1,6 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { Spinner } from './Spinner.js';
+import { Spinner } from './Spinner.tsx';
 
 describe('Spinner', () => {
   it('renders a braille frame and label', () => {

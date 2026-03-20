@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import type { SavedJob } from '../profile/schema.js';
-import { deleteJob, loadJobRefinement, loadJobs, saveJob } from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { isUserExit } from '../utils/user-exit.js';
+import type { SavedJob } from '../profile/schema.ts';
+import { deleteJob, loadJobRefinement, loadJobs, saveJob } from '../profile/serializer.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { isUserExit } from '../utils/user-exit.ts';
 
 export interface JobsOptions {
   profileDir?: string;

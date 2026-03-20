@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import type { DiffBlock } from '../../../services/refine.js';
+import type { DiffBlock } from '../../../services/refine.ts';
 
 /** Pure formatter for tests and non-Ink consumers. */
 export function formatDiffBlockLines(block: DiffBlock): string[] {

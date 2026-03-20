@@ -1,7 +1,7 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { AppStoreProvider } from '../../store.js';
-import { InlineEditor } from './InlineEditor.js';
+import { AppStoreProvider } from '../../store.tsx';
+import { InlineEditor } from './InlineEditor.tsx';
 
 describe('InlineEditor', () => {
   it('shows read-only when not editing', () => {

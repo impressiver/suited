@@ -1,5 +1,5 @@
-import { profileToMarkdown } from '../profile/markdown.js';
-import type { ContactMeta, Profile, Sourced } from '../profile/schema.js';
+import { profileToMarkdown } from '../profile/markdown.ts';
+import type { ContactMeta, Profile, Sourced } from '../profile/schema.ts';
 import {
   loadActiveProfile,
   loadRefined,
@@ -9,8 +9,8 @@ import {
   saveRefined,
   saveSource,
   sourceMdPath,
-} from '../profile/serializer.js';
-import { fileExists } from '../utils/fs.js';
+} from '../profile/serializer.ts';
+import { fileExists } from '../utils/fs.ts';
 
 /** Editable contact fields (subset of `ContactInfo`). */
 export type ContactFields = Partial<{

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appReducer, createInitialAppState } from './store.js';
+import { appReducer, createInitialAppState } from './store.tsx';
 
 describe('appReducer', () => {
   const base = createInitialAppState('/tmp/profile');

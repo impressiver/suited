@@ -1,6 +1,6 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { ProgressSteps } from './ProgressSteps.js';
+import { ProgressSteps } from './ProgressSteps.tsx';
 
 describe('ProgressSteps', () => {
   it('marks current step', () => {

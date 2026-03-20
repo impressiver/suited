@@ -1,6 +1,6 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { StatusBadge } from './StatusBadge.js';
+import { StatusBadge } from './StatusBadge.tsx';
 
 describe('StatusBadge', () => {
   it('renders children', () => {

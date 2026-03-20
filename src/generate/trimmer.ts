@@ -1,6 +1,6 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { callWithTool } from '../claude/client.js';
-import type { ResumeDocument } from '../profile/schema.js';
+import { callWithTool } from '../claude/client.ts';
+import type { ResumeDocument } from '../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Tool schema

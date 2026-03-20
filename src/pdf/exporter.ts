@@ -1,8 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import puppeteer from 'puppeteer-core';
-import type { TemplateName } from '../profile/schema.js';
-import { findChromePath } from '../utils/chrome.js';
+import type { TemplateName } from '../profile/schema.ts';
+import { findChromePath } from '../utils/chrome.ts';
 
 interface PdfOptions {
   template: TemplateName;

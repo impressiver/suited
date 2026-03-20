@@ -1,6 +1,6 @@
 import InkTextInput from 'ink-text-input';
 import { useEffect } from 'react';
-import { useAppDispatch } from '../../store.js';
+import { useAppDispatch } from '../../store.tsx';
 
 export interface TextInputProps {
   value: string;

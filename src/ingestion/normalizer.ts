@@ -1,4 +1,4 @@
-import type { DataSource, Sourced } from '../profile/schema.js';
+import type { DataSource, Sourced } from '../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Date normalization

@@ -6,8 +6,8 @@ import {
   useMemo,
   useReducer,
 } from 'react';
-import type { Profile } from '../profile/schema.js';
-import type { FocusTarget, ScreenId } from './types.js';
+import type { Profile } from '../profile/schema.ts';
+import type { FocusTarget, ScreenId } from './types.ts';
 
 export interface AppState {
   profileDir: string;

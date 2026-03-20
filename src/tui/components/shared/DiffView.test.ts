@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDiffBlockLines } from './DiffView.js';
+import { formatDiffBlockLines } from './DiffView.tsx';
 
 describe('formatDiffBlockLines', () => {
   it('formats position bullet diff with - and + lines', () => {

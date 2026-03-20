@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { extname } from 'node:path';
-import { findCsvDir } from '../utils/zip.js';
+import { findCsvDir } from '../utils/zip.ts';
 
 export type InputKind = 'linkedin-url' | 'export-zip' | 'export-dir' | 'paste-text';
 

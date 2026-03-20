@@ -10,16 +10,16 @@
 
 import 'dotenv/config';
 import { Command } from 'commander';
-import { runContact } from './commands/contact.js';
-import { runFlow } from './commands/flow.js';
-import { runGenerate } from './commands/generate.js';
-import { runImport } from './commands/import.js';
-import { runImprove } from './commands/improve.js';
-import { runJobs } from './commands/jobs.js';
-import { runPrepare } from './commands/prepare.js';
-import { runRefine } from './commands/refine.js';
-import { runValidate } from './commands/validate.js';
-import { PACKAGE_VERSION } from './version.js';
+import { runContact } from './commands/contact.ts';
+import { runFlow } from './commands/flow.ts';
+import { runGenerate } from './commands/generate.ts';
+import { runImport } from './commands/import.ts';
+import { runImprove } from './commands/improve.ts';
+import { runJobs } from './commands/jobs.ts';
+import { runPrepare } from './commands/prepare.ts';
+import { runRefine } from './commands/refine.ts';
+import { runValidate } from './commands/validate.ts';
+import { PACKAGE_VERSION } from './version.ts';
 
 const program = new Command();
 

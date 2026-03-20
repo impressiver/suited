@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { render } from 'ink';
-import type { FlowOptions } from '../commands/flow.js';
-import { App } from './App.js';
-import { AppStoreProvider } from './store.js';
+import type { FlowOptions } from '../commands/flow.ts';
+import { App } from './App.tsx';
+import { AppStoreProvider } from './store.tsx';
 
 export async function runTui(options: FlowOptions): Promise<void> {
   const profileDir = options.profileDir ?? 'output';

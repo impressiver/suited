@@ -1,21 +1,21 @@
-import { getFlairInfo } from '../generate/resume-builder.js';
+import { getFlairInfo } from '../generate/resume-builder.ts';
 import {
   loadGenerationConfig,
   loadSource,
   refinedJsonPath,
   sourceJsonPath,
-} from '../profile/serializer.js';
-import { banner, c, randomTagline } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { isUserExit } from '../utils/user-exit.js';
-import { runContact } from './contact.js';
-import type { FlowOptions } from './flow.js';
-import { runGenerate } from './generate.js';
-import { runImport } from './import.js';
-import { runJobs } from './jobs.js';
-import { runPrepare } from './prepare.js';
-import { runRefine } from './refine.js';
-import { runValidate } from './validate.js';
+} from '../profile/serializer.ts';
+import { banner, c, randomTagline } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { isUserExit } from '../utils/user-exit.ts';
+import { runContact } from './contact.ts';
+import type { FlowOptions } from './flow.ts';
+import { runGenerate } from './generate.ts';
+import { runImport } from './import.ts';
+import { runJobs } from './jobs.ts';
+import { runPrepare } from './prepare.ts';
+import { runRefine } from './refine.ts';
+import { runValidate } from './validate.ts';
 
 export async function runDashboard(options: FlowOptions): Promise<void> {
   const { default: inquirer } = await import('inquirer');

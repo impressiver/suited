@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { createDebouncedString } from './debounceString.js';
+import { createDebouncedString } from './debounceString.ts';
 
 /**
  * Debounced string flush — for MultilineInput (16ms) and similar.

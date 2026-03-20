@@ -1,6 +1,6 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { ConfirmPrompt } from './ConfirmPrompt.js';
+import { ConfirmPrompt } from './ConfirmPrompt.tsx';
 
 describe('ConfirmPrompt', () => {
   it('renders message and hint', () => {

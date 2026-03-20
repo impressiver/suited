@@ -1,5 +1,5 @@
-import type { FlowOptions } from '../commands/flow.js';
-import type { ScreenId } from './types.js';
+import type { FlowOptions } from '../commands/flow.ts';
+import type { ScreenId } from './types.ts';
 
 /** Build argv tail for `node <cli> …` subprocess (no binary name). */
 export function buildPendingCliArgs(

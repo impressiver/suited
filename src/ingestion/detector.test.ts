@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectInput } from './detector.js';
+import { detectInput } from './detector.ts';
 
 describe('detectInput', () => {
   it('detects LinkedIn profile URLs', async () => {

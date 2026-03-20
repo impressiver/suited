@@ -1,7 +1,7 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { callWithTool } from '../claude/client.js';
-import { CONTENT_TWEAK_SYSTEM, JOB_TAILORED_POLISH_SYSTEM } from '../claude/prompts/refine.js';
-import type { JobAnalysis, ResumeDocument } from '../profile/schema.js';
+import { callWithTool } from '../claude/client.ts';
+import { CONTENT_TWEAK_SYSTEM, JOB_TAILORED_POLISH_SYSTEM } from '../claude/prompts/refine.ts';
+import type { JobAnalysis, ResumeDocument } from '../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Tool schema

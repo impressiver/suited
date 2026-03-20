@@ -1,5 +1,5 @@
-import { buildRefList } from '../claude/prompts/curate.js';
-import type { Profile } from '../profile/schema.js';
+import { buildRefList } from '../claude/prompts/curate.ts';
+import type { Profile } from '../profile/schema.ts';
 
 export interface ValidationResult {
   /** True when structure + ref map are usable for accuracy guard (matches prior CLI messaging). */

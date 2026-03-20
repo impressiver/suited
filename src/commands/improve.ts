@@ -1,5 +1,5 @@
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.js';
-import type { Profile } from '../profile/schema.js';
+import { markdownToProfile, profileToMarkdown } from '../profile/markdown.ts';
+import type { Profile } from '../profile/schema.ts';
 import {
   loadRefined,
   loadSource,
@@ -8,13 +8,13 @@ import {
   saveRefined,
   saveSource,
   sourceJsonPath,
-} from '../profile/serializer.js';
-import { computeHealthScore } from '../services/improve.js';
-import { c, healthQuip, healthStars } from '../utils/colors.js';
-import { ensureContactDetails } from '../utils/contact.js';
-import { fileExists } from '../utils/fs.js';
-import { openInEditor } from '../utils/interactive.js';
-import { runRefine } from './refine.js';
+} from '../profile/serializer.ts';
+import { computeHealthScore } from '../services/improve.ts';
+import { c, healthQuip, healthStars } from '../utils/colors.ts';
+import { ensureContactDetails } from '../utils/contact.ts';
+import { fileExists } from '../utils/fs.ts';
+import { openInEditor } from '../utils/interactive.ts';
+import { runRefine } from './refine.ts';
 
 export interface ImproveOptions {
   profileDir?: string;

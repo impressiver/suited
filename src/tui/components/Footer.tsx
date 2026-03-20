@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import type { FocusTarget } from '../types.js';
+import type { FocusTarget } from '../types.ts';
 
 export interface FooterProps {
   focusTarget: FocusTarget;

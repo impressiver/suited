@@ -2,10 +2,10 @@
  * `resume validate` — re-run accuracy guard on the current profile
  */
 
-import { loadActiveProfile, sourceJsonPath } from '../profile/serializer.js';
-import { validateProfile } from '../services/validate.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
+import { loadActiveProfile, sourceJsonPath } from '../profile/serializer.ts';
+import { validateProfile } from '../services/validate.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
 
 export interface ValidateOptions {
   profileDir?: string;

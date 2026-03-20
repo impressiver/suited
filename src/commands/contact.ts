@@ -1,8 +1,8 @@
-import type { Profile, Sourced } from '../profile/schema.js';
-import { loadActiveProfile } from '../profile/serializer.js';
-import { type ContactFields, mergeContactMeta } from '../services/contact.js';
-import { c } from '../utils/colors.js';
-import { isUserExit } from '../utils/user-exit.js';
+import type { Profile, Sourced } from '../profile/schema.ts';
+import { loadActiveProfile } from '../profile/serializer.ts';
+import { type ContactFields, mergeContactMeta } from '../services/contact.ts';
+import { c } from '../utils/colors.ts';
+import { isUserExit } from '../utils/user-exit.ts';
 
 export interface ContactOptions {
   profileDir?: string;

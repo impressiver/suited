@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Profile } from '../profile/schema.js';
-import { computeRefinementDiff } from './refine.js';
+import type { Profile } from '../profile/schema.ts';
+import { computeRefinementDiff } from './refine.ts';
 
 const src = (s: string) => ({
   value: s,

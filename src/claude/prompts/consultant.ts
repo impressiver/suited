@@ -1,5 +1,5 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import type { JobAnalysis, ResumeDocument } from '../../profile/schema.js';
+import type { JobAnalysis, ResumeDocument } from '../../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Shared types

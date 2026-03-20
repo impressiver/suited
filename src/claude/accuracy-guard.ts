@@ -9,8 +9,8 @@
  * Throws AccuracyGuardError on any mismatch. Pipeline halts before assembly.
  */
 
-import type { CurationPlan, Profile } from '../profile/schema.js';
-import type { RefEntry } from './prompts/curate.js';
+import type { CurationPlan, Profile } from '../profile/schema.ts';
+import type { RefEntry } from './prompts/curate.ts';
 
 export interface AccuracyError {
   ref: string;

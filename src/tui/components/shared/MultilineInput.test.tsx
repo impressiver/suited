@@ -1,7 +1,7 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { AppStoreProvider } from '../../store.js';
-import { MultilineInput } from './MultilineInput.js';
+import { AppStoreProvider } from '../../store.tsx';
+import { MultilineInput } from './MultilineInput.tsx';
 
 describe('MultilineInput', () => {
   it('renders value lines under AppStoreProvider', () => {

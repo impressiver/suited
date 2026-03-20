@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Profile } from '../profile/schema.js';
-import { computeHealthScore } from './improve.js';
+import type { Profile } from '../profile/schema.ts';
+import { computeHealthScore } from './improve.ts';
 
 function minimalProfile(overrides: Partial<Profile> = {}): Profile {
   const base: Profile = {

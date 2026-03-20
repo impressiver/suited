@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import { TextInput } from './TextInput.js';
+import { TextInput } from './TextInput.tsx';
 
 export interface InlineEditorProps {
   value: string;

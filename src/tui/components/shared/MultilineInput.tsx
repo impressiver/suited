@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState } from 'react';
-import { useDebouncedStringCallback } from '../../hooks/useDebouncedStringCallback.js';
-import { useAppDispatch } from '../../store.js';
+import { useDebouncedStringCallback } from '../../hooks/useDebouncedStringCallback.ts';
+import { useAppDispatch } from '../../store.tsx';
 
 const DEBOUNCE_MS = 16;
 

@@ -11,7 +11,7 @@
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { deduplicateSkills } from '../ingestion/normalizer.js';
+import { deduplicateSkills } from '../ingestion/normalizer.ts';
 import type {
   Certification,
   DataSource,
@@ -23,7 +23,7 @@ import type {
   Skill,
   Sourced,
   VolunteerRole,
-} from './schema.js';
+} from './schema.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

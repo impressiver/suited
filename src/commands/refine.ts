@@ -1,25 +1,25 @@
-import { callWithTool } from '../claude/client.js';
+import { callWithTool } from '../claude/client.ts';
 import {
   APPLY_PROFILE_FEEDBACK_SYSTEM,
   buildProfileFeedbackPrompt,
   type ConsultantFinding,
   type ProfileEvaluation,
-} from '../claude/prompts/consultant.js';
-import { profileToRefineText, refinementsToolSchema } from '../claude/prompts/refine.js';
+} from '../claude/prompts/consultant.ts';
+import { profileToRefineText, refinementsToolSchema } from '../claude/prompts/refine.ts';
 import {
   enrichFindingsWithUserInput,
   evaluateProfile,
   printProfileEvaluation,
-} from '../generate/consultant.js';
-import { type CuratorResult, curateForJob } from '../generate/curator.js';
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.js';
+} from '../generate/consultant.ts';
+import { type CuratorResult, curateForJob } from '../generate/curator.ts';
+import { markdownToProfile, profileToMarkdown } from '../profile/markdown.ts';
 import type {
   JobRefinement,
   Profile,
   RefinementQuestion,
   RefinementSession,
   Sourced,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 import {
   deleteJobRefinement,
   hashSource,
@@ -33,7 +33,7 @@ import {
   saveJobRefinement,
   saveRefined,
   sourceJsonPath,
-} from '../profile/serializer.js';
+} from '../profile/serializer.ts';
 import {
   applyDirectEdit,
   applyRefinements,
@@ -41,11 +41,11 @@ import {
   generateRefinementQuestions,
   polishProfile,
   type RefinementsOutput,
-} from '../services/refine.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { openInEditor } from '../utils/interactive.js';
-import { runProfileEditor } from './profile-editor.js';
+} from '../services/refine.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { openInEditor } from '../utils/interactive.ts';
+import { runProfileEditor } from './profile-editor.ts';
 
 export interface RefineOptions {
   profileDir?: string;

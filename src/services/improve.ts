@@ -1,4 +1,4 @@
-import type { Profile } from '../profile/schema.js';
+import type { Profile } from '../profile/schema.ts';
 
 export interface HealthScore {
   /** 0–5 inclusive. */

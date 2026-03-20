@@ -1,16 +1,16 @@
 import { Box, useApp, useInput } from 'ink';
 import { useEffect, useMemo } from 'react';
-import type { FlowOptions } from '../commands/flow.js';
-import { buildPendingCliArgs, screenRunsCliOnEnter } from './cliArgs.js';
-import { Layout } from './components/Layout.js';
-import { useProfileSnapshot } from './hooks/useProfileSnapshot.js';
-import { DashboardScreen } from './screens/DashboardScreen.js';
-import { DelegateScreen } from './screens/DelegateScreen.js';
-import { ImportScreen } from './screens/ImportScreen.js';
-import { JobsScreen } from './screens/JobsScreen.js';
-import { SettingsScreen } from './screens/SettingsScreen.js';
-import { useAppDispatch, useAppState } from './store.js';
-import { SCREEN_ORDER, type TuiExitBag } from './types.js';
+import type { FlowOptions } from '../commands/flow.ts';
+import { buildPendingCliArgs, screenRunsCliOnEnter } from './cliArgs.ts';
+import { Layout } from './components/Layout.tsx';
+import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
+import { DashboardScreen } from './screens/DashboardScreen.tsx';
+import { DelegateScreen } from './screens/DelegateScreen.tsx';
+import { ImportScreen } from './screens/ImportScreen.tsx';
+import { JobsScreen } from './screens/JobsScreen.tsx';
+import { SettingsScreen } from './screens/SettingsScreen.tsx';
+import { useAppDispatch, useAppState } from './store.tsx';
+import { SCREEN_ORDER, type TuiExitBag } from './types.ts';
 
 /** Ink only sets `key.return` for `\r`; many TTYs send `\n` for Enter (`name === 'enter'`), which leaves `key.return` false. */
 function isEnterKey(key: { return?: boolean }, input: string): boolean {

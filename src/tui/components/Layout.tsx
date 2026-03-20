@@ -1,10 +1,10 @@
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
-import type { FocusTarget, ScreenId } from '../types.js';
-import { NAV_LABELS } from '../types.js';
-import { Footer } from './Footer.js';
-import { Header, type HeaderProps } from './Header.js';
-import { Sidebar } from './Sidebar.js';
+import type { FocusTarget, ScreenId } from '../types.ts';
+import { NAV_LABELS } from '../types.ts';
+import { Footer } from './Footer.tsx';
+import { Header, type HeaderProps } from './Header.tsx';
+import { Sidebar } from './Sidebar.tsx';
 
 export interface LayoutProps extends HeaderProps {
   activeScreen: ScreenId;

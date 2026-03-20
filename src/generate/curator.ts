@@ -1,17 +1,17 @@
-import { assertAccurate } from '../claude/accuracy-guard.js';
-import { callWithTool } from '../claude/client.js';
+import { assertAccurate } from '../claude/accuracy-guard.ts';
+import { callWithTool } from '../claude/client.ts';
 import {
   buildRefList,
   CURATE_SYSTEM,
   curateTool,
   type RefEntry,
-} from '../claude/prompts/curate.js';
+} from '../claude/prompts/curate.ts';
 import {
   type CurationPlan,
   CurationPlanSchema,
   type JobAnalysis,
   type Profile,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 
 export interface CuratorResult {
   plan: CurationPlan;

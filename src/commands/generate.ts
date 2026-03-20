@@ -5,27 +5,27 @@ import {
   evaluateForJob,
   printJobEvaluation,
   resumeDocContext,
-} from '../generate/consultant.js';
-import { buildRefMapForProfile, curateForJob } from '../generate/curator.js';
+} from '../generate/consultant.ts';
+import { buildRefMapForProfile, curateForJob } from '../generate/curator.ts';
 import {
   buildFitOverrideCss,
   SQUEEZE_THRESHOLDS,
   type SqueezeLevel,
-} from '../generate/fit-adjuster.js';
-import { analyzeJobDescription } from '../generate/job-analyzer.js';
-import { extractLogomark, svgToDataUri } from '../generate/logo-extractor.js';
-import { discoverLogoSvgs, fetchSvgsFromUrl } from '../generate/logo-fetcher.js';
-import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.js';
-import { renderResumeHtml } from '../generate/renderer.js';
+} from '../generate/fit-adjuster.ts';
+import { analyzeJobDescription } from '../generate/job-analyzer.ts';
+import { extractLogomark, svgToDataUri } from '../generate/logo-extractor.ts';
+import { discoverLogoSvgs, fetchSvgsFromUrl } from '../generate/logo-fetcher.ts';
+import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.ts';
+import { renderResumeHtml } from '../generate/renderer.ts';
 import {
   assembleFullResumeDocument,
   assembleResumeDocument,
   getFlairInfo,
   getRecommendedFlair,
-} from '../generate/resume-builder.js';
-import { autoTrimToFit } from '../generate/trimmer.js';
-import { exportToPdf, measurePageFit } from '../pdf/exporter.js';
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.js';
+} from '../generate/resume-builder.ts';
+import { autoTrimToFit } from '../generate/trimmer.ts';
+import { exportToPdf, measurePageFit } from '../pdf/exporter.ts';
+import { markdownToProfile, profileToMarkdown } from '../profile/markdown.ts';
 import type {
   FlairLevel,
   GenerationConfig,
@@ -35,7 +35,7 @@ import type {
   ResumeDocument,
   SavedJob,
   TemplateName,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 import {
   clearGenerationConfig,
   deleteJob,
@@ -59,11 +59,11 @@ import {
   saveJobRefinement,
   saveLogoCache,
   saveRefined,
-} from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { openInEditor } from '../utils/interactive.js';
-import { createSpinner } from '../utils/spinner.js';
+} from '../profile/serializer.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { openInEditor } from '../utils/interactive.ts';
+import { createSpinner } from '../utils/spinner.ts';
 
 export interface GenerateOptions {
   profileDir?: string;
@@ -290,7 +290,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
       if (!useEditedJobProfile) {
         // [2/4] Curation — with in-session re-run support (Phase 3 preview)
-        let curatorResult: import('../generate/curator.js').CuratorResult | undefined;
+        let curatorResult: import('../generate/curator.ts').CuratorResult | undefined;
         let usedStoredRefinement = false;
         let skipStoredForThisRun = false;
         let previewApproved = false;
@@ -932,7 +932,7 @@ async function buildConfig(
   // Flair
   let flair: FlairLevel = options.flair ? (parseInt(options.flair, 10) as FlairLevel) : 3;
 
-  let templateOverride: import('../profile/schema.js').TemplateName | undefined;
+  let templateOverride: import('../profile/schema.ts').TemplateName | undefined;
 
   if (!options.flair) {
     const { selectedFlair } = (await inquirer.prompt([
@@ -1218,7 +1218,7 @@ async function selectSections(
 // ---------------------------------------------------------------------------
 
 const ALL_TEMPLATE_CONFIGS: Array<{
-  template: import('../profile/schema.js').TemplateName;
+  template: import('../profile/schema.ts').TemplateName;
   flair: FlairLevel;
   label: string;
 }> = [

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { callWithTool } from '../claude/client.js';
+import { callWithTool } from '../claude/client.ts';
 import {
   APPLY_JOB_FEEDBACK_SYSTEM,
   applyJobFeedbackTool,
@@ -17,10 +17,10 @@ import {
   type ProfileEvaluation,
   profileEvalTool,
   resumeDocToConsultantText,
-} from '../claude/prompts/consultant.js';
-import { profileToRefineText } from '../claude/prompts/refine.js';
-import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.js';
-import { c } from '../utils/colors.js';
+} from '../claude/prompts/consultant.ts';
+import { profileToRefineText } from '../claude/prompts/refine.ts';
+import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.ts';
+import { c } from '../utils/colors.ts';
 
 /** Run the hiring consultant evaluation on a general (non-tailored) profile. */
 export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluation> {

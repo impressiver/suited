@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Eta } from 'eta';
-import type { ResumeDocument } from '../profile/schema.js';
-import { generateAsciiName } from '../utils/ascii-name.js';
+import type { ResumeDocument } from '../profile/schema.ts';
+import { generateAsciiName } from '../utils/ascii-name.ts';
 
 // TEMPLATES_DIR is only used in dev/npm mode (non-SEA). When bundled to CJS
 // for a SEA binary, import.meta.url is empty — guard so startup doesn't throw.

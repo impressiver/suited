@@ -1,7 +1,7 @@
 import { renderToString } from 'ink';
 import { describe, expect, it } from 'vitest';
-import { AppStoreProvider } from '../../store.js';
-import { TextInput } from './TextInput.js';
+import { AppStoreProvider } from '../../store.tsx';
+import { TextInput } from './TextInput.tsx';
 
 describe('TextInput', () => {
   it('renders under AppStoreProvider', () => {

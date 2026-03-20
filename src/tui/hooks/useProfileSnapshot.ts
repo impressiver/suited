@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getFlairInfo } from '../../generate/resume-builder.js';
+import { getFlairInfo } from '../../generate/resume-builder.ts';
 import {
   loadGenerationConfig,
   loadJobs,
   loadSource,
   refinedJsonPath,
   sourceJsonPath,
-} from '../../profile/serializer.js';
-import { fileExists } from '../../utils/fs.js';
+} from '../../profile/serializer.ts';
+import { fileExists } from '../../utils/fs.ts';
 
 export interface ProfileSnapshot {
   loading: boolean;

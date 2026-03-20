@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
 import { useEffect, useState } from 'react';
-import { loadJobs } from '../../profile/serializer.js';
+import { loadJobs } from '../../profile/serializer.ts';
 
 export interface JobsScreenProps {
   profileDir: string;

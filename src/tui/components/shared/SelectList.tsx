@@ -47,9 +47,17 @@ export function SelectList<T extends string = string>({
     <Box flexDirection="column">
       {items.map((item, i) => {
         const sel = i === selectedIndex;
+        const rowActive = isActive && sel;
         return (
-          <Text key={item.value} bold={sel} dimColor={!sel}>
-            {sel ? '› ' : '  '}
+          <Text key={item.value} bold={rowActive} dimColor={!rowActive}>
+            {rowActive ? (
+              <>
+                <Text color="white">›</Text>
+                <Text> </Text>
+              </>
+            ) : (
+              '  '
+            )}
             {item.label}
           </Text>
         );

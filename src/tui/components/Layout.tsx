@@ -27,7 +27,7 @@ export function Layout({
     <Box flexDirection="column" padding={1} flexGrow={1} height="100%">
       <Header {...headerProps} />
       <Box marginTop={1} flexDirection="row" flexGrow={1}>
-        <Sidebar activeScreen={activeScreen} />
+        <Sidebar activeScreen={activeScreen} focusTarget={focusTarget} />
         <Box flexGrow={1} flexDirection="column" minHeight={0}>
           {panelFocusBanner != null && panelFocusBanner !== '' && (
             <Box marginBottom={1} flexDirection="column">

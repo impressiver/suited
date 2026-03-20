@@ -78,7 +78,8 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 ## 5. PR / merge discipline
 
 - **One stream (or slice)** per PR when possible; reference **stream ID** (e.g. `T2: JobsScreen`) in the title or body.
-- **Update specs** when you change phase reality: the “current repo status” line in [`tui-phased-delivery.md`](./tui-phased-delivery.md), or open questions in [`tui-open-questions.md`](./tui-open-questions.md).
+- **Specs MUST stay aligned with the repo.** Update `specs/**` whenever you change behavior, architecture, UX contracts, CLI/TUI guarantees, or testing/CI rules — not only when phase labels move. At minimum, adjust the same files you would have read to implement the feature (see [`tui-README.md`](./tui-README.md) / [`README.md`](./README.md) indexes). **Also** update phase/status lines when reality changes: [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-open-questions.md`](./tui-open-questions.md), or this file’s living progress as appropriate.
+- **Before every commit:** run **`pnpm vibecheck`** from the repo root (format, lint, check, typecheck, tests, TUI import gate, build — see [`package.json`](../package.json)). On failure, **fix** what it reports and **re-run** `pnpm vibecheck`; repeat until clean. **Cap:** at most **three** `vibecheck` runs in that loop (first attempt counts). If still failing after the third run, **stop**, summarize errors, and **ask the user** — do not commit.
 - **Do not** duplicate business logic in the TUI — call **`src/services/`** (or keep delegation visible until services exist).
 - Follow [`CONTRIBUTING.md`](../CONTRIBUTING.md) for tests and lint.
 

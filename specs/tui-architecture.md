@@ -198,6 +198,25 @@ During `running`: `operationInProgress = true`, sidebar and screen-jump blocked,
 
 ---
 
+## Selection caret & inactive menus
+
+Across the shell, **at most one** list-style **caret** (`›`, bright / `white` where supported) **MUST** mark the row that currently receives **↑↓** list navigation. Everything that is not that active list behaves as **parent / background**: **no caret**, rows **dimmed** (including the row that holds contextual selection, e.g. which job is open in a split pane).
+
+**Rules:**
+
+| Area | Caret | Dimming |
+|------|-------|---------|
+| **`Sidebar`** | **`focusTarget === 'sidebar'`** and row is `activeScreen`: show `›` on that row only. | When focus is **`content`**, **all** sidebar rows dim; **no** caret on any row (current screen is still implied by the header / active route). |
+| **`SelectList`** | Caret on the selected row **only when `isActive` is true** (this list owns arrow keys). | When **`isActive` is false**, **no** caret on any row; **all** rows dim. Selection index may still update programmatically for when the list becomes active again. |
+| **Contact (field list)** | Caret on the focused field label **only when** the panel has content focus **and** phase is **browse** (not while a `TextInput` is focused — avoid two cursors). | When sidebar has focus, or for non-selected fields, dim labels and values accordingly. |
+| **Dashboard quick actions** | `isActive` **MUST** track panel focus (e.g. `focusTarget === 'content'`), not always `true`. | Same as `SelectList` when inactive. |
+
+**Not a caret:** Breadcrumb separators (e.g. `Summary › Experience` in Profile) use `›` as typography in **dim** text; they **MUST NOT** be styled as the white list caret.
+
+**Implementation reference:** `Sidebar.tsx` (takes `focusTarget`), `SelectList.tsx`, `ContactScreen.tsx`, `DashboardScreen.tsx`; split layouts (e.g. Jobs list + detail) rely on **`isActive={false}`** on the non-focused column.
+
+---
+
 ## Component hierarchy
 
 ```
@@ -205,7 +224,7 @@ During `running`: `operationInProgress = true`, sidebar and screen-jump blocked,
   <Layout>
     <Header />           ← "Suited · Jane Smith · 12 positions · refined ✓"
     <Box flexDirection="row">
-      <Sidebar />        ← nav items; ► marks active; grayed when operationInProgress
+      <Sidebar />        ← nav items; white › on active row only when sidebar has focus; all dim, no › when content focused
       <ContentArea>      ← flex:1
         <DashboardScreen />      (screen === 'dashboard')
         <ImportScreen />         (screen === 'import')

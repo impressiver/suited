@@ -18,7 +18,7 @@ The same files are **grouped by phase** in [`specs/README.md`](./README.md). Use
 |-----|---------|
 | [Phased delivery & current implementation](./tui-phased-delivery.md) | Phase A/B/C status, what shipped vs optional follow-ups |
 | [Goals & constraints](./tui-goals-and-constraints.md) | Goals, non-goals, breakout rule, service extraction, rollback |
-| [UX & workflow](./tui-ux.md) | Pipeline, discoverability, mermaid pipeline diagram |
+| [UX & workflow](./tui-ux.md) | Pipeline, discoverability, single caret / dim inactive menus, mermaid pipeline diagram |
 | [Stack & structure](./tui-stack-and-structure.md) | Ink/React versions, directory tree, modified files |
 | [Architecture](./tui-architecture.md) | State, keyboard, footer modes, streaming, focus, components, key precedence |
 | [State machines](./tui-state-machines.md) | Mermaid diagrams for Refine / Generate |

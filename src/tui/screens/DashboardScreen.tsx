@@ -229,7 +229,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
           selectedIndex={quickIndex}
           onChange={(i) => setQuickIndex(i)}
           onSubmit={(item) => navigate(item.value)}
-          isActive
+          isActive={panelActive}
         />
       </Box>
       <Box marginTop={1} flexDirection="column">

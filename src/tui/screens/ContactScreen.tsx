@@ -165,11 +165,20 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
         {FIELD_ORDER.map(({ key, label }, i) => {
           const sel = i === fieldIndex;
           const v = values[key] ?? '';
+          const showMenuCaret = active && phase === 'browse' && sel;
+          const labelMuted = !active || !sel;
           return (
             <Box key={key} flexDirection="row">
               <Box width={12}>
-                <Text dimColor={!sel} bold={sel}>
-                  {sel ? '› ' : '  '}
+                <Text bold={showMenuCaret} dimColor={labelMuted}>
+                  {showMenuCaret ? (
+                    <>
+                      <Text color="white">›</Text>
+                      <Text> </Text>
+                    </>
+                  ) : (
+                    '  '
+                  )}
                   {label}
                 </Text>
               </Box>
@@ -186,7 +195,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
                   }}
                 />
               ) : (
-                <Text dimColor={!sel}>{v || '—'}</Text>
+                <Text dimColor={!active || !sel}>{v || '—'}</Text>
               )}
             </Box>
           );

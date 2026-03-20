@@ -30,7 +30,7 @@ Grouped for **planning → design → build → verify**. Order within build fol
 |------|------|
 | [`tui-phased-delivery.md`](./tui-phased-delivery.md) | Phase A / B / C, delegation vs services |
 | [`tui-goals-and-constraints.md`](./tui-goals-and-constraints.md) | Goals, breakout rule, service extraction |
-| [`tui-ux.md`](./tui-ux.md) | Pipeline UX, discoverability |
+| [`tui-ux.md`](./tui-ux.md) | Pipeline UX, discoverability, selection caret / inactive menus |
 | [`tui-scope.md`](./tui-scope.md) | LOC / file-count ballpark |
 | [`tui-open-questions.md`](./tui-open-questions.md) | Decisions to lock |
 
@@ -38,7 +38,7 @@ Grouped for **planning → design → build → verify**. Order within build fol
 
 | File | Role |
 |------|------|
-| [`tui-architecture.md`](./tui-architecture.md) | State, keyboard, footer modes, streaming, focus |
+| [`tui-architecture.md`](./tui-architecture.md) | State, keyboard, footer modes, streaming, focus, selection caret rules |
 | [`tui-state-machines.md`](./tui-state-machines.md) | Refine / Generate diagrams |
 | [`tui-ui-mockups.md`](./tui-ui-mockups.md) | ASCII wireframes |
 | [`tui-screens.md`](./tui-screens.md) | Per-screen loads, states, components |

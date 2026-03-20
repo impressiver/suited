@@ -1,0 +1,28 @@
+---
+description: Update specs with contract changes; run vibecheck before commit
+alwaysApply: true
+---
+
+# Specs stay current
+
+When you change **behavior**, **architecture**, **user-visible UX**, **CLI/TUI contracts**, or **testing/CI expectations**, update the relevant files under **`specs/`** in the **same change** (same PR / same session).
+
+- Prefer the smallest set of docs: e.g. `specs/tui-architecture.md` for TUI structure, `specs/tui-ux.md` for UX summaries, `specs/tui-screens.md` per screen, `specs/AGENTS.md` for phase/status when reality shifts.
+- Do **not** leave specs describing old behavior after the code has moved on.
+- If unsure which file to touch, start from `specs/tui-README.md` or `specs/README.md`.
+
+Normative alongside `specs/AGENTS.md` § PR / merge discipline.
+
+---
+
+# Pre-commit: `vibecheck`
+
+Before **every** `git commit` (or when handing off a change as ready to merge), run from the repo root:
+
+```bash
+pnpm vibecheck
+```
+
+That script runs format, lint, `check`, typecheck, tests, TUI import gate, and build (see `package.json`). **Do not** commit if `vibecheck` fails.
+
+**Fix loop (max 3 runs):** If `vibecheck` exits non-zero, fix what it reports (files, tests, types, lint, etc.), then run `pnpm vibecheck` again. Repeat until it passes. **At most three** `pnpm vibecheck` invocations total in this loop (the first run counts toward the cap). If the **third** run still fails, **stop** — summarize the remaining errors and **ask the user** what to do next; do not commit, do not keep retrying in a loop.

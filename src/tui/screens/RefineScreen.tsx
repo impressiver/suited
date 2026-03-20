@@ -41,6 +41,7 @@ import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { panelInnerWidth } from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
@@ -127,7 +128,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [polishMenuIdx, setPolishMenuIdx] = useState(0);
   const [consultantMenuIdx, setConsultantMenuIdx] = useState(0);
   const consultantWorkRef = useRef<{ base: Profile; evaluation: ProfileEvaluation } | null>(null);
-  const [, rows] = useTerminalSize();
+  const [cols, rows] = useTerminalSize();
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
 
@@ -773,6 +774,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
             value={directEditDraft}
             onChange={setDirectEditDraft}
             focus={active}
+            width={panelInnerWidth(cols)}
             onSubmit={(text) => {
               const t = text.trim();
               if (!t) {

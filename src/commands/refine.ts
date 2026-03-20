@@ -674,6 +674,7 @@ async function runJobRefinements(
       summary: job.text.slice(0, 200),
     },
     plan: curatorResult.plan,
+    ...(refinement?.pinnedRender != null ? { pinnedRender: refinement.pinnedRender } : {}),
   };
   await saveJobRefinement(newRefinement, profileDir);
 

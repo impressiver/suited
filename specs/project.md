@@ -18,7 +18,7 @@ This document is the **engineering + product contract** for the **suited** CLI a
 
 - **Factual grounding** — Tailored text and PDFs MUST be derived from a **reference map** of profile items with stable IDs; the generation path MUST validate references before export (see §6).
 - **Local-first workflow** — Profile data and artifacts live under a **configurable profile directory** (default `output/`); users SHOULD be able to inspect and edit human-readable files (e.g. `refined.md`) between runs.
-- **Clear pipeline** — Import → refine → (optional) jobs → prepare → generate MUST remain conceptually separable; interactive UI MUST route into the same command logic as non-interactive use where applicable.
+- **Clear pipeline** — Import → refine → (optional) jobs → prepare → *(optional)* [Curate](./tui-screens.md#curatescreen-planned) *(TUI, planned)* → generate MUST remain conceptually separable; interactive UI MUST route into the same command logic as non-interactive use where applicable.
 - **Explicit AI use** — Calls to Anthropic or compatible APIs MUST be driven by user configuration (API keys in env / `.env`); the tool MUST NOT phone home with resume content for analytics by default (see [`SECURITY.md`](../SECURITY.md) if that ever changes).
 
 ---
@@ -38,8 +38,11 @@ Order of stages:
 1. **Import** — Ingest LinkedIn URL, export ZIP/CSV, or paste → produces structured **source** material under the profile dir (e.g. `source.json`).
 2. **Refine** — Q&A and structured edits → **refined** profile (`refined.json`, `refined.md`).
 3. **Jobs** — User stores **job descriptions** (files / metadata under the profile dir).
-4. **Prepare** — Curate the profile **for one saved job** (selection + feedback) before PDF.
-5. **Generate** — Assemble resume + template → **PDF** using job-aware curation.
+4. **Prepare** — Curate the profile **for one saved job** (selection + feedback) before PDF — produces a **curation plan** (what to include).
+5. **Curate** *(TUI — planned)* — Optional **main-menu** step **after prepare** (or in parallel with revisiting a job): **iterate job-scoped refined content** (polish, consultant, manual edits, direct edit) with **per-job persistence**, distinct from global **Refine**. See [`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned).
+6. **Generate** — Assemble resume + template → **PDF** using job-aware curation (and any job-scoped curated profile on disk).
+
+**Templates vs flair (orthogonal):** A **template** is the **baseline layout** (structure, typography family, overall pattern). A **flair level** (e.g. 1–5) is chosen **independently** for that template. Flair sets how much **creative freedom** the layout / “designer” side of generation may take when interpreting the baseline: lower flair stays close to the template’s default look; higher flair allows more **artistic license** and run-to-run **variety** in styling and presentation while content remains reference-grounded (see §6). Flair is not a proxy for “which template” — it is a dial on how far an agent may depart from the baseline for a given template.
 
 **Validate** checks integrity; **improve** is an interactive maintenance hub (re-refine, bullets, summary, contact) without replacing the core refine contract.
 
@@ -71,6 +74,7 @@ The tool MUST support `--profile-dir` so multiple profiles can coexist. Within a
 
 - Global refined profile (`refined.md` / `refined.json`) — editable by the user.
 - Per-job curated copies under `jobs/{job-slug}/` — editable; subsequent runs SHOULD detect changes and offer reload vs re-curation as implemented in commands.
+- Per-job refinement JSON under `refinements/{jobId}.json` — stores the curation plan plus optional **`pinnedRender`**: the last successful **layout squeeze** tier (and resolved template / flair metadata) so the next generate for the same job, with the same flair and template override, can reuse the same CSS fit-override path for repeatable PDF layout. Re-prepare / re-curate SHOULD preserve `pinnedRender` until a successful export overwrites it. When the user **clears job-scoped curated content** (e.g. Curate **Clear and start over**), implementation SHOULD **clear or invalidate `pinnedRender`** for that `jobId` so the next export does not reuse a squeeze tier tied to discarded layout length; the next successful PDF export may write a fresh `pinnedRender`.
 
 Exact filenames and migration rules live in code and user docs; **behavioral** expectation: **no silent overwrite** of user-edited files without confirmation where the CLI already implements that pattern.
 
@@ -78,8 +82,8 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 
 ## 8. Interactive UI
 
-- **Today:** Default `suited` with no subcommand runs **`runDashboard`** (terminal menus via `inquirer` and related patterns). See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
-- **Future:** Full-screen TUI (Ink/React) is specified in [`tui-README.md`](./tui-README.md) and `tui-*.md`. Core business logic MUST remain in **`generate/`**, **`profile/`**, **`claude/`**, **`ingestion/`**, and shared services — not duplicated inside UI-only code (see TUI spec for forbidden imports and phasing).
+- **Default entry (`suited` with no subcommand):** In an **interactive TTY** (stdin + stdout TTY), the process runs the **full-screen Ink TUI** (`runFlow` → `runTui`). In a **non-TTY** environment, it **MUST NOT** block on input — it prints a **one-line** hint to stderr and exits (canonical behavior in [`tui-README.md`](./tui-README.md)). **Subcommands** (`suited generate`, `suited refine`, …) use their own interactive or non-interactive paths (some still use **inquirer** where documented); they MUST call **`src/services/`** for shared behavior, not duplicate pipeline logic in UI-only code.
+- **TUI contract:** [`tui-README.md`](./tui-README.md) and `tui-*.md`. A planned **Curate** sidebar row covers **per-job** polish/consultant/edit flows ([CurateScreen](./tui-screens.md#curatescreen-planned)). Core business logic MUST remain in **`generate/`**, **`profile/`**, **`claude/`**, **`ingestion/`**, and shared services — not inside `src/tui/**` except as wiring (see TUI spec for forbidden imports).
 
 ---
 

@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createDebouncedString } from './debounceString.ts';
 
+export interface DebouncedStringCallbacks {
+  schedule: (value: string) => void;
+  cancel: () => void;
+}
+
 /**
  * Debounced string flush — for MultilineInput (16ms) and similar.
  */
 export function useDebouncedStringCallback(
   fn: (value: string) => void,
   delayMs: number,
-): (value: string) => void {
+): DebouncedStringCallbacks {
   const fnRef = useRef(fn);
   useEffect(() => {
     fnRef.current = fn;
@@ -23,5 +28,5 @@ export function useDebouncedStringCallback(
 
   useEffect(() => () => debounced.cancel(), [debounced]);
 
-  return debounced.flush;
+  return { schedule: debounced.flush, cancel: debounced.cancel };
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title><%= it.contact.name %> — Resume</title>
+  <title><%= it.contact.name %>  -  Resume</title>
   <style><%~ it.css %></style>
 </head>
 <body data-flair="<%= it.flair %>">
@@ -77,7 +77,7 @@
   <section class="section">
     <h2 class="section-title">Certifications</h2>
     <% for (const cert of it.certifications) { %>
-    <div class="cert-entry"><%= cert.name %><% if (cert.authority) { %> — <%= cert.authority %><% } %><% if (cert.date) { %> (<%= cert.date %>)<% } %></div>
+    <div class="cert-entry"><%= cert.name %><% if (cert.authority) { %>  -  <%= cert.authority %><% } %><% if (cert.date) { %> (<%= cert.date %>)<% } %></div>
     <% } %>
   </section>
   <% } %>

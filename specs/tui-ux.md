@@ -1,12 +1,14 @@
 # UX & workflow
 
-The CLI mental model is **Import → Refine → Generate**. The TUI exposes **seven sidebar destinations** plus **manual section editing** under **Refine**, with **Dashboard** for suggested next step.
+The CLI mental model is **Import → Refine → (optional per-job Curate) → Generate**. The TUI exposes **`SCREEN_ORDER.length` sidebar destinations** plus **manual section editing** opened from **Refine** or *(planned)* **Curate**, with **Dashboard** for suggested next step.
+
+**Curate (planned):** A future **main sidebar** row for **job-targeted** iteration on refined content — job list → per-job hub (polish, consultant, edit sections, direct edit, clear & restart from global refined + plan). See [CurateScreen](./tui-screens.md#curatescreen-planned).
 
 - **Pipeline status** — Derived from profile data (source, `refined.json`, jobs, last PDF). Compact indicators in the **Header** on every screen (when implemented).
 - **Suggested next step** — Dashboard highlights one primary action from state; secondary actions via sidebar.
 - **First-run / blocked** — No API key → banner + path to Settings. No source → suggest Import. Avoid dead-end dashboards.
 
-**Discoverability:** `1–7` screen jumps + letter shortcuts (`g` `j` `i` `d` `r` `c` `s`) for sidebar targets. **`p` is not a global jump** (reserved for **Jobs** → prepare when that screen defers shortcuts). **Manual profile sections:** Refine menu → *Edit profile sections*. Optional command palette (`:` or `/`).
+**Discoverability:** `1–n` screen jumps (`n` = sidebar row count) + letter shortcuts for sidebar targets (exact map lives with `SCREEN_ORDER` in code). **`p` is not a global jump** (reserved for **Jobs** → prepare when that screen defers shortcuts). **Manual profile sections:** Refine → *Edit profile sections* (global refined); *(planned)* Curate → *Edit profile sections* (job-scoped store). Optional command palette (`:` or `/`).
 
 **Contextual footer:** The bottom hint line reflects the **focused panel**’s current screen and step (lists, scroll panes, confirms, etc.). Inline “nav” dim lines under menus were removed so shortcuts are not duplicated in the body.
 
@@ -18,12 +20,20 @@ flowchart LR
   end
   LI --> Import[Import]
   Import --> Refine[Refine]
+  JD --> Jobs[Jobs]
   Refine --> Gen[Generate]
-  JD --> Gen
+  Jobs --> Gen
+  Refine -. optional .-> Curate[Curate per job]
+  Jobs -. optional .-> Curate
+  Curate --> Gen
   Gen --> Out[PDFs / artifacts]
 ```
 
+**Curate** (dotted edges) is **optional**: users may go **Refine → Generate** or **Jobs → Generate** without it. When used, **Curate** is the hub for **per-job curated** profile iteration before or between generates.
+
 Users may jump to any screen anytime; Dashboard ties intent back to the pipeline.
+
+**Generate — template vs flair:** **Template** picks the **baseline layout**; **flair** (level) is a **separate** control on how much **creative freedom** the layout/design agent may use when rendering that baseline (more flair → more **variety** and **artistic license** in the visual result). Defaults in Settings apply only to the initial flair level, not to template choice.
 
 ---
 

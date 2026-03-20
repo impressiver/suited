@@ -30,7 +30,7 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, consultant, **manual section edit** → ProfileEditorScreen, direct edit, md sync). **ProfileEditorScreen** is not a sidebar row; **NavigateProvider** + **`profileEditorReturnTo`** for guarded navigation. Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, consultant, **manual section edit** → ProfileEditorScreen, direct edit, md sync). **ProfileEditorScreen** is not a sidebar row; **NavigateProvider** + **`profileEditorReturnTo`** for guarded navigation. **Planned:** **Curate** sidebar screen for per-job curated profile workflows ([`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned)). Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 ---
 

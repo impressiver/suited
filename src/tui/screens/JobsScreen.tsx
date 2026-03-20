@@ -27,6 +27,7 @@ import {
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { panelInnerWidth } from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
@@ -156,7 +157,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       case 'addCompany':
         return `Jobs · Esc back · Enter next${sb}`;
       case 'addJd':
-        return `Jobs · Ctrl+D save job · Esc back${sb}`;
+        return `Jobs · Ctrl+D or Ctrl+S save job · Esc back${sb}`;
       case 'viewJd':
         return `Jobs · ↑↓ scroll JD · Esc back${sb}`;
       case 'deleteAsk':
@@ -758,17 +759,25 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'addJd') {
+    const jdW = panelInnerWidth(cols);
     return (
       <Box flexDirection="column">
         <Text bold>Add job — description</Text>
-        <MultilineInput
-          value={jdDraft}
-          onChange={setJdDraft}
-          focus={active}
-          onSubmit={(text) => {
-            void finalizeNewJob(text, mode.title, mode.company);
-          }}
-        />
+        <Text dimColor>
+          Paste or type the JD, then <Text bold>Ctrl+D</Text> or <Text bold>Ctrl+S</Text> to save ·
+          Esc → company step
+        </Text>
+        <Box marginTop={1}>
+          <MultilineInput
+            value={jdDraft}
+            onChange={setJdDraft}
+            focus={active}
+            width={jdW}
+            onSubmit={(text) => {
+              void finalizeNewJob(text, mode.title, mode.company);
+            }}
+          />
+        </Box>
       </Box>
     );
   }

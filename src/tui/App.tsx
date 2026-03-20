@@ -64,7 +64,11 @@ export function App({ profileDir, flowOptions }: AppProps) {
       return `${base} · locked · Esc cancels op`;
     }
     if (state.inTextInput) {
-      return 'Text field focused · q does not quit · Esc cancels field';
+      const fieldNote = 'Text field · q does not quit · Esc cancels/back';
+      if (panelFooterHint != null && panelFooterHint !== '') {
+        return `${panelFooterHint} · ${fieldNote}`;
+      }
+      return fieldNote;
     }
     if (focusTarget === 'sidebar') {
       return `${base} · Enter → panel`;

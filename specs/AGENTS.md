@@ -66,6 +66,7 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 
 | Activity | Read |
 |----------|------|
+| **Curate screen (planned)** | [`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned), [`tui-definition-of-done.md` — post–Phase C](./tui-definition-of-done.md#whats-left-postphase-c-polish) |
 | Decide Phase A vs B scope | [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) |
 | Layout / keyboard / streaming UI | [`tui-architecture.md`](./tui-architecture.md) |
 | Per-screen behavior | [`tui-screens.md`](./tui-screens.md) |
@@ -79,7 +80,7 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 
 - **One stream (or slice)** per PR when possible; reference **stream ID** (e.g. `T2: JobsScreen`) in the title or body.
 - **Specs MUST stay aligned with the repo.** Update `specs/**` whenever you change behavior, architecture, UX contracts, CLI/TUI guarantees, or testing/CI rules — not only when phase labels move. At minimum, adjust the same files you would have read to implement the feature (see [`tui-README.md`](./tui-README.md) / [`README.md`](./README.md) indexes). **Also** update phase/status lines when reality changes: [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-open-questions.md`](./tui-open-questions.md), or this file’s living progress as appropriate.
-- **Before every commit:** run **`pnpm vibecheck`** from the repo root (format, lint, check, typecheck, tests, TUI import gate, build — see [`package.json`](../package.json)). On failure, **fix** what it reports and **re-run** `pnpm vibecheck`; repeat until clean. **Cap:** at most **three** `vibecheck` runs in that loop (first attempt counts). If still failing after the third run, **stop**, summarize errors, and **ask the user** — do not commit.
+- **Before every commit:** run **`pnpm vibecheck`** from the repo root (format, lint — includes **no em dash in `src/templates`**, check, typecheck, tests, TUI import gate, build — see [`package.json`](../package.json)). On failure, **fix** what it reports and **re-run** `pnpm vibecheck`; repeat until clean. **Cap:** at most **three** `vibecheck` runs in that loop (first attempt counts). If still failing after the third run, **stop**, summarize errors, and **ask the user** — do not commit.
 - **Do not** duplicate business logic in the TUI — call **`src/services/`** (or keep delegation visible until services exist).
 - Follow [`CONTRIBUTING.md`](../CONTRIBUTING.md) for tests and lint.
 
@@ -105,7 +106,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **4** | **T2 — Dashboard + Settings** (variants, health, pipeline/activity; API key probe + `.env`) | **Done** (2026-03-19) |
 | **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Generate/Refine/Profile were stubs at phase close — now superseded by phases 7–8) | **Done** (2026-03-19) |
 | **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
-| **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, flair, `pendingJobId` | **Done** (2026-03-19) |
+| **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, template + flair (independent; flair = designer-agent creative freedom vs baseline), `pendingJobId` | **Done** (2026-03-19) |
 | **8** | **Refine + Profile MVP** — Refine: Q&A, `applyRefinements`, `DiffView`, `saveRefined`; Profile: stack + summary/bullets, persist like CLI `profile-editor` | **Done** (2026-03-19) |
 | **9+** | Phase C + post-C polish | **Phase C** checklist: [`tui-definition-of-done.md` § Phase C](./tui-definition-of-done.md#phase-c--full-vision-north-star). Optional follow-ups: [`post–Phase C`](./tui-definition-of-done.md#whats-left-postphase-c-polish). |
 
@@ -165,7 +166,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 ### Phase 7 — completed work
 
-- **`src/generate/layoutSqueeze.ts`** — shared `trySqueeze` (CLI `generate.ts` imports it).
+- **`src/generate/layoutSqueeze.ts`** — shared `trySqueeze` (returns HTML + `appliedSqueezeLevel`), `renderWithSqueeze` (optional reuse of `JobRefinement.pinnedRender`); CLI and `runTuiGeneratePdf` import it.
 - **`src/services/sectionSelection.ts`** (+ test) — `selectAllSections` for non-interactive “include everything”.
 - **`src/services/generateResume.ts`** — `runTuiGeneratePdf()` — reuse job refinement when `jobId` set; else analyze + curate + save refinement; polish; job-scoped profile write; trim/fit loop; PDF + `saveGenerationConfig`.
 - **`src/tui/screens/GenerateScreen.tsx`** — source picker (paste / saved / full), MultilineInput paste, flair SelectList, consumes `pendingJobId` from Jobs.

@@ -8,7 +8,11 @@ import {
 } from '../generate/consultant.ts';
 import { buildRefMapForProfile, curateForJob } from '../generate/curator.ts';
 import { analyzeJobDescription } from '../generate/job-analyzer.ts';
-import { trySqueeze } from '../generate/layoutSqueeze.ts';
+import {
+  type AppliedSqueezeLevel,
+  renderWithSqueeze,
+  trySqueeze,
+} from '../generate/layoutSqueeze.ts';
 import { extractLogomark, svgToDataUri } from '../generate/logo-extractor.ts';
 import { discoverLogoSvgs, fetchSvgsFromUrl } from '../generate/logo-fetcher.ts';
 import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.ts';
@@ -56,6 +60,7 @@ import {
   saveLogoCache,
   saveRefined,
 } from '../profile/serializer.ts';
+import { persistJobRefinementPinnedRender } from '../services/jobRefinement.ts';
 import { c } from '../utils/colors.ts';
 import { fileExists } from '../utils/fs.ts';
 import { openInEditor } from '../utils/interactive.ts';
@@ -68,6 +73,25 @@ export interface GenerateOptions {
   output?: string;
   jd?: string;
   flair?: string;
+}
+
+async function persistPinnedRenderForJob(
+  profileDir: string,
+  jobId: string | undefined,
+  resumeDoc: ResumeDocument,
+  requestedFlair: FlairLevel,
+  templateOverride: TemplateName | undefined,
+  squeezeLevel: AppliedSqueezeLevel,
+): Promise<void> {
+  if (!jobId) return;
+  await persistJobRefinementPinnedRender(profileDir, jobId, {
+    requestedFlair,
+    effectiveFlair: resumeDoc.flair,
+    resolvedTemplate: resumeDoc.template,
+    templateOverride,
+    squeezeLevel,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 const INDUSTRY_LABELS: Record<IndustryVertical, string> = {
@@ -327,11 +351,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             }
             // Save this refinement for future reuse
             if (config.jobId) {
+              const prevRef = await loadJobRefinement(profileDir, config.jobId);
               const refinement: JobRefinement = {
                 jobId: config.jobId,
                 createdAt: new Date().toISOString(),
                 jobAnalysis: config.jobAnalysis,
                 plan: curatorResult.plan,
+                ...(prevRef?.pinnedRender != null ? { pinnedRender: prevRef.pinnedRender } : {}),
               };
               await saveJobRefinement(refinement, profileDir);
             }
@@ -616,11 +642,17 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     } else {
       // Single template — render, fit-check, export
       let outputPath = `${resumeOutputDir}/${fileBaseName}_${date}-${hhmm}.pdf`;
-      let html = await renderResumeHtml(resumeDoc);
+
+      const jobRefinementForPin =
+        config.jobId != null ? await loadJobRefinement(profileDir, config.jobId) : null;
 
       let fitCancelled = false;
       console.log(c.muted('Checking page fit...'));
-      html = await trySqueeze(html, resumeDoc);
+      let { html, appliedSqueezeLevel } = await renderWithSqueeze(resumeDoc, {
+        requestedFlair: config.flair,
+        templateOverride,
+        reusePin: jobRefinementForPin?.pinnedRender,
+      });
 
       while (true) {
         // eslint-disable-line no-constant-condition
@@ -669,13 +701,26 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             inquirer,
           ));
         }
-        html = await renderResumeHtml(resumeDoc);
-        html = await trySqueeze(html, resumeDoc);
+        const squeezed = await renderWithSqueeze(resumeDoc, {
+          requestedFlair: config.flair,
+          templateOverride,
+        });
+        html = squeezed.html;
+        appliedSqueezeLevel = squeezed.appliedSqueezeLevel;
       }
       if (fitCancelled) break;
 
       console.log(c.muted('Generating PDF...'));
       await exportToPdf(html, { template: resumeDoc.template, outputPath });
+
+      await persistPinnedRenderForJob(
+        profileDir,
+        config.jobId,
+        resumeDoc,
+        config.flair,
+        templateOverride,
+        appliedSqueezeLevel,
+      );
 
       // Save config; stamp resolved template + profile version
       config.profileUpdatedAt = profile.updatedAt;
@@ -749,9 +794,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             const newDate = newNowTs.toISOString().slice(0, 10);
             const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
             outputPath = `${resumeOutputDir}/${fileBaseName}-${newDate}-${newHhmm}.pdf`;
-            let tweakedHtml = await renderResumeHtml(resumeDoc);
-            tweakedHtml = await trySqueeze(tweakedHtml, resumeDoc);
-            await exportToPdf(tweakedHtml, { template: resumeDoc.template, outputPath });
+            const tweakedSq = await renderWithSqueeze(resumeDoc, {
+              requestedFlair: config.flair,
+              templateOverride,
+            });
+            await exportToPdf(tweakedSq.html, { template: resumeDoc.template, outputPath });
+            await persistPinnedRenderForJob(
+              profileDir,
+              config.jobId,
+              resumeDoc,
+              config.flair,
+              templateOverride,
+              tweakedSq.appliedSqueezeLevel,
+            );
             console.log(`${c.ok} ${c.success('Tweaked and ready:')} ${c.path(outputPath)}`);
             console.log(
               c.muted('  (Previous PDF still exists with its original timestamp — no work lost.)'),
@@ -787,9 +842,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const newDate = newNowTs.toISOString().slice(0, 10);
           const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
           outputPath = `${resumeOutputDir}/${fileBaseName}-${newDate}-${newHhmm}.pdf`;
-          let templateHtml = await renderResumeHtml(resumeDoc);
-          templateHtml = await trySqueeze(templateHtml, resumeDoc);
-          await exportToPdf(templateHtml, { template: resumeDoc.template, outputPath });
+          const templateSq = await renderWithSqueeze(resumeDoc, {
+            requestedFlair: config.flair,
+            templateOverride,
+          });
+          await exportToPdf(templateSq.html, { template: resumeDoc.template, outputPath });
+          await persistPinnedRenderForJob(
+            profileDir,
+            config.jobId,
+            resumeDoc,
+            config.flair,
+            templateOverride,
+            templateSq.appliedSqueezeLevel,
+          );
           console.log(`${c.ok} ${c.success('Resume generated:')} ${c.path(outputPath)}`);
         } else if (next === 'newjd') {
           reuseConfig = false;
@@ -1250,7 +1315,7 @@ async function generateAllTemplates(
     let html = await renderResumeHtml(doc);
 
     // Phase 1: try CSS squeeze before content removal
-    html = await trySqueeze(html, doc);
+    html = (await trySqueeze(html, doc)).html;
 
     // Phase 2: if still overflowing, ask user
     let skip = false;
@@ -1295,7 +1360,7 @@ async function generateAllTemplates(
       }
       doc = { ...currentBase, template: tc.template, flair: tc.flair };
       html = await renderResumeHtml(doc);
-      html = await trySqueeze(html, doc);
+      html = (await trySqueeze(html, doc)).html;
     }
 
     if (skip) {

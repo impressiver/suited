@@ -44,12 +44,12 @@ Start simple. Cross-screen state growth is an implementation detail.
 | `↑↓` | Move selection in focused list or diff block |
 | `Enter` | Confirm / activate; submit single-line input |
 | `Esc` | Pop one level: blur input → cancel sub-state → go back → (only then) quit prompt |
-| `1–7` | Direct screen jump for sidebar `SCREEN_ORDER` (suppressed when `operationInProgress` or `inTextInput`) |
-| Letter shortcuts | `g/j/i/d/r/c/s` screen jump (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred) |
+| `1–n` | Direct screen jump for sidebar `SCREEN_ORDER` (`n` = row count; suppressed when `operationInProgress` or `inTextInput`) |
+| Letter shortcuts | Screen jump per implementation map (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred). *(Planned:* assign a letter for **Curate** when that row ships.) |
 | `:` or `/` | Open command palette |
 | `q` | Quit (suppressed during any text input) |
 | `Ctrl+C` | Hard exit (always works; documented in footer when relevant) |
-| `Ctrl+D` | Submit MultilineInput (the "done" key for multi-line fields) |
+| `Ctrl+D` / `Ctrl+S` | Submit MultilineInput (“done” / save for multi-line fields) |
 
 **Precedence:** See [README — Key handling precedence](./tui-README.md#key-handling-precedence).
 
@@ -63,7 +63,7 @@ Ink 6's `useInput` fires for **every** keypress on **every** registered handler 
 useInput((input, key) => {
   // 1. Modal / confirm — always wins; handled by ConfirmPrompt's own useInput
   // 2. Text input mode — suppress global shortcuts
-  if (state.inTextInput) return; // q, 1-8, letter jumps do nothing
+  if (state.inTextInput) return; // q, 1–n screen jumps, letter jumps do nothing
   // 3. Async lock — suppress navigation
   if (state.operationInProgress) {
     if (key.escape) dispatch({ type: 'CANCEL_OPERATION' });
@@ -71,7 +71,7 @@ useInput((input, key) => {
   }
   // 4. Global navigation
   if (input === 'q') { /* quit */ }
-  if (/^[1-7]$/.test(input)) { /* SET_SCREEN via SCREEN_ORDER */ }
+  if (/* input is digit 1..SCREEN_ORDER.length */) { /* SET_SCREEN via SCREEN_ORDER */ }
   // ... letter shortcuts
 });
 ```
@@ -98,15 +98,17 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 **Required:** `<MultilineInput>` **MUST** accumulate input into a `useRef` buffer and **debounce** state updates (e.g. 16ms idle before flushing to `useState`). This is an implementation detail of the component — callers see only the final `onChange(value)` callback. Show character count from the debounced value, not live per-keystroke.
 
+**Layout / UX:** While focused, render a **visible caret** (e.g. inverse block) at the insertion point. Callers **SHOULD** pass a **`width`** (typically `panelInnerWidth(terminalCols)` from `src/tui/panelContentWidth.ts`) so Ink wraps long pasted lines inside the panel instead of overflowing horizontally. On submit, **cancel** any pending debounced flush before calling `onChange` + `onSubmit` so a stale timer cannot overwrite the final value.
+
 ---
 
 ## Footer (context-sensitive)
 
 | Mode | Footer content |
 |------|----------------|
-| Navigation | `↑↓ select · Enter open · Tab focus · 1–7 jump · q quit` |
+| Navigation | `↑↓ select · Enter open · Tab focus · 1–n jump · q quit` |
 | Single-line input | `Enter: submit · Esc: cancel · q does NOT quit` |
-| Multi-line input | `Ctrl+D: done · Enter: newline · Esc: cancel · q does NOT quit` |
+| Multi-line input | Screen `panelFooterHint` (e.g. Jobs: Ctrl+D/Ctrl+S save) **plus** `Text field · q does not quit` when `inTextInput`; inline screen copy repeats submit keys |
 | Async running (cancellable) | `⠋ working… · Esc: cancel · navigation locked` |
 | Async running (not cancellable) | `⠋ working… · navigation locked (cannot cancel)` |
 | Streaming LLM | `streaming… · Esc: abort request · second Esc: back` |
@@ -118,16 +120,13 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 ## Screen index
 
-| Key | Screen |
-|-----|--------|
-| `1` | Dashboard |
-| `2` | Import |
-| `3` | Refine |
-| `4` | Generate |
-| `5` | Jobs |
-| `6` | Profile |
-| `7` | Contact |
-| `8` | Settings |
+**Today (`SCREEN_ORDER` in code):** seven sidebar rows (order may differ from this table — **Profile** / *Edit sections* is not a sidebar row). Numeric keys **`1`…`n`** map to that array in order.
+
+| Concept | Notes |
+|---------|--------|
+| Dashboard, Import, Contact, Jobs, Refine, Generate, Settings | Current top-level destinations |
+| **Curate** *(planned)* | New row: **job list → per-job curate hub** (polish, consultant, edit sections, direct edit, clear & restart). Insert **after Refine, before Generate** when implemented; renumber keys in the same PR. See [CurateScreen](./tui-screens.md#curatescreen-planned). |
+| ProfileEditorScreen | Not in sidebar; opened from Refine or *(planned)* Curate with `profileEditorReturnTo`. |
 
 ---
 

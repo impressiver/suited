@@ -8,6 +8,7 @@ Lock these before wide implementation to reduce screen churn.
 
 ## Unresolved
 
+0. **Curate screen — letter shortcut:** When **Curate** is added to `SCREEN_ORDER`, pick a global letter jump that does not collide with Jobs / Refine / existing keys; document in [`tui-ux.md`](./tui-ux.md) and footer hints.
 1. **Multiline submit key:** Ctrl+D only, or also F10? Pick one primary, document it everywhere.
 2. **Stream cancel:** First Esc aborts in-flight request; second Esc navigates back (recommended). Confirm and document in footer.
 4. **Profile breadcrumb:** In Header, or inside ContentArea? (Recommend: ContentArea — Header already has profile info.)

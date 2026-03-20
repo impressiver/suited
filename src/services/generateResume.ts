@@ -1,9 +1,8 @@
 import type { CuratorResult } from '../generate/curator.ts';
 import { buildRefMapForProfile, curateForJob } from '../generate/curator.ts';
 import { analyzeJobDescription } from '../generate/job-analyzer.ts';
-import { trySqueeze } from '../generate/layoutSqueeze.ts';
+import { renderWithSqueeze } from '../generate/layoutSqueeze.ts';
 import { polishResumeForJob } from '../generate/polisher.ts';
-import { renderResumeHtml } from '../generate/renderer.ts';
 import {
   assembleFullResumeDocument,
   assembleResumeDocument,
@@ -32,6 +31,7 @@ import {
   saveJobRefinement,
 } from '../profile/serializer.ts';
 import { throwIfAborted } from '../utils/abort.ts';
+import { persistJobRefinementPinnedRender } from './jobRefinement.ts';
 import { selectAllSections } from './sectionSelection.ts';
 
 export interface RunTuiGeneratePdfOptions {
@@ -161,6 +161,8 @@ export async function runTuiGeneratePdf(
   };
 
   let resumeDoc: ResumeDocument;
+  /** Loaded when `config.jd` — used for `pinnedRender` reuse after the JD block. */
+  let storedJobRefinement: JobRefinement | null = null;
 
   if (config.jd) {
     let jobAnalysis: JobAnalysis;
@@ -168,6 +170,7 @@ export async function runTuiGeneratePdf(
 
     const stored =
       options.jobId != null ? await loadJobRefinement(profileDir, options.jobId) : null;
+    storedJobRefinement = stored;
 
     if (stored) {
       jobAnalysis = stored.jobAnalysis;
@@ -196,13 +199,16 @@ export async function runTuiGeneratePdf(
       throwIfAborted(signal);
 
       if (options.jobId) {
+        const prevRef = await loadJobRefinement(profileDir, options.jobId);
         const refinement: JobRefinement = {
           jobId: options.jobId,
           createdAt: new Date().toISOString(),
           jobAnalysis,
           plan: curatorResult.plan,
+          ...(prevRef?.pinnedRender != null ? { pinnedRender: prevRef.pinnedRender } : {}),
         };
         await saveJobRefinement(refinement, profileDir);
+        storedJobRefinement = refinement;
       }
     }
 
@@ -267,8 +273,11 @@ export async function runTuiGeneratePdf(
   const hhmm = nowTs.toTimeString().slice(0, 5).replace(':', '');
   const outputPath = `${resumeOutputDir}/${fileBaseName}_${date}-${hhmm}.pdf`;
 
-  let html = await renderResumeHtml(resumeDoc);
-  html = await trySqueeze(html, resumeDoc);
+  let { html, appliedSqueezeLevel } = await renderWithSqueeze(resumeDoc, {
+    requestedFlair: options.flair,
+    templateOverride: options.templateOverride,
+    reusePin: options.jobId != null ? storedJobRefinement?.pinnedRender : undefined,
+  });
   throwIfAborted(signal);
 
   for (let step = 0; step < 6; step += 1) {
@@ -278,8 +287,12 @@ export async function runTuiGeneratePdf(
       break;
     }
     resumeDoc = await autoTrimToFit(resumeDoc, fit.ratio);
-    html = await renderResumeHtml(resumeDoc);
-    html = await trySqueeze(html, resumeDoc);
+    const next = await renderWithSqueeze(resumeDoc, {
+      requestedFlair: options.flair,
+      templateOverride: options.templateOverride,
+    });
+    html = next.html;
+    appliedSqueezeLevel = next.appliedSqueezeLevel;
   }
 
   throwIfAborted(signal);
@@ -290,6 +303,17 @@ export async function runTuiGeneratePdf(
   config.profileUpdatedAt = profile.updatedAt;
   config.resolvedTemplate = resumeDoc.template;
   await saveGenerationConfig(config, profileDir);
+
+  if (options.jobId != null && config.jd) {
+    await persistJobRefinementPinnedRender(options.profileDir, options.jobId, {
+      requestedFlair: options.flair,
+      effectiveFlair: resumeDoc.flair,
+      resolvedTemplate: resumeDoc.template,
+      templateOverride: options.templateOverride,
+      squeezeLevel: appliedSqueezeLevel,
+      updatedAt: new Date().toISOString(),
+    });
+  }
 
   options.onProgress?.(config.jd ? 5 : 4);
   return { outputPath, config };

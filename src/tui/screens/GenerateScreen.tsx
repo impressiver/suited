@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FlairLevel, SavedJob } from '../../profile/schema.ts';
+import type { FlairLevel, SavedJob, TemplateName } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
 import { runTuiGeneratePdf } from '../../services/generateResume.ts';
 import { ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
@@ -33,7 +33,10 @@ type PickFlairSnapshot = {
   idx: number;
 };
 
-type GenerateRunCtx = PickFlairSnapshot & { flair: FlairLevel };
+type GenerateRunCtx = PickFlairSnapshot & {
+  flair: FlairLevel;
+  templateOverride?: TemplateName;
+};
 
 const JOB_PROGRESS_LABELS = [
   'Job prep (analyze & curate)',
@@ -50,12 +53,29 @@ const FULL_PROGRESS_LABELS = [
   'Save metadata',
 ] as const;
 
-const FLAIR_CHOICES: { flair: FlairLevel; label: string }[] = [
-  { flair: 1, label: '1 — Classic (ATS-safe, serif)' },
-  { flair: 2, label: '2 — Classic+ (minimal accents)' },
-  { flair: 3, label: '3 — Modern (accent color)' },
-  { flair: 4, label: '4 — Modern+ (bolder accents)' },
-  { flair: 5, label: '5 — Bold (sidebar, color block)' },
+const FLAIR_CHOICES: {
+  value: string;
+  flair: FlairLevel;
+  templateOverride?: TemplateName;
+  label: string;
+}[] = [
+  { value: '1', flair: 1, label: '1 — Classic (ATS-safe, serif)' },
+  { value: '2', flair: 2, label: '2 — Classic+ (minimal accents)' },
+  { value: '3', flair: 3, label: '3 — Modern (accent color)' },
+  { value: '4', flair: 4, label: '4 — Modern+ (bolder accents)' },
+  { value: '5', flair: 5, label: '5 — Bold (sidebar, color block)' },
+  {
+    value: 'retro',
+    flair: 1,
+    templateOverride: 'retro',
+    label: '★ — Retro Terminal (amber-on-black, ASCII art)',
+  },
+  {
+    value: 'timeline',
+    flair: 4,
+    templateOverride: 'timeline',
+    label: '◈ — Timeline (dark header, prose entries, two-column)',
+  },
 ];
 
 export interface GenerateScreenProps {
@@ -201,6 +221,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         const { outputPath } = await runTuiGeneratePdf({
           profileDir,
           flair: ctx.flair,
+          templateOverride: ctx.templateOverride,
           jd: ctx.jd,
           jobId: ctx.jobId,
           jobTitle: ctx.title,
@@ -380,7 +401,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
 
   if (phase.p === 'pick-flair') {
     const flairItems = FLAIR_CHOICES.map((c) => ({
-      value: String(c.flair),
+      value: c.value,
       label: c.label,
     }));
     return (
@@ -400,14 +421,18 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
             onChange={(i) => setPhase({ ...phase, idx: i })}
             isActive={active}
             onSubmit={(item) => {
-              const flair = parseInt(item.value, 10) as FlairLevel;
+              const choice = FLAIR_CHOICES.find((c) => c.value === item.value);
+              if (!choice) {
+                return;
+              }
               void runGenerate({
                 jd: phase.jd,
                 jobId: phase.jobId,
                 title: phase.title,
                 company: phase.company,
                 idx: phase.idx,
-                flair,
+                flair: choice.flair,
+                templateOverride: choice.templateOverride,
               });
             }}
           />

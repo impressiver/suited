@@ -15,7 +15,7 @@ Every screen documents: what loads on mount, the full state machine (every state
 - `refined` — suggest Generate or manage jobs; show health score from `computeHealthScore()`
 - `ready` — has jobs + refined; suggest Generate; show last PDF details
 
-**Components:** `StatusBadge` (pipeline), `ScrollView` (pipeline + activity). Navigation matches the left sidebar (`1–7` and letter keys; no eighth sidebar row — manual profile edit is under **Refine**).
+**Components:** `StatusBadge` (pipeline), `ScrollView` (pipeline + activity). Navigation matches the left sidebar (`1–n` for `SCREEN_ORDER` length and letter keys; manual profile edit is under **Refine**; planned **Curate** adds another sidebar row — see [CurateScreen](#curatescreen-planned)).
 
 ### ImportScreen
 
@@ -65,7 +65,7 @@ already-refined:
       Direct edit              → MultilineInput → direct-edit-run → diff-review (keep-session)
 ```
 
-**Job-specific** hiring-manager feedback stays on **Jobs** → job detail → **Professional feedback (job fit)** (`evaluateForJob`), not on Refine.
+**Job-specific** hiring-manager feedback today stays on **Jobs** → job detail → **Professional feedback (job fit)** (`evaluateForJob`). The planned **Curate** screen (see [CurateScreen](#curatescreen-planned)) centralizes ongoing **job-scoped** polish, consultant, and edit flows; relationship to Jobs feedback is **normative** in the Curate table (shared module, optional **Open in Curate** routing).
 
 **Key constraint:** Every sub-state renders inside `<RefineScreen>`. No sub-state spawns an Inquirer prompt or calls `runRefine`.
 
@@ -79,11 +79,57 @@ already-refined:
 
 **Backlog — side-by-side suggestion diffs:** Replace or augment unified `DiffView` with a **before | after** (side-by-side) layout for all AI-suggestion review steps above. Tracked as a post–Phase C task in [`tui-definition-of-done.md`](./tui-definition-of-done.md) (**Suggestion diffs (side-by-side)**).
 
+### CurateScreen (planned)
+
+**Purpose:** **Job-targeted curation of refined content** — same *family* of actions as **Refine** (polish, consultant, manual section edit, direct edit), but scoped to **one saved job** and a **per-job curated copy** of the profile derived from global **`refined.json`**, not the global refine hub.
+
+**Relationship to other screens:**
+
+| Screen / flow | Role |
+|---------------|------|
+| **Refine** | Global profile: Q&A from source, polish/consultant/direct edit on **refined** as a whole. |
+| **Jobs → Prepare** | JD analysis + **curation plan** (what to include), persisted in `refinements/{jobId}.json`; inline summary in Jobs. |
+| **Curate** | After (or alongside) that plan, **iterate the job-specific refined profile** — wording, sections, consultant pass — stored **per job** and **loaded by default** when the user reopens that job in Curate. |
+| **Generate** | Consumes job context + stored artifacts to produce PDFs. |
+
+**Consultant / job-fit (normative — avoid duplicate product models):** **Jobs → Professional feedback (job fit)** (`evaluateForJob` / `applyJobFeedback`) remains the **quick path** from the job detail card. **Curate → Professional consultant review** is a **deeper** pass over the **job-scoped profile** with JD context, analogous to **Refine → Professional consultant** but on the per-job copy. Implementation **SHOULD** reuse **one** consultant/evaluation module with explicit **scope** (`global-refined` vs `job-scoped profile` + `jobId`), not two divergent “consultant” stacks. When Curate ships, **Jobs** MAY route “extended review” to **Curate** instead of growing a second full hub on the job panel.
+
+**Loads on mount:** Require **`refined.json`** (or equivalent active refined profile). If missing, show a short **blocked** state: refine the base profile first (link / shortcut to **Refine**). Load **`loadJobs()`** for the job list. Empty jobs → prompt to add jobs on **Jobs** or empty-state with sidebar shortcut.
+
+**Prepare optional:** Curate **MUST** be usable **without** a prior **Prepare** run: if `refinements/{jobId}.json` / plan is missing, **initialize** the job-scoped copy from global **`refined.json`** alone (full profile or a later default — match **Generate**’s non-prepared job path). **Generate** SHOULD still work; Curate is an **optional** refinement step, not a hard gate.
+
+**Top level — job list:** `SelectList` (or list + preview pattern consistent with **Jobs**) of saved jobs. **Selecting a job** resolves **`jobId`** (stable, from `SavedJob`) and **`job-slug`** for `jobs/{slug}/` using the **same** `makeJobSlug(company, title)` (or successor) as **Generate** / **prepare** so paths stay consistent. **Slug drift:** If the user edits company/title on the saved job, implementation **SHOULD** migrate or re-resolve the job-scoped directory for that `jobId` (or document a single canonical slug rule) so “load by default” does not silently point at a stale folder.
+
+**Selecting a job — load path:** Load that job’s **saved curated profile** from disk when present (job-scoped refined JSON / optional markdown under `jobs/{slug}/` — same persistence model as CLI job-tailored editing). If none exists yet, **initialize** from current global **`refined.json`** plus the stored **curation plan** when available (`refinements/{jobId}.json`); otherwise from global refined only (see **Prepare optional** above).
+
+**External edits (job-scoped markdown):** If `jobs/{slug}/refined.md` exists alongside JSON, the TUI **SHOULD** apply the same **external edit** pattern as Refine (`isMdNewerThanJson` → banner + confirm sync to JSON) so manual edits outside the app are not dropped.
+
+**Per-job hub menu** (after a job is selected): `SelectList` of:
+
+1. **Polish sections (AI)** — Same service contract as Refine’s polish path (`polishProfile` / section scope), run against the **loaded job-scoped profile**; diff-review → save to **that job’s** curated store.
+2. **Professional consultant review** — Job-aware consultant pass on the **job-scoped profile** (hiring-manager style), analogous to Refine’s whole-profile consultant but **context = selected job**; then apply / diff-review → save per job.
+3. **Edit profile sections (manual)** — Navigate to **`ProfileEditorScreen`** with **`profileEditorReturnTo('curate')`** (or equivalent), editing the **job-scoped** profile JSON backing store, not global refined only.
+4. **Direct edit** — `MultilineInput` + direct-edit apply against the **job-scoped** profile; diff-review → save per job.
+5. **Clear and start over** — **ConfirmPrompt**: discard the saved **curated copy** for this job and **rebuild from** the current global **`refined.json`** plus the stored **curation plan** when present; then return to the hub or reload the fresh copy. MUST NOT delete the saved **job record** or JD text on **Jobs** — only the job-scoped curated profile / overrides this screen owns. **SHOULD** also **clear `pinnedRender`** in `refinements/{jobId}.json` (see [`project.md` §7](./project.md#7-profile-directory-layout-conceptual)) so layout squeeze metadata does not outlive the discarded content.
+
+**Persistence (normative):**
+
+- **Curated data for each job** MUST be **saved separately** from global `refined.json` and MUST be **loaded by default** when that job is selected again in Curate.
+- Implementation SHOULD reuse existing **job-scoped refined** paths (`jobs/{slug}/` JSON + optional markdown) and stay consistent with **Generate** / **prepare** consumers so one curated source of truth exists per job for tailored content.
+
+**Esc / focus:** Same discipline as **Refine** and **Jobs** — **Curate** owns **Esc** to step back **job hub → job list → (optional) sidebar**; coordinate with **`App.tsx`** so global Esc does not steal back navigation while content is focused.
+
+**Components:** `SelectList`, `CheckboxList` (polish scope), `MultilineInput`, `DiffView`, `Spinner`, `ScrollView`, `ConfirmPrompt`, `ProfileEditorScreen` (nested).
+
+**Letter shortcut / sidebar index:** When implemented, add **Curate** as a **main sidebar row** (recommended order: after **Refine**, before **Generate**). Assign **`SCREEN_ORDER` index** and footer copy (`1–n`) in the same PR as the screen. **Renumbering:** Inserting a row **rebinds number keys** for every screen after the insertion point — document the new order in **footer hints** and release notes; users relearning `4 = Jobs` vs `5 = Jobs` is an explicit UX cost of the change.
+
 ### GenerateScreen
+
+**Template and flair:** **Template** (baseline layout) and **flair level** are **independent** in the **TUI** (user picks both). **Flair** is specified as a dial on **variety** and **artistic license** vs the baseline — the **product direction** for higher flair is more room for a layout/design step to depart from template defaults while staying reference-grounded. **Today’s implementation** is largely **deterministic** (template files + `buildFitOverrideCss` squeeze tiers + industry caps via `getFlairInfo`); any future **designer-agent** styling MUST still honor §6 in [`project.md`](./project.md). **Settings → default flair** seeds the initial level only; it does not fix the template choice.
 
 **Loads on mount:** If `pendingJobId` is set in `AppState`, clear it and jump to flair picker with that job’s JD.
 
-**Current implementation (MVP):** source picker (**saved job** / **full resume** only — ad-hoc JD paste lives on **Jobs** when adding a job) → flair **`SelectList`** → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
+**Current implementation (MVP):** source picker (**saved job** / **full resume** only — ad-hoc JD paste lives on **Jobs** when adding a job) → flair / template **`SelectList`** (flair levels 1–5 plus **Retro** and **Timeline** overrides, matching CLI `generate` prompts) → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
 
 **Esc (non-running phases):** Like **Jobs**, **`App.tsx`** does not map **Esc** → sidebar while **Generate** content is focused — **`GenerateScreen`** owns **Esc** to step back through source / saved-job / flair / done / error states (including when a paste **`MultilineInput`** is focused). After the field blurs, a further **Esc** can return to the sidebar via the global handler.
 
@@ -96,7 +142,7 @@ idle:
 
 config:
   → template-picker       (SelectList of 5 templates)
-  → flair-picker          (← → keys; integrated with template selection)
+  → flair-picker          (level 1–5; independent of template — sets designer-agent creative freedom vs baseline)
 
 pipeline (all cancellable via Esc + AbortSignal):
   → analyzing-jd          (step 1/6; spinner + streaming)
@@ -114,8 +160,8 @@ pipeline (all cancellable via Esc + AbortSignal):
 ```
 
 **Generate `done` action row:** The existing CLI offers more post-generation options than a simple back. The TUI **MUST** include:
-- Generate another (same job, same template/flair)
-- Change template / flair (same JD — go back to `template-picker`)
+- Generate another (same job, same template + flair as last run)
+- Change template and/or flair (same JD — return to config; choices remain independent)
 - Generate for a different job (go back to `jd-source-picker`)
 - Tweak content (`MultilineInput` → `tweak-running` → re-runs trim + PDF only; maps to `tweakResumeContent()`)
 
@@ -137,15 +183,15 @@ pipeline (all cancellable via Esc + AbortSignal):
 - `list` — two-panel or stacked; job list left, detail right; active job highlighted
 - `add-title` — TextInput for job title
 - `add-company` — TextInput for company
-- `add-jd` — MultilineInput for JD paste; Ctrl+D submits; calls `saveJob()`
+- `add-jd` — MultilineInput for JD paste (panel width + wrap); **Ctrl+D** or **Ctrl+S** submits; calls `saveJob()`; inline + footer hints (footer still shows Jobs line while `inTextInput` via `App.tsx`)
 - `delete-confirm` — `ConfirmPrompt` inline
 - `view-jd` — `ScrollView` of full JD text; Esc to close
 - `generate-navigate` — dispatches `SET_SCREEN('generate')` + `SET_PENDING_JOB(jobId)` simultaneously; GenerateScreen reads and clears `pendingJobId` on mount to pre-populate the JD source picker
 - `prepare-curating` — inline curation spinner + streaming for the selected job
-- `prepare-done` — summary; action row (→ Generate, → back)
+- `prepare-done` — summary; action row (→ Generate, → back). *(Planned:* optional **→ Curate** hand-off to [CurateScreen](#curatescreen-planned) with `pendingJobId` / equivalent so the same job opens in the curate hub.)
 - `error` — error + retry / back
 
-**All actions stay inside the TUI.** `g` dispatches `SET_SCREEN + SET_PENDING_JOB`; `p` runs the curation pipeline inline.
+**All actions stay inside the TUI.** `g` dispatches `SET_SCREEN + SET_PENDING_JOB`; `p` runs the curation pipeline inline. **Prepare** produces the **curation plan**; deep **job-scoped** polish / consultant / edits belong on the planned **Curate** screen ([CurateScreen](#curatescreen-planned)), not duplicated as a second full editor on Jobs.
 
 **Per-screen shortcuts active only in `list` state:** `a`, `d`, `g`, `p` fire only when the screen is in `list` state (not during any active text input sub-state like `add-title`, `add-company`, `add-jd`). In those sub-states, the global `inTextInput` flag already suppresses them, but the screen handler must also check its own state.
 
@@ -155,9 +201,14 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 ### ProfileEditorScreen
 
-**Not in the sidebar.** Reached from **Refine** → *Edit profile sections (manual)*. Store flag **`profileEditorReturnTo`** (typically `'refine'`) so **Esc** at the section list (no unsaved edits) navigates back to Refine instead of only focusing the sidebar.
+**Not in the sidebar.** Reached from **Refine** → *Edit profile sections (manual)*, and *(planned)* from **Curate** → *Edit profile sections* for the **job-scoped** profile. Store flag **`profileEditorReturnTo`** (`'refine'` | `'curate'` when implemented) so **Esc** at the section list (no unsaved edits) returns to the correct hub instead of only focusing the sidebar. **`profileEditorJobContext` *(planned)*:** when launching from Curate, persist **`jobId`** and resolved **`slug`** (or equivalent) in `AppState` so the editor knows which job-scoped store to read/write.
 
-**Loads on mount:** `loadRefined()` or `loadSource()` (same rule as before: refined.json wins).
+**Loads on mount:**
+
+- **`profileEditorReturnTo === 'refine'` (today):** `loadRefined()` or `loadSource()` — refined.json wins over source when present.
+- **`profileEditorReturnTo === 'curate'` *(planned)*:** `loadJobRefinedProfile(profileDir, slug)` when a job-scoped JSON exists; otherwise build initial in-memory profile from global **`refined.json`** + curation plan (same assembly rules as **Generate** / prepare consumers) and treat as **dirty** until first **Save**, or persist on first save per product choice — **MUST NOT** silently write global `refined.json` when editing from Curate.
+
+**Save:** Refine path: `saveRefined()` / `saveSource()` as today. Curate path *(planned)*: **`saveJobRefinedProfile`** (and optional `profileToMarkdown` to `jobs/{slug}/refined.md` if markdown parity is kept). **s** key saves the **active** target only.
 
 **Navigation model:** local stack. Each level is a state: `section-list → section → position-list → position → bullets`. `Esc` pops; `Enter` pushes. Breadcrumb shown in content area header.
 
@@ -171,7 +222,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 - `skills` — CheckboxList of all skills; space to toggle; s to save
 - `education-list`, `certifications-list`, `projects-list` — similar pattern
 
-**Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, number keys, Esc to sidebar / return screen), if unsaved changes exist, a `<ConfirmPrompt>` overlays the current state: "Unsaved changes — save before leaving? (Enter=save / n=discard / Esc=stay)". This is the resolved policy (see [Open questions](./tui-open-questions.md) — question 3). Writes via `saveRefined()` or `saveSource()`.
+**Save policy:** Changes are held in local component state (not global store) until the user presses `s` (save). On navigate-away (sidebar jump, number keys, Esc to sidebar / return screen), if unsaved changes exist, a `<ConfirmPrompt>` overlays the current state: "Unsaved changes — save before leaving? (Enter=save / n=discard / Esc=stay)". This is the resolved policy (see [Open questions](./tui-open-questions.md) — question 3). Writes via `saveRefined()`, `saveSource()`, or *(planned)* `saveJobRefinedProfile` when the active target is job-scoped.
 
 **No `$EDITOR`:** Profile editing is entirely inline. If a user wants to open the markdown in their editor, they do it via the CLI (`suited refine --edit`), not the TUI.
 

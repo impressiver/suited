@@ -14,8 +14,10 @@ import {
   TextInput,
 } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
+import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
+import { panelInnerWidth } from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
@@ -75,6 +77,7 @@ export function ImportScreen({
 }: ImportScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
+  const [termCols] = useTerminalSize();
   const { focusTarget, activeScreen, inTextInput } = useAppState();
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>('idle');
@@ -128,7 +131,7 @@ export function ImportScreen({
     const modeHint =
       mode === 'line'
         ? 'Enter submit · Esc sidebar · h headed browser toggle · p paste mode'
-        : 'Ctrl+D submit · Esc sidebar · h headed toggle · p single-line mode';
+        : 'Ctrl+D or Ctrl+S submit · Esc sidebar · h headed toggle · p single-line mode';
     return `Import · ${modeHint}${sb}`;
   }, [mode, phase]);
 
@@ -338,6 +341,7 @@ export function ImportScreen({
             value={pasteValue}
             onChange={setPasteValue}
             focus={active && mode === 'paste' && phase !== 'error'}
+            width={panelInnerWidth(termCols)}
             onSubmit={(v) => {
               void runImport(v);
             }}

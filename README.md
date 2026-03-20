@@ -157,9 +157,9 @@ suited generate --flair 3                # set visual intensity (1–5)
 
 Settings are remembered between runs — if you regenerate without changes, you won't be re-prompted.
 
-## Templates
+## Templates and flair
 
-Suited picks the right template based on flair level, or you can choose manually.
+**Template** is the **baseline layout** (classic, modern, bold, timeline, retro). **Flair** (1–5) is a **separate** control: it sets how much stylistic freedom the generator applies **within** that baseline (tighter vs more varied presentation). In the **TUI**, you pick template and flair **independently**. On the **CLI**, if you only set `--flair`, the tool may still map flair (and industry) to a **default** template unless you pass an explicit template override — conservative industries often cap effective flair and classic-style output.
 
 | Template | Style | Best for |
 |----------|-------|----------|
@@ -169,7 +169,7 @@ Suited picks the right template based on flair level, or you can choose manually
 | timeline | Visual work history | Roles where career progression matters |
 | retro | Typographic, distinctive | Standing out |
 
-**Flair levels** (1–5) control how visually expressive the output is. Flair 1–2 always uses the classic template. Academia, healthcare, and legal roles default to classic regardless of flair.
+**Flair** also interacts with **industry** (e.g. academia, healthcare, legal) so very high flair requests may be toned down for conservative roles — see the interactive **generate** flow for the effective settings.
 
 ## Accuracy guarantee
 

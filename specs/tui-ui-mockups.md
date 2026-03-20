@@ -224,7 +224,9 @@ Then runs curation inline (spinner → streaming → summary → action row), ne
 
 Ad-hoc JD paste happens when **adding a job** on **Jobs** (`MultilineInput`), not on Generate. Generate picks **saved jobs** or **full resume** only.
 
-### Generate — template + flair configuration
+### Generate — template and flair (independent)
+
+Template = **baseline layout**. Flair = **per-template** level of **creative freedom** for the layout/design agent (how much it may depart from that baseline for variety). Pick each separately; neither implies the other.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -232,14 +234,14 @@ Ad-hoc JD paste happens when **adding a job** on **Jobs** (`MultilineInput`), no
 ├───────────────┬──────────────────────────────────────────────────────────────┤
 │ ► 4 Generate  │  Configure resume                                           │
 │   …           │  ────────────────────────────────────────────────────────    │
-│               │  Template                                                    │
+│               │  Template (baseline)                                         │
 │               │  ► Classic (ATS-safe, serif)                               │
 │               │    Modern (two-column header)                               │
 │               │    Bold (full sidebar)                                      │
 │               │    Retro (typographic)                                      │
 │               │    Timeline (visual, with logos)                            │
 │               │                                                              │
-│               │  Flair  [ ████░ ]  3 / 5  (← → to adjust)                 │
+│               │  Flair (designer freedom vs baseline)  [ ████░ ]  3 / 5     │
 │               │                                                              │
 │               │  [ Generate → ]                                             │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
@@ -303,7 +305,7 @@ Ad-hoc JD paste happens when **adding a job** on **Jobs** (`MultilineInput`), no
 │               │    Template: Modern  ·  Flair: 3  ·  Fit: 98%             │
 │               │                                                              │
 │               │  ► Generate another (same job)                              │
-│               │    Change template / flair                                  │
+│               │    Change template and/or flair                             │
 │               │    Generate for a different job                             │
 │               │    Back to Dashboard                                        │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
@@ -335,6 +337,45 @@ Jobs actions (`a`, `d`, `g`, `p`) all stay inside the TUI — no breakout:
 - **`d`** → inline `<ConfirmPrompt>` "Delete arize-sr-platform? (Enter/n)"
 - **`g`** → navigate to GenerateScreen with job pre-selected
 - **`p`** → run curation inline (spinner → summary → action row)
+
+### Curate — job list *(planned main-menu row)*
+
+Sidebar gains a **Curate** row (recommended between Refine and Generate). First panel: pick a saved job; curated profile for that job loads from disk when present.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Suited  ·  Jane Smith  ·  curate                                            │
+├───────────────┬──────────────────────────────────────────────────────────────┤
+│   4 Jobs      │  Curate for a job                                           │
+│   5 Refine    │  ────────────────────────────────────────────────────────    │
+│ ► 6 Curate    │  Select job (loads saved curated copy when present)          │
+│   7 Generate  │  ► Arize · Sr Platform Engineer                            │
+│   …           │    Acme · Staff Engineer                                   │
+│               │    OldCo · Contract                                        │
+├───────────────┴──────────────────────────────────────────────────────────────┤
+│ ↑↓ select  ·  Enter open hub  ·  Esc back  ·  numbers / letters per sidebar │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Curate — hub for selected job *(planned)*
+
+Same services as Refine (polish, consultant, direct edit) but on the **job-scoped** profile; **Edit sections** opens ProfileEditor with return path **Curate**. **Clear and start over** rebuilds from global `refined.json` + curation plan after confirm.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Suited  ·  Jane Smith  ·  curate · Arize                                     │
+├───────────────┬──────────────────────────────────────────────────────────────┤
+│ ► 6 Curate    │  Arize · Sr Platform Engineer                               │
+│   …           │  ────────────────────────────────────────────────────────    │
+│               │  ► Polish sections (AI)                                     │
+│               │    Professional consultant review                           │
+│               │    Edit profile sections (manual)                          │
+│               │    Direct edit                                              │
+│               │    Clear and start over from refined…                       │
+├───────────────┴──────────────────────────────────────────────────────────────┤
+│ ↑↓ choose  ·  Enter run  ·  Esc → job list                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Edit sections (from Refine) — section list
 
@@ -411,7 +452,7 @@ Pressing Enter on a bullet opens `<InlineEditor>` pre-filled with the bullet tex
 │               │  API key      [ sk-ant-api03-•••••••••••••••••••••••••• ]  │
 │               │  Provider     ► Anthropic  /  OpenRouter                   │
 │               │  Output dir   [ ./output________________________________ ]  │
-│               │  Default flair [ 3 ▼ ]                                      │
+│               │  Default flair [ 3 ▼ ]  (initial level; independent of template) │
 │               │  [ ] Headed browser default                                 │
 │               │                                                              │
 │               │  [ Save to .env ]                                           │

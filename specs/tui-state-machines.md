@@ -84,6 +84,8 @@ stateDiagram-v2
 
 ## GenerateScreen (pipeline)
 
+**`template_config`:** User sets **template** (baseline layout) and **flair level** as **separate** choices. **Flair** bounds how much **creative freedom** the layout/design agent may take when interpreting that baseline (higher → more variety and artistic license; lower → closer to the template default). Changing template does not imply a flair change, and vice versa.
+
 ```mermaid
 stateDiagram-v2
   [*] --> jd_source
@@ -113,7 +115,7 @@ stateDiagram-v2
   exporting_pdf --> done
 
   done --> jd_source : generate for different job
-  done --> template_config : change template/flair (same JD)
+  done --> template_config : change template and/or flair (same JD)
   done --> tweak_input : tweak content
   tweak_input --> tweak_running : submitted
   tweak_running --> done : tweaked

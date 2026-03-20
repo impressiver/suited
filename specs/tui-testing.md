@@ -115,6 +115,15 @@ Use `vi.useFakeTimers()` to control async advancement. Assert that:
 
 **Rationale:** "No breakout" is not enforceable by human review alone. This check prevents Phase A subprocess debt from silently persisting into Phase B.
 
+## Resume templates (lint enforcement)
+
+**`pnpm lint`** runs Biome, then **`scripts/check-templates-no-em-dash.mjs`**, which walks **`src/templates/**`** and fails if any file contains:
+
+- the **em dash** character (U+2014), or
+- HTML entities that render as an em dash: `&mdash;`, `&#8212;`, `&#x2014;`
+
+**Rationale:** Keep template source ASCII-friendly and avoid typographic dashes in shipped Eta/CSS that are easy to break when editing or diffing.
+
 ## CI
 
 One `pnpm test` covers everything. TUI tests run headless — the testing library does not require a real TTY. If `@inkjs/testing-library` requires a specific env flag, document it in `package.json` `scripts.test` or a `.env.test` file.

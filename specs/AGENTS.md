@@ -100,7 +100,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 |-------|--------|--------|
 | **1** | **S1 — Service extraction** (`src/services/*`, commands delegate; `computeRefinementDiff`, CLI parity tests) | **Done** (2026-03-19) |
 | **2** | **T0 — TUI infrastructure hardening** (`store.tsx`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | **Done** (2026-03-19) |
-| **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | Not started |
+| **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | **Done** (2026-03-19) |
 | **4+** | Screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §4–15 |
 
 ### Phase 1 — completed work
@@ -114,7 +114,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 ### Coordination rules (avoid clobbering)
 
 1. **While Phase N is open:** prefer edits only in the **files that phase owns** (see table above).  
-2. **Do not** run parallel agents on the same command file + the same service file without splitting (e.g. one agent on `commands/refine.ts`, another on `commands/import.ts`). **Phase 1 was S1-only** — no parallel T0/T1 on `App.tsx` / `store.ts` until Phase 2 starts.  
+2. **Do not** run parallel agents on the same command file + the same service file without splitting (e.g. one agent on `commands/refine.ts`, another on `commands/import.ts`). **Phase 1 was S1-only** — no parallel T0/T1 on `App.tsx` / `store.tsx` until Phase 2 starts.  
 3. After each phase, merge or rebase before starting the next so `main` reflects the new boundaries (`src/services/**` is shared infrastructure for later T2).
 
 ### Phase 2 — completed work
@@ -125,6 +125,12 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/store.test.ts`** — reducer unit tests.
 - **`src/commands/flow.test.ts`** — non-TTY `runFlow` stderr + `exitCode` (canonical behavior per [`tui-README.md`](./tui-README.md)).
 
-### What’s next (Phase 3 preview)
+### Phase 3 — completed work
 
-- **T1 — Shared components** per [`tui-implementation-order.md`](./tui-implementation-order.md) §3; wire `SET_IN_TEXT_INPUT` from `TextInput` / `MultilineInput` when those land.
+- **`src/tui/components/shared/`** — `Spinner`, `SelectList`, `TextInput` (ink-text-input + `SET_IN_TEXT_INPUT`), `MultilineInput` (debounced `onChange` via `createDebouncedString` / `useDebouncedStringCallback`), `ConfirmPrompt`, `StatusBadge`, `ScrollView`, `InlineEditor`, `DiffView` (`formatDiffBlockLines` + `DiffBlock` from `src/services/refine.ts`), `ProgressSteps`; barrel **`index.ts`**.
+- **`src/tui/hooks/debounceString.ts`** + tests — shared debounce used by multiline paste path.
+- Colocated **`*.test.ts(x)`** — `renderToString` smoke tests + pure diff/debounce tests.
+
+### What’s next (Phase 4 preview)
+
+- **T2 / implementation order §4+** — deepen **DashboardScreen** states, **Settings** API field + save, then Contact / Import / Jobs / … per [`tui-screens.md`](./tui-screens.md).

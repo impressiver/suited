@@ -35,14 +35,14 @@ src/
         Sidebar.tsx
         ContentArea.tsx
         Layout.tsx
-      shared/
+      shared/                 ← barrel `index.ts`; Spinner, SelectList, TextInput, …
         Spinner.tsx
         DiffView.tsx
         ProgressSteps.tsx
         TextInput.tsx
         MultilineInput.tsx
         SelectList.tsx
-        CheckboxList.tsx
+        CheckboxList.tsx       (Phase C / optional)
         ConfirmPrompt.tsx
         StatusBadge.tsx
         ScrollView.tsx

@@ -2,13 +2,17 @@
 
 These documents are the **product + engineering contract** for the full-screen Ink TUI that replaces `runDashboard` when users run `suited` with no subcommand in a real TTY. They are split so **vision**, **phasing**, and **checklists** stay navigable.
 
+**Implementers:** **[`AGENTS.md`](./AGENTS.md)** assigns **parallel workstreams** (P0, S1, T0–T2, L1, Q1), dependencies, and PR discipline — read that before splitting work across people.
+
 **Bookmark:** [`specs/tui.md`](./tui.md) remains a one-line pointer to this README.
 
-**Related:** [`specs/project.md`](./project.md) (whole product), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+**Related:** [`specs/project.md`](./project.md) (whole product), [`specs/README.md`](./README.md) (grouped file list), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
 
 ---
 
 ## Documents
+
+The same files are **grouped by phase** in [`specs/README.md`](./README.md). Use this table for **what each doc answers**.
 
 | Doc | Purpose |
 |-----|---------|
@@ -24,7 +28,7 @@ These documents are the **product + engineering contract** for the full-screen I
 | [Testing](./tui-testing.md) | Vitest, ink-testing-library, forbidden-import enforcement |
 | [Screen details](./tui-screens.md) | Per-screen loads, states, components (Settings API probe semantics) |
 | [Build](./tui-build.md) | deps, tsconfig, Vitest glob |
-| [Implementation order](./tui-implementation-order.md) | Phased rollout steps |
+| [Implementation order](./tui-implementation-order.md) | **Sequential** rollout steps (single implementer); parallel lanes → [`AGENTS.md`](./AGENTS.md) |
 | [Definition of done](./tui-definition-of-done.md) | **MVP** vs **full vision** checklists |
 | [Open questions](./tui-open-questions.md) | Decisions to lock |
 | [Scope estimate](./tui-scope.md) | File counts, LOC ballpark |

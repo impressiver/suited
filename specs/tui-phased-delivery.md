@@ -40,3 +40,11 @@ See [Goals & constraints](./tui-goals-and-constraints.md) and [Screen details](.
 - **[Definition of done](./tui-definition-of-done.md)** splits **MVP (Phase A/B)** from **full vision (Phase C)**.
 - **[Architecture](./tui-architecture.md)** describes the target; Phase A may omit `store` complexity until needed.
 - **[UI mockups](./tui-ui-mockups.md)** show the **target** UI; Phase A may simplify visually but should not contradict [Terminal](./tui-terminal.md) or non-TTY rules.
+
+---
+
+## Agent routing
+
+- **Who works on what in parallel:** [`AGENTS.md`](./AGENTS.md) (workstreams **P0 / S1 / T0–T2 / L1 / Q1** and dependency graph).
+- **Single-threaded build order:** [`tui-implementation-order.md`](./tui-implementation-order.md).
+- When this doc’s **“current repo status”** line changes, update it in the **same PR** that changes behavior (or a follow-up immediately after).

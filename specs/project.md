@@ -2,6 +2,8 @@
 
 This document is the **engineering + product contract** for the **suited** CLI as a whole: scope, pipeline, accuracy rules, and where to find deeper detail. It complements the user-facing [`README.md`](../README.md) and module-oriented [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
+**Implementers:** for parallel workstreams, dependency order, and which TUI doc to open per task, see [`AGENTS.md`](./AGENTS.md).
+
 **Normative terms** (MUST / MUST NOT / SHOULD / MAY) follow [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
 
 ---
@@ -97,6 +99,7 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 | [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) | Module map, data flow, dashboard vs TUI |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | Dev workflow, PR expectations |
 | [`SECURITY.md`](../SECURITY.md) | Reporting, dependency policy |
+| [`AGENTS.md`](./AGENTS.md) | Agent/human routing: streams, deps, PR discipline |
 | [`tui-README.md`](./tui-README.md) | Future TUI (phasing, screens, testing) |
 
 ---

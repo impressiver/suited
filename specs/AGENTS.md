@@ -1,0 +1,89 @@
+# Agent implementation guide
+
+Use this file to **route work**, avoid duplicate effort, and pick the **smallest set of specs** to read before coding. It complements [`project.md`](./project.md) (product contract) and [`tui-README.md`](./tui-README.md) (TUI index + global rules).
+
+**Normative terms** follow [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119) where used in linked specs.
+
+---
+
+## 1. Start here (3 steps)
+
+1. Read **[`project.md`](./project.md)** — invariants (accuracy, profile dir, no duplicate pipelines).
+2. If your work touches the **default `suited` UI** or `src/tui/**`, read **[`tui-phased-delivery.md`](./tui-phased-delivery.md)** (Phase A vs B vs C) and the **global rules** in [`tui-README.md`](./tui-README.md) (non-TTY, key precedence, forbidden imports).
+3. Open **[§2 Workstreams](#2-workstreams)** below, pick **one** stream, then only open the **Primary specs** for that row.
+
+---
+
+## 2. Workstreams
+
+Each row is a **parallelizable lane** when dependencies are satisfied. Prefer **one PR per stream slice** (e.g. one screen, one service module) to keep review small.
+
+| ID | Stream | You are building… | Primary specs | Typical code | Depends on |
+|----|--------|-------------------|---------------|--------------|------------|
+| **P0** | **Product / pipeline** | Behavior that applies to CLI and any UI: profile schema, generate path, validation | [`project.md`](./project.md), [`README.md`](../README.md) accuracy section | `src/profile/`, `src/generate/`, `src/commands/*` | — |
+| **S1** | **Service extraction** | Callable modules from commands; no new UI | [`tui-goals-and-constraints.md`](./tui-goals-and-constraints.md), [`tui-phased-delivery.md`](./tui-phased-delivery.md) (Phase B), [`tui-implementation-order.md`](./tui-implementation-order.md) step 1 | `src/services/` (new/refactors), `src/commands/*` | P0 for contracts |
+| **T0** | **TUI bootstrap** | Ink app, store, layout, TTY gate, build | [`tui-stack-and-structure.md`](./tui-stack-and-structure.md), [`tui-build.md`](./tui-build.md), [`tui-terminal.md`](./tui-terminal.md), [`tui-README.md`](./tui-README.md) (non-TTY SSOT) | `src/tui/**`, `src/commands/flow.ts`, `tsconfig` | — |
+| **T1** | **Shared TUI components** | Reusable inputs, lists, spinners, diff, scroll | [`tui-architecture.md`](./tui-architecture.md), [`tui-ui-mockups.md`](./tui-ui-mockups.md) | `src/tui/components/**` | T0 |
+| **T2** | **Screens** | One screen per assignment; wire to services or documented delegation | [`tui-screens.md`](./tui-screens.md), [`tui-ux.md`](./tui-ux.md), [`tui-state-machines.md`](./tui-state-machines.md) as needed | `src/tui/screens/**` | T0+T1; **S1** for Phase B “real” data (Phase A may delegate per phased-delivery) |
+| **L1** | **LLM streaming** | `callWithToolStreaming`, tool events, AbortSignal | [`tui-architecture.md`](./tui-architecture.md), [`tui-testing.md`](./tui-testing.md) | `src/claude/**`, TUI consumers | P0; coordinate with T2 on Refine/Generate |
+| **Q1** | **QA / CI** | Tests, forbidden-import gates, footers | [`tui-testing.md`](./tui-testing.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) | `src/**/*.test.*`, CI scripts | After `src/tui/**` exists |
+
+**Routing hints**
+
+- **Default entry / non-TTY** behavior is specified in [`tui-README.md`](./tui-README.md) and implemented in **`flow.ts`** — do not fork SSOT across files.
+- **Phase A** allows subprocess delegation; **Phase B** expects services — see [`tui-phased-delivery.md`](./tui-phased-delivery.md). If you add delegation, **document it** in phased-delivery or PR description per spec.
+- **Forbidden:** `src/tui/**` importing `inquirer`, `ora`, or `src/commands/**` — enforce in Q1 ([`tui-testing.md`](./tui-testing.md)).
+
+---
+
+## 3. Dependency graph (high level)
+
+```mermaid
+flowchart TB
+  P0[Stream P0 Product / pipeline]
+  S1[Stream S1 Services]
+  T0[Stream T0 TUI bootstrap]
+  T1[Stream T1 TUI components]
+  T2[Stream T2 Screens]
+  L1[Stream L1 LLM streaming]
+  Q1[Stream Q1 QA CI]
+  P0 --> S1
+  T0 --> T1
+  T1 --> T2
+  S1 -.->|Phase B data| T2
+  T0 --> T2
+  P0 --> L1
+  T2 --> L1
+  T0 --> Q1
+  T2 --> Q1
+```
+
+Sequential **order within TUI** when alone on the team: follow [`tui-implementation-order.md`](./tui-implementation-order.md). The graph above shows **what can run in parallel** across people.
+
+---
+
+## 4. Spec map by activity
+
+| Activity | Read |
+|----------|------|
+| Decide Phase A vs B scope | [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) |
+| Layout / keyboard / streaming UI | [`tui-architecture.md`](./tui-architecture.md) |
+| Per-screen behavior | [`tui-screens.md`](./tui-screens.md) |
+| Errors, Esc vs Ctrl+C | [`tui-failure.md`](./tui-failure.md) |
+| Open decisions | [`tui-open-questions.md`](./tui-open-questions.md) |
+| Size / LOC | [`tui-scope.md`](./tui-scope.md) |
+
+---
+
+## 5. PR / merge discipline
+
+- **One stream (or slice)** per PR when possible; reference **stream ID** (e.g. `T2: JobsScreen`) in the title or body.
+- **Update specs** when you change phase reality: the “current repo status” line in [`tui-phased-delivery.md`](./tui-phased-delivery.md), or open questions in [`tui-open-questions.md`](./tui-open-questions.md).
+- **Do not** duplicate business logic in the TUI — call **`src/services/`** (or keep delegation visible until services exist).
+- Follow [`CONTRIBUTING.md`](../CONTRIBUTING.md) for tests and lint.
+
+---
+
+## 6. Full file index
+
+See [`README.md`](./README.md) in this folder for a grouped list of all spec files.

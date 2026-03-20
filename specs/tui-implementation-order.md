@@ -1,8 +1,10 @@
 # Implementation order
 
+**Parallel teams:** this list is **sequential** for a solo implementer. For **parallelizable lanes** (services vs TUI bootstrap vs screens), read **[`AGENTS.md`](./AGENTS.md)** first.
+
 Start from a working skeleton and add screens incrementally, verifying **no Inquirer breakout** at each step (Phase B/C). Phase A may use delegation per [Phased delivery](./tui-phased-delivery.md).
 
-1. **Service extraction** — Extract `generateRefinementQuestions`, `applyRefinements`, `computeRefinementDiff`, `polishProfile`, `applyDirectEdit` from `commands/refine.ts` into `src/services/refine.ts`. Extract `computeHealthScore` from `commands/improve.ts`. Extract `validateProfile` from `commands/validate.ts`. Refactor the command files to delegate to services. Write unit tests. **This unblocks all TUI screens.**
+1. **Service extraction** (Phase B prerequisite — may be deferred in Phase A if subprocess delegation is used) — Design and implement `computeRefinementDiff(original, refined): DiffBlock[]` as a **new function** (does not exist yet; requires refactoring the inline diff logic from `reviewRefinements()` in `commands/refine.ts`). Extract `generateRefinementQuestions`, `applyRefinements`, `polishProfile`, `applyDirectEdit` from `commands/refine.ts` into `src/services/refine.ts`. Extract `computeHealthScore` from `commands/improve.ts`, `validateProfile` from `commands/validate.ts`. Implement `mergeContactMeta` in `src/services/contact.ts`. Refactor the command files to delegate to services. Write unit tests. **This unblocks Phase B screens.** If starting with Phase A subprocess delegation, this step is scheduled just before Phase B work begins — do not skip it.
 
 2. **Infrastructure** — Install Ink + deps. Configure tsconfig JSX. Create `store.ts`, `App.tsx`, `Layout.tsx` with stub placeholder screens. Add `store.test.ts`. Verify: `suited` launches Ink; Tab and `q` work; non-TTY matches [README](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth).
 
@@ -24,7 +26,7 @@ Start from a working skeleton and add screens incrementally, verifying **no Inqu
 
 11. **GenerateScreen** — State machine. Wire all 6 steps. Curation preview + manual edit.
 
-12. **`callWithToolStreaming`** — Add to `claude/client.ts`. Wire into Refine (questions, consultant, polish) and Generate (all steps). Add `tool_start`/`tool_end` events to clean up streaming display.
+12. **`callWithToolStreaming` real implementation** — The stub already exists in `claude/client.ts` (yields a single `done` event). Replace the stub body with `client.messages.stream()`. Emit `tool_start` when the tool-use block begins, `tool_end` when the accumulated JSON is parsed and validated, `done` when complete. Pass `AbortSignal`. Wire into Refine (questions, consultant, polish) and Generate (all steps). Add streaming integration tests with fake generators (see [Testing](./tui-testing.md#streaming-tests)).
 
 13. **AbortSignal wiring** — Pass signals from `useAsyncOp` into every long-running call. Wire Esc → cancel → footer copy.
 

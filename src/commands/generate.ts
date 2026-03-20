@@ -7,12 +7,8 @@ import {
   resumeDocContext,
 } from '../generate/consultant.ts';
 import { buildRefMapForProfile, curateForJob } from '../generate/curator.ts';
-import {
-  buildFitOverrideCss,
-  SQUEEZE_THRESHOLDS,
-  type SqueezeLevel,
-} from '../generate/fit-adjuster.ts';
 import { analyzeJobDescription } from '../generate/job-analyzer.ts';
+import { trySqueeze } from '../generate/layoutSqueeze.ts';
 import { extractLogomark, svgToDataUri } from '../generate/logo-extractor.ts';
 import { discoverLogoSvgs, fetchSvgsFromUrl } from '../generate/logo-fetcher.ts';
 import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.ts';
@@ -1316,44 +1312,6 @@ async function generateAllTemplates(
   }
 
   return paths;
-}
-
-// ---------------------------------------------------------------------------
-// CSS squeeze — try progressive layout tightening before content removal
-// ---------------------------------------------------------------------------
-
-async function trySqueeze(html: string, doc: ResumeDocument): Promise<string> {
-  const initial = await measurePageFit(html);
-  if (!initial.overflows) return html;
-
-  const levels: SqueezeLevel[] = [1, 2, 3];
-  let best = html;
-
-  for (const level of levels) {
-    if (initial.ratio < SQUEEZE_THRESHOLDS[level]) continue;
-
-    const squeezed = await renderResumeHtml(doc, buildFitOverrideCss(level));
-    const fit = await measurePageFit(squeezed);
-
-    if (!fit.overflows) {
-      const pct = Math.round(initial.ratio * 100);
-      console.log(c.muted(`  Fits after layout adjustments (was ${pct}%, squeeze level ${level})`));
-      return squeezed;
-    }
-    best = squeezed; // keep the tightest version as the base for user prompts
-  }
-
-  // Still overflowing after max squeeze — return the maximally-squeezed HTML
-  // so at least the remaining overflow is minimised before the user decides
-  const finalFit = await measurePageFit(best);
-  if (finalFit.ratio < initial.ratio) {
-    console.log(
-      c.muted(
-        `  Applied max layout adjustments (${Math.round(initial.ratio * 100)}% → ${Math.round(finalFit.ratio * 100)}%)`,
-      ),
-    );
-  }
-  return best;
 }
 
 // ---------------------------------------------------------------------------

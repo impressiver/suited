@@ -104,7 +104,8 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **4** | **T2 — Dashboard + Settings** (variants, health, quick actions; API key probe + `.env`) | **Done** (2026-03-19) |
 | **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Refine/Generate/Profile stubs) | **Done** (2026-03-19) |
 | **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
-| **7+** | Full Generate/Refine/Profile screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §9–15 |
+| **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, flair, `pendingJobId` | **Done** (2026-03-19) |
+| **8+** | Full Refine/Profile, generate sub-states (analysis review, curation UI, done menu), streaming, CI | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §9–15 |
 
 ### Phase 1 — completed work
 
@@ -160,6 +161,13 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/App.tsx`** — Jobs content: defer those letters; **Esc** chain owned by Jobs (not forced to sidebar); **↑↓** screen-cycle suppressed on Jobs like Dashboard.
 - **`src/tui/screens/JobsScreen.tsx`** — Full Phase-A jobs flow per [`tui-screens.md`](./tui-screens.md) (minus prepare streaming UI and two-panel layout polish).
 
-### What’s next (Phase 7 preview)
+### Phase 7 — completed work
 
-- **Generate / Refine / Profile** — full screens per [`tui-screens.md`](./tui-screens.md); L1 streaming; optional CI forbidden-import gates.
+- **`src/generate/layoutSqueeze.ts`** — shared `trySqueeze` (CLI `generate.ts` imports it).
+- **`src/services/sectionSelection.ts`** (+ test) — `selectAllSections` for non-interactive “include everything”.
+- **`src/services/generateResume.ts`** — `runTuiGeneratePdf()` — reuse job refinement when `jobId` set; else analyze + curate + save refinement; polish; job-scoped profile write; trim/fit loop; PDF + `saveGenerationConfig`.
+- **`src/tui/screens/GenerateScreen.tsx`** — source picker (paste / saved / full), MultilineInput paste, flair SelectList, consumes `pendingJobId` from Jobs.
+
+### What’s next (Phase 8 preview)
+
+- **Refine / Profile** — full screens per [`tui-screens.md`](./tui-screens.md); Generate polish: analysis confirm, curation preview, done action row, streaming; optional CI forbidden-import gates.

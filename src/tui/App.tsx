@@ -56,6 +56,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (activeScreen === 'jobs' && focusTarget === 'content') {
       return 'Jobs · a add · d delete · p prepare · g generate · Esc back · Tab sidebar';
     }
+    if (activeScreen === 'generate' && focusTarget === 'content') {
+      return 'Generate · ↑↓ lists · Enter confirm · paste uses Ctrl+D · Tab sidebar';
+    }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
   }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);
 
@@ -63,11 +66,11 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (focusTarget !== 'content') {
       return null;
     }
-    return 'Tab or Esc → return to sidebar · On Dashboard/Contact/Jobs, ↑↓ may move lists instead of changing screen';
+    return 'Tab or Esc → return to sidebar · On Dashboard/Contact/Jobs/Generate, ↑↓ may move lists instead of changing screen';
   }, [focusTarget]);
 
   const screenUsesContentArrows = (screen: ScreenId): boolean =>
-    screen === 'dashboard' || screen === 'contact' || screen === 'jobs';
+    screen === 'dashboard' || screen === 'contact' || screen === 'jobs' || screen === 'generate';
 
   useInput(
     (input, key) => {
@@ -187,7 +190,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
       case 'refine':
         return <RefineScreen />;
       case 'generate':
-        return <GenerateScreen />;
+        return <GenerateScreen profileDir={profileDir} />;
       case 'jobs':
         return <JobsScreen profileDir={profileDir} />;
       case 'profile':

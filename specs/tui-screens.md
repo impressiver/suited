@@ -143,7 +143,7 @@ pipeline (all cancellable via Esc + AbortSignal):
 **Navigation model:** local stack. Each level is a state: `section-list → section → position-list → position → bullets`. `Esc` pops; `Enter` pushes. Breadcrumb shown in content area header.
 
 **States:**
-- `section-list` — SelectList: Summary / Experience / Skills / Education / Certifications / Projects (TUI today: Summary, Experience, **Skills**; rest not built yet)
+- `section-list` — SelectList: Summary / Experience / Skills / Education / Certifications / Projects (**all** present in TUI; Education/Certs/Projects use the same list + **`[`/`]`** + a/d pattern as Skills — primary field edit only unless noted)
 - `summary` — `InlineEditor` pre-filled with current summary; Enter saves, Esc discards
 - `position-list` — SelectList of positions; `a` adds; `d` deletes (ConfirmPrompt)
 - `position-detail` — shows role metadata; Enter → `bullets`

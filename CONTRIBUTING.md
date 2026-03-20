@@ -37,7 +37,7 @@ Conventional-style messages help the release script classify bumps (`feat:`, `fi
 ## Code style
 
 - **Biome** is the source of truth (`biome.json`). Use `pnpm format` to apply.
-- Match existing patterns: TypeScript **strict**, ESM imports with **`.js`** extensions in source, business logic outside `src/commands/` where possible.
+- Match existing patterns: TypeScript **strict**, **relative** imports use **`.ts` / `.tsx`** (matches source files; `tsc` rewrites to `.js` in `dist/`). Biome **`useImportExtensions`** enforces this—run `pnpm lint` on touched files. Published package paths (e.g. `…/messages.js`) stay as the package ships them. Business logic outside `src/commands/` where possible.
 
 ## Adding tests
 

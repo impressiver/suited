@@ -101,7 +101,8 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **1** | **S1 — Service extraction** (`src/services/*`, commands delegate; `computeRefinementDiff`, CLI parity tests) | **Done** (2026-03-19) |
 | **2** | **T0 — TUI infrastructure hardening** (`store.tsx`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | **Done** (2026-03-19) |
 | **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | **Done** (2026-03-19) |
-| **4+** | Screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §4–15 |
+| **4** | **T2 — Dashboard + Settings** (variants, health, quick actions; API key probe + `.env`) | **Done** (2026-03-19) |
+| **5+** | Remaining screens, streaming, CI gates | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §5–15 |
 
 ### Phase 1 — completed work
 
@@ -131,6 +132,16 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/hooks/debounceString.ts`** + tests — shared debounce used by multiline paste path.
 - Colocated **`*.test.ts(x)`** — `renderToString` smoke tests + pure diff/debounce tests.
 
-### What’s next (Phase 4 preview)
+### Phase 4 — completed work
 
-- **T2 / implementation order §4+** — deepen **DashboardScreen** states, **Settings** API field + save, then Contact / Import / Jobs / … per [`tui-screens.md`](./tui-screens.md).
+- **`src/tui/dashboardVariant.ts`** (+ test) — maps snapshot + `hasApiKey()` to the five dashboard states.
+- **`src/tui/settings/`** — `probeProvider.ts` (Anthropic / OpenRouter key probes), `upsertEnvFile.ts` (+ test) for `.env` merges.
+- **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant, optional health via `loadActiveProfile` + `computeHealthScore`, `ScrollView` pipeline/activity, `SelectList` quick actions.
+- **`src/tui/screens/SettingsScreen.tsx`** — provider list + masked `TextInput`, **`s`** save (probe + write `.env`), shortcuts **`a`/`A`**, **`o`/`O`**, **`e`**, **`l`**.
+- **`src/tui/App.tsx`** — on **Dashboard** with **content** focus, **↑↓** move quick-action list (not global screen nav); **1–8** / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save).
+
+**Imports:** local modules **always** use **`.ts` / `.tsx`** on relative paths (not `.js`, not extensionless). `allowImportingTsExtensions` + `rewriteRelativeImportExtensions` make **`pnpm build`** emit resolvable Node ESM. Extensionless relatives + plain **`tsc` → `node dist/`** do not work; **Biome `useImportExtensions`** enforces the rule so you do not have to remember it by hand.
+
+### What’s next (Phase 5 preview)
+
+- **T2 / implementation order §5+** — Contact / Import / Jobs / … per [`tui-screens.md`](./tui-screens.md); L1 streaming where applicable.

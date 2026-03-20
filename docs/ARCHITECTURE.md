@@ -45,6 +45,10 @@ Today, the default experience is the **inquirer-based dashboard** (`dashboard.ts
 
 A **full-screen TUI** (Ink/React) is **specified** in [`specs/tui-README.md`](../specs/tui-README.md) (split docs: `specs/tui-*.md`) as a future replacement for the interactive layer only — **core logic stays** in `generate/`, `profile/`, `claude/`, and `ingestion/`. Until that ships, all behavior above applies to both paths.
 
+## TypeScript imports (local modules)
+
+Use **`.ts` or `.tsx`** on **relative** specifiers (`./` / `../`). That matches the file on disk; `allowImportingTsExtensions` plus `rewriteRelativeImportExtensions` in `tsconfig.json` emit **`dist/**/*.js`** with **`import "./foo.js"`** so **`node dist/index.js`** works. Extensionless relatives are not used here: plain `tsc` output would stay extensionless and Node ESM would not resolve them. **Biome** (`useImportExtensions`) treats missing or wrong extensions as an error.
+
 ## Build artifacts
 
 - `pnpm build` — `tsc` outputs to **`dist/`**; templates are copied to `dist/templates/`.

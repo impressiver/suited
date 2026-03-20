@@ -96,20 +96,24 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       }
 
       if (key.upArrow) {
-        dispatch({
-          type: 'SET_SCREEN',
-          screen:
-            SCREEN_ORDER[
-              (SCREEN_ORDER.indexOf(activeScreen) - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length
-            ],
-        });
+        if (!(focusTarget === 'content' && activeScreen === 'dashboard')) {
+          dispatch({
+            type: 'SET_SCREEN',
+            screen:
+              SCREEN_ORDER[
+                (SCREEN_ORDER.indexOf(activeScreen) - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length
+              ],
+          });
+        }
         return;
       }
       if (key.downArrow) {
-        dispatch({
-          type: 'SET_SCREEN',
-          screen: SCREEN_ORDER[(SCREEN_ORDER.indexOf(activeScreen) + 1) % SCREEN_ORDER.length],
-        });
+        if (!(focusTarget === 'content' && activeScreen === 'dashboard')) {
+          dispatch({
+            type: 'SET_SCREEN',
+            screen: SCREEN_ORDER[(SCREEN_ORDER.indexOf(activeScreen) + 1) % SCREEN_ORDER.length],
+          });
+        }
         return;
       }
 
@@ -131,7 +135,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
       if (input >= '1' && input <= '8') {
         const idx = parseInt(input, 10) - 1;
         const next = SCREEN_ORDER[idx];
-        if (next) {
+        if (next && next !== activeScreen) {
           dispatch({ type: 'SET_SCREEN', screen: next });
         }
         return;
@@ -148,7 +152,7 @@ export function App({ profileDir, flowOptions, exitBag }: AppProps) {
         s: 'settings',
       };
       const mapped = letterMap[input];
-      if (mapped) {
+      if (mapped && mapped !== activeScreen) {
         dispatch({ type: 'SET_SCREEN', screen: mapped });
       }
     },

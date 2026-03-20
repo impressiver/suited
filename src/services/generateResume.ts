@@ -45,6 +45,10 @@ export interface RunTuiGeneratePdfOptions {
   company?: string;
   /** Checked between major pipeline steps (not mid–single Claude call). */
   signal?: AbortSignal;
+  /**
+   * UI progress: active step index (see `GenerateScreen` labels). Job path: 0…5; full resume: 0…4.
+   */
+  onProgress?: (stepIndex: number) => void;
 }
 
 export interface RunTuiGeneratePdfResult {
@@ -141,6 +145,7 @@ export async function runTuiGeneratePdf(
   const { signal } = options;
   const profile = await loadActiveProfile(profileDir);
   throwIfAborted(signal);
+  options.onProgress?.(0);
 
   const nowIso = new Date().toISOString();
   const config: GenerationConfig = {
@@ -202,6 +207,7 @@ export async function runTuiGeneratePdf(
     }
 
     throwIfAborted(signal);
+    options.onProgress?.(1);
 
     config.jobAnalysis = jobAnalysis;
     config.company = jobAnalysis.company;
@@ -228,10 +234,12 @@ export async function runTuiGeneratePdf(
       saveJobRefinedProfile(jobProfile, profileDir, slug),
       profileToMarkdown(jobProfile, jobRefinedMdPath(profileDir, slug)),
     ]);
+    options.onProgress?.(2);
   } else {
     resumeDoc = assembleFullResumeDocument(profile, config);
     const { effectiveFlair } = getFlairInfo(config.flair, 'general');
     resumeDoc = { ...resumeDoc, flair: effectiveFlair };
+    options.onProgress?.(1);
   }
 
   throwIfAborted(signal);
@@ -275,11 +283,14 @@ export async function runTuiGeneratePdf(
   }
 
   throwIfAborted(signal);
+  options.onProgress?.(config.jd ? 3 : 2);
+  options.onProgress?.(config.jd ? 4 : 3);
   await exportToPdf(html, { template: resumeDoc.template, outputPath });
 
   config.profileUpdatedAt = profile.updatedAt;
   config.resolvedTemplate = resumeDoc.template;
   await saveGenerationConfig(config, profileDir);
 
+  options.onProgress?.(config.jd ? 5 : 4);
   return { outputPath, config };
 }

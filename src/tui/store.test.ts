@@ -35,4 +35,11 @@ describe('appReducer', () => {
     });
     expect(s.deferLetterShortcutsFor).toBe('jobs');
   });
+
+  it('tracks profile editor dirty flag', () => {
+    let s = appReducer(base, { type: 'SET_PROFILE_EDITOR_DIRTY', value: true });
+    expect(s.profileEditorDirty).toBe(true);
+    s = appReducer(s, { type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
+    expect(s.profileEditorDirty).toBe(false);
+  });
 });

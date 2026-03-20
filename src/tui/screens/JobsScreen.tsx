@@ -1,8 +1,20 @@
 import { createHash } from 'node:crypto';
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { JobEvaluation } from '../../claude/prompts/consultant.ts';
+import { buildRefMapForProfile } from '../../generate/curator.ts';
+import { applyJobFeedback, evaluateForJob } from '../../generate/consultant.ts';
+import { assembleResumeDocument, getFlairInfo } from '../../generate/resume-builder.ts';
 import type { SavedJob } from '../../profile/schema.ts';
-import { deleteJob, loadJobRefinement, loadJobs, saveJob } from '../../profile/serializer.ts';
+import {
+  deleteJob,
+  loadActiveProfile,
+  loadJobRefinement,
+  loadJobs,
+  saveJob,
+} from '../../profile/serializer.ts';
+import { formatCurationPreviewLines } from '../../services/curationPreview.ts';
+import { formatJobEvaluationLines } from '../../services/jobEvaluationText.ts';
 import { runJobRefinementPipeline } from '../../services/jobRefinement.ts';
 import {
   ConfirmPrompt,
@@ -14,6 +26,7 @@ import {
 } from '../components/shared/index.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
+import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 const ADD_SENTINEL = '__add__';
@@ -27,7 +40,25 @@ type Mode =
   | { m: 'viewJd'; job: SavedJob; scroll: number }
   | { m: 'deleteAsk'; job: SavedJob; from: 'list' | 'detail' }
   | { m: 'prepareRun'; job: SavedJob }
-  | { m: 'prepareOk'; job: SavedJob; nPos: number; nSkills: number }
+  | {
+      m: 'prepareOk';
+      job: SavedJob;
+      previewLines: string[];
+      prepScroll: number;
+      nPos: number;
+      nSkills: number;
+    }
+  | { m: 'viewPrep'; job: SavedJob; lines: string[]; scroll: number }
+  | { m: 'feedbackRun'; job: SavedJob }
+  | {
+      m: 'feedbackView';
+      job: SavedJob;
+      evaluation: JobEvaluation;
+      lines: string[];
+      scroll: number;
+    }
+  | { m: 'feedbackApply'; job: SavedJob }
+  | { m: 'feedbackDone'; note: string }
   | { m: 'err'; msg: string; canRetryPrepare?: boolean };
 
 export interface JobsScreenProps {
@@ -36,6 +67,7 @@ export interface JobsScreenProps {
 
 export function JobsScreen({ profileDir }: JobsScreenProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigateToScreen();
   const { activeScreen, focusTarget, inTextInput, operationInProgress } = useAppState();
   const [cols, rows] = useTerminalSize();
   const splitPane = jobsUseSplitPane(cols);
@@ -52,6 +84,10 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   const [jdDraft, setJdDraft] = useState('');
   const [errMenuIdx, setErrMenuIdx] = useState(0);
   const [prepareFailStreak, setPrepareFailStreak] = useState(0);
+  const [detailRefinement, setDetailRefinement] = useState<Awaited<
+    ReturnType<typeof loadJobRefinement>
+  > | null>(null);
+  const [feedbackMenuIdx, setFeedbackMenuIdx] = useState(0);
   const lastPrepareJobRef = useRef<SavedJob | null>(null);
 
   const reload = useCallback(async () => {
@@ -71,6 +107,30 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  const detailJobId = mode.m === 'detail' ? mode.job.id : null;
+
+  useEffect(() => {
+    if (!detailJobId) {
+      setDetailRefinement(null);
+      return;
+    }
+    let cancelled = false;
+    void loadJobRefinement(profileDir, detailJobId).then((r) => {
+      if (!cancelled) {
+        setDetailRefinement(r);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [detailJobId, profileDir]);
+
+  useEffect(() => {
+    if (mode.m === 'detail') {
+      setMenuIndex(0);
+    }
+  }, [detailRefinement, mode.m]);
 
   const listItems = useMemo(() => {
     const items = jobs.map((j) => ({
@@ -109,9 +169,84 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   const goGenerate = useCallback(
     (job: SavedJob) => {
       dispatch({ type: 'SET_PENDING_JOB', jobId: job.id });
-      dispatch({ type: 'SET_SCREEN', screen: 'generate' });
+      navigate('generate');
     },
-    [dispatch],
+    [dispatch, navigate],
+  );
+
+  const runFeedback = useCallback(
+    async (job: SavedJob) => {
+      setMode({ m: 'feedbackRun', job });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const refinement = await loadJobRefinement(profileDir, job.id);
+        if (!refinement) {
+          throw new Error('Prepare this job first (p).');
+        }
+        const profile = await loadActiveProfile(profileDir);
+        const refMap = buildRefMapForProfile(profile);
+        const { effectiveFlair } = getFlairInfo(3, refinement.jobAnalysis.industry);
+        const doc = assembleResumeDocument(
+          profile,
+          refinement.plan,
+          refMap,
+          effectiveFlair,
+          refinement.jobAnalysis.industry,
+          job.title,
+          job.company,
+        );
+        const evaluation = await evaluateForJob(doc, refinement.jobAnalysis);
+        const lines = formatJobEvaluationLines(evaluation);
+        setFeedbackMenuIdx(0);
+        setMode({ m: 'feedbackView', job, evaluation, lines, scroll: 0 });
+      } catch (e) {
+        setErrMenuIdx(0);
+        setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: false });
+      } finally {
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
+    [dispatch, profileDir],
+  );
+
+  const applyFeedbackGaps = useCallback(
+    async (job: SavedJob, evaluation: JobEvaluation) => {
+      if (evaluation.gaps.length === 0) {
+        setMode({ m: 'feedbackDone', note: 'No gaps in the review — nothing to apply.' });
+        return;
+      }
+      setMode({ m: 'feedbackApply', job });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const refinement = await loadJobRefinement(profileDir, job.id);
+        if (!refinement) {
+          throw new Error('Lost job preparation — run Prepare again.');
+        }
+        const profile = await loadActiveProfile(profileDir);
+        const refMap = buildRefMapForProfile(profile);
+        const { effectiveFlair } = getFlairInfo(3, refinement.jobAnalysis.industry);
+        const doc = assembleResumeDocument(
+          profile,
+          refinement.plan,
+          refMap,
+          effectiveFlair,
+          refinement.jobAnalysis.industry,
+          job.title,
+          job.company,
+        );
+        await applyJobFeedback(doc, refinement.jobAnalysis, evaluation.gaps);
+        setMode({
+          m: 'feedbackDone',
+          note: `Applied ${evaluation.gaps.length} gap suggestion(s) to the tailored resume draft (in-memory). Run Generate with this job to build an updated PDF.`,
+        });
+      } catch (e) {
+        setErrMenuIdx(0);
+        setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: false });
+      } finally {
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
+    [dispatch, profileDir],
   );
 
   const runPrepare = useCallback(
@@ -121,10 +256,19 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       try {
         const existing = await loadJobRefinement(profileDir, job.id);
         const r = await runJobRefinementPipeline(profileDir, job, existing);
+        const profile = await loadActiveProfile(profileDir);
+        const previewLines = formatCurationPreviewLines(
+          profile,
+          r.plan,
+          job.company,
+          job.title,
+        );
         setPrepareFailStreak(0);
         setMode({
           m: 'prepareOk',
           job,
+          previewLines,
+          prepScroll: 0,
           nPos: r.plan.selectedPositions.length,
           nSkills: r.plan.selectedSkillIds.length,
         });
@@ -226,7 +370,15 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         setMode({ m: 'list' });
         return;
       }
-      if (mode.m === 'prepareOk' || mode.m === 'err') {
+      if (mode.m === 'viewPrep' || mode.m === 'feedbackView') {
+        setMode({ m: 'detail', job: mode.job });
+        return;
+      }
+      if (mode.m === 'prepareOk' || mode.m === 'feedbackDone') {
+        setMode({ m: 'list' });
+        return;
+      }
+      if (mode.m === 'err') {
         setMode({ m: 'list' });
         return;
       }
@@ -257,16 +409,71 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     { isActive: active && mode.m === 'viewJd' },
   );
 
-  const detailMenuItems = useMemo(
-    () => [
+  useInput(
+    (_input, key) => {
+      if (!active || inTextInput) {
+        return;
+      }
+      if (!(mode.m === 'prepareOk' || mode.m === 'viewPrep' || mode.m === 'feedbackView')) {
+        return;
+      }
+      const h =
+        mode.m === 'feedbackView'
+          ? Math.max(4, Math.min(16, rows - 14))
+          : Math.max(4, Math.min(18, rows - 12));
+      const lines =
+        mode.m === 'prepareOk' ? mode.previewLines : mode.lines;
+      const scroll = mode.m === 'prepareOk' ? mode.prepScroll : mode.scroll;
+      const maxScroll = Math.max(0, lines.length - h);
+      if (key.upArrow) {
+        const next = Math.max(0, scroll - 1);
+        if (mode.m === 'prepareOk') {
+          setMode({ ...mode, prepScroll: next });
+        } else if (mode.m === 'viewPrep') {
+          setMode({ ...mode, scroll: next });
+        } else {
+          setMode({ ...mode, scroll: next });
+        }
+      }
+      if (key.downArrow) {
+        const next = Math.min(maxScroll, scroll + 1);
+        if (mode.m === 'prepareOk') {
+          setMode({ ...mode, prepScroll: next });
+        } else if (mode.m === 'viewPrep') {
+          setMode({ ...mode, scroll: next });
+        } else {
+          setMode({ ...mode, scroll: next });
+        }
+      }
+    },
+    {
+      isActive:
+        active &&
+        (mode.m === 'prepareOk' || mode.m === 'viewPrep' || mode.m === 'feedbackView'),
+    },
+  );
+
+  const detailMenuItems = useMemo(() => {
+    const items: { value: string; label: string }[] = [
       { value: 'jd', label: 'View job description' },
-      { value: 'prep', label: 'Prepare (curate for this job)' },
+    ];
+    if (detailRefinement) {
+      items.push(
+        { value: 'viewPrep', label: 'View preparation (curation summary)' },
+        { value: 'feedback', label: 'Professional feedback (job fit)' },
+      );
+    }
+    items.push(
+      {
+        value: 'prep',
+        label: detailRefinement ? 'Re-prepare (re-run curation)' : 'Prepare (curate for this job)',
+      },
       { value: 'gen', label: 'Open Generate with this job' },
       { value: 'del', label: 'Delete this job' },
       { value: 'back', label: '← Back to list' },
-    ],
-    [],
-  );
+    );
+    return items;
+  }, [detailRefinement]);
 
   const finalizeNewJob = useCallback(
     async (jd: string, title: string, company: string) => {
@@ -310,12 +517,95 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }
 
   if (mode.m === 'prepareOk') {
+    const h = Math.max(4, Math.min(18, rows - 12));
     return (
       <Box flexDirection="column">
         <Text bold>Prepared</Text>
         <Text color="green">
           {mode.job.title} @ {mode.job.company} — {mode.nPos} positions · {mode.nSkills} skills
         </Text>
+        <Text dimColor>↑↓ scroll summary · Esc → list</Text>
+        <Box marginTop={1}>
+          <ScrollView
+            lines={mode.previewLines}
+            height={h}
+            scrollOffset={mode.prepScroll}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (mode.m === 'viewPrep') {
+    const h = Math.max(4, Math.min(18, rows - 12));
+    return (
+      <Box flexDirection="column">
+        <Text bold>Preparation — {mode.job.title} @ {mode.job.company}</Text>
+        <Text dimColor>↑↓ scroll · Esc → job menu</Text>
+        <Box marginTop={1}>
+          <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (mode.m === 'feedbackRun') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Jobs</Text>
+        <Spinner label={`Job fit review — ${mode.job.title} @ ${mode.job.company}…`} />
+      </Box>
+    );
+  }
+
+  if (mode.m === 'feedbackView') {
+    const h = Math.max(4, Math.min(16, rows - 14));
+    const feedbackItems = [
+      { value: 'apply', label: 'Apply gap suggestions to tailored draft' },
+      { value: 'back', label: '← Back to job menu' },
+    ];
+    return (
+      <Box flexDirection="column">
+        <Text bold>Professional feedback</Text>
+        <Text dimColor>↑↓ scroll · Esc back</Text>
+        <Box marginTop={1}>
+          <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
+        </Box>
+        <Box marginTop={1}>
+          <SelectList
+            items={feedbackItems}
+            selectedIndex={feedbackMenuIdx}
+            onChange={(i) => setFeedbackMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'apply') {
+                void applyFeedbackGaps(mode.job, mode.evaluation);
+              } else {
+                setMode({ m: 'detail', job: mode.job });
+              }
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (mode.m === 'feedbackApply') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Jobs</Text>
+        <Spinner label="Applying feedback to tailored resume draft…" />
+      </Box>
+    );
+  }
+
+  if (mode.m === 'feedbackDone') {
+    return (
+      <Box flexDirection="column">
+        <Text bold color="green">
+          Feedback
+        </Text>
+        <Text>{mode.note}</Text>
         <Text dimColor>Esc → list</Text>
       </Box>
     );
@@ -348,7 +638,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
             onSubmit={(item) => {
               if (item.value === 'settings') {
                 setPrepareFailStreak(0);
-                dispatch({ type: 'SET_SCREEN', screen: 'settings' });
+                navigate('settings');
                 dispatch({ type: 'SET_FOCUS', target: 'content' });
                 setMode({ m: 'list' });
                 return;
@@ -485,6 +775,29 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
             onSubmit={(item) => {
               if (item.value === 'jd') {
                 setMode({ m: 'viewJd', job: mode.job, scroll: 0 });
+              } else if (item.value === 'viewPrep') {
+                void (async () => {
+                  const r = await loadJobRefinement(profileDir, mode.job.id);
+                  const p = await loadActiveProfile(profileDir);
+                  if (!r) {
+                    setErrMenuIdx(0);
+                    setMode({
+                      m: 'err',
+                      msg: 'No preparation for this job yet.',
+                      canRetryPrepare: false,
+                    });
+                    return;
+                  }
+                  const lines = formatCurationPreviewLines(
+                    p,
+                    r.plan,
+                    mode.job.company,
+                    mode.job.title,
+                  );
+                  setMode({ m: 'viewPrep', job: mode.job, lines, scroll: 0 });
+                })();
+              } else if (item.value === 'feedback') {
+                void runFeedback(mode.job);
               } else if (item.value === 'prep') {
                 void runPrepare(mode.job);
               } else if (item.value === 'gen') {

@@ -26,6 +26,8 @@ export interface AppState {
    * When set to the active screen, App defers `a`/`d`/`g`/`p` to that screen (Jobs per tui-screens.md).
    */
   deferLetterShortcutsFor: ScreenId | null;
+  /** True while Profile editor has unsaved local edits (Phase C navigate-away guard). */
+  profileEditorDirty: boolean;
 }
 
 export type AppAction =
@@ -40,7 +42,8 @@ export type AppAction =
   | { type: 'SET_PENDING_JOB'; jobId: string | null }
   | { type: 'SET_DEFER_LETTER_SHORTCUTS'; screen: ScreenId | null }
   /** Clears async lock (Esc during `operationInProgress`); extend later for AbortSignal. */
-  | { type: 'CANCEL_OPERATION' };
+  | { type: 'CANCEL_OPERATION' }
+  | { type: 'SET_PROFILE_EDITOR_DIRTY'; value: boolean };
 
 export function createInitialAppState(profileDir: string): AppState {
   return {
@@ -55,6 +58,7 @@ export function createInitialAppState(profileDir: string): AppState {
     lastError: null,
     pendingJobId: null,
     deferLetterShortcutsFor: null,
+    profileEditorDirty: false,
   };
 }
 
@@ -84,6 +88,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         operationInProgress: false,
         operationCancelSeq: state.operationCancelSeq + 1,
       };
+    case 'SET_PROFILE_EDITOR_DIRTY':
+      return { ...state, profileEditorDirty: action.value };
   }
 }
 

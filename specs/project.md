@@ -27,7 +27,7 @@ This document is the **engineering + product contract** for the **suited** CLI a
 
 - suited is **not** a hosted SaaS or multi-tenant product in this repo’s scope.
 - **LinkedIn automation** exists only to support user-owned import; users MUST comply with LinkedIn’s terms (see user-facing notes in [`README.md`](../README.md)).
-- A **full-screen Ink TUI** is specified separately; it is a **UI shell** replacement for the interactive dashboard, not a second pipeline ([`tui-README.md`](./tui-README.md)).
+- The **full-screen Ink TUI** (default `suited` in a TTY) is the primary interactive shell; it uses **`src/services/`** and is specified in [`tui-README.md`](./tui-README.md) — not a second pipeline ([`tui-definition-of-done.md`](./tui-definition-of-done.md)).
 
 ---
 
@@ -96,11 +96,12 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 | Document | Role |
 |----------|------|
 | [`README.md`](../README.md) | Installation, usage, templates, accuracy guarantee (user-facing) |
-| [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) | Module map, data flow, dashboard vs TUI |
+| [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) | Module map, data flow, TUI vs CLI subcommands |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | Dev workflow, PR expectations |
 | [`SECURITY.md`](../SECURITY.md) | Reporting, dependency policy |
 | [`AGENTS.md`](./AGENTS.md) | Agent/human routing: streams, deps, PR discipline |
-| [`tui-README.md`](./tui-README.md) | Future TUI (phasing, screens, testing) |
+| [`tui-README.md`](./tui-README.md) | TUI index (screens, testing, non-TTY, phasing) |
+| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phase A/B/C + post–C polish |
 
 ---
 

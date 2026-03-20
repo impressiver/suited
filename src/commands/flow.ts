@@ -19,7 +19,7 @@ export async function runFlow(options: FlowOptions): Promise<void> {
   }
 
   console.error(
-    'suited: open an interactive terminal to use the dashboard, or run e.g. suited --help, suited refine',
+    'suited: open an interactive terminal to use the TUI, or run e.g. suited --help, suited refine',
   );
   process.exitCode = 0;
 }

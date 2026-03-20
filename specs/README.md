@@ -4,7 +4,7 @@
 
 **Product contract (whole repo):** [`project.md`](./project.md)
 
-**TUI (Ink replacement for dashboard):** stub [`tui.md`](./tui.md) → index [`tui-README.md`](./tui-README.md)
+**TUI (default interactive `suited`):** bookmark [`tui.md`](./tui.md) → index [`tui-README.md`](./tui-README.md) — **Phase C** complete per [`tui-definition-of-done.md`](./tui-definition-of-done.md); optional polish listed there as *post–Phase C*.
 
 User guide and module layout: [`README.md`](../README.md), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
@@ -15,7 +15,7 @@ User guide and module layout: [`README.md`](../README.md), [`docs/ARCHITECTURE.m
 | File | Role |
 |------|------|
 | [`AGENTS.md`](./AGENTS.md) | **Parallel workstreams**, dependency graph, PR discipline |
-| [`project.md`](./project.md) | Pipeline, accuracy, profile layout, UI split (CLI vs future TUI) |
+| [`project.md`](./project.md) | Pipeline, accuracy, profile layout, TUI (default) vs CLI subcommands |
 | [`tui.md`](./tui.md) | Short bookmark → [`tui-README.md`](./tui-README.md) |
 
 ---
@@ -58,7 +58,7 @@ Grouped for **planning → design → build → verify**. Order within build fol
 | File | Role |
 |------|------|
 | [`tui-testing.md`](./tui-testing.md) | Vitest, ink-testing-library, forbidden imports |
-| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | MVP vs full vision checklists |
+| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phases A–C checklists + post–C polish |
 
 ### Index (global TUI rules)
 

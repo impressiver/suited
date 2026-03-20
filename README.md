@@ -10,8 +10,9 @@ Every word in the output traces back to something you actually wrote.
 ## How it works
 
 1. **Import** your LinkedIn profile (URL, data export, or paste)
-2. **Refine** — Claude asks a few targeted questions to fill gaps and sharpen weak bullets
-3. **Generate** — paste a job description and get a tailored PDF resume
+2. **Refine** — Claude asks targeted questions (and you can polish, direct-edit, or re-run Q&A) to improve **source → refined** data
+3. **Jobs** — save job descriptions; **prepare** curates your profile per job; optional **professional feedback** before generating
+4. **Generate** — paste or pick a saved JD and get a tailored PDF resume
 
 Your data stays on your machine. Nothing is sent anywhere except to the AI API you configure.
 
@@ -75,28 +76,38 @@ OPENROUTER_API_KEY=your_key_here
 
 ## Usage
 
-Run the full pipeline:
+### Default: full-screen TUI
+
+In a normal **interactive terminal** (TTY):
 
 ```bash
 suited
 ```
 
-That's it. suited walks you through each step interactively and skips anything already done.
+This launches the **Ink-based TUI**: sidebar + eight screens — **Dashboard**, **Import**, **Contact**, **Jobs**, **Refine**, **Profile** (improve), **Generate**, and **Settings**. Keyboard shortcuts (`1–8`, letter keys, `Tab`, `Esc`, `q`) navigate; see [`specs/tui-README.md`](specs/tui-README.md) for rules (non-TTY behavior, focus, forbidden imports).
 
-### Which command?
+Core work runs through **`src/services/`** (shared with CLI subcommands). The TUI does **not** spawn subprocesses for those flows.
+
+If **stdin or stdout is not a TTY** (e.g. pipes, CI), `suited` with no subcommand prints a one-line hint to stderr and exits without hanging (see [`specs/tui-README.md`](specs/tui-README.md)).
+
+### Which command? (CLI subcommands)
+
+The same pipeline is available as **subcommands** using **Inquirer**-style prompts (no Ink):
 
 | Goal | Command |
 |------|---------|
 | First structured pass: Q&A and AI-assisted edits from **source → refined** data | `suited refine` |
-| Ongoing **profile hub**: health view, re-run refine, edit summary/bullets, contact | `suited improve` |
+| Ongoing **profile hub** (CLI menu): health, re-refine, bullets, summary, contact | `suited improve` |
 | **Curate** your profile for one **saved job** (before generating a PDF) | `suited prepare` |
 | Export a **PDF** for a job (paste or saved JD) | `suited generate` |
 
-Use **`refine`** when you are moving from raw import to a refined profile. Use **`improve`** when you already have data and want a menu of maintenance options. Use **`prepare`** after you have job descriptions saved (`suited jobs`) to tailor content to a specific role. **`generate`** produces the PDF.
+In the **TUI**, use **Dashboard** (health + validation summary), **Refine**, **Profile**, **Jobs** (prepare + curation preview + job-fit feedback), and **Generate** instead of `improve` / `prepare` / `validate` for most day-to-day work.
 
-### Interactive UI (dashboard vs TUI)
+Use **`refine`** (or the Refine screen) when moving from raw import to refined data. Use **`improve`** or the **Profile** screen for ongoing edits. Use **`prepare`** or **Jobs → Prepare** after saving job descriptions. **`generate`** (or the Generate screen) produces the PDF.
 
-With no subcommand, suited runs an **interactive dashboard** (terminal menus). A **full-screen TUI** is [specified in `specs/`](specs/tui-README.md) (files `tui-*.md`) as a future replacement for that layer; core pipeline behavior is the same. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit together.
+### Architecture
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for entry points, `src/tui/`, `src/services/`, and how CLI vs TUI share logic.
 
 ### Import options
 
@@ -135,7 +146,7 @@ suited import https://www.linkedin.com/in/your-username --headed
 | `suited improve` | Interactive hub: refine again, bullets, summary, contact |
 | `suited jobs` | Add, list, delete saved job descriptions |
 | `suited prepare` | Curate profile for one saved job before PDF |
-| `suited validate` | Validate profile data and guardrails |
+| `suited validate` | Validate profile data and guardrails (summary also on **Dashboard** in the TUI) |
 
 ### Generate options
 
@@ -204,16 +215,19 @@ suited generate --profile-dir output/engineering
 
 ```bash
 pnpm install
-pnpm dev              # Run without building
-pnpm dev import       # Run a specific command
+pnpm dev              # Run without building (default → TUI when TTY)
+pnpm dev import       # Run a specific subcommand
 pnpm check            # Lint + format (Biome)
 pnpm test             # Unit tests (Vitest)
+pnpm run ci           # test + TUI forbidden-import check + build (matches typical CI)
 pnpm build            # Compile TypeScript → dist/
 pnpm build:bundle     # Build esbuild CJS bundle (for testing)
 pnpm build:binary     # Build SEA binary for current platform → dist-bin/
 ```
 
-Contributing notes: [`CONTRIBUTING.md`](CONTRIBUTING.md). Module layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Project specification: [`specs/project.md`](specs/project.md). Agent routing / parallel work: [`specs/AGENTS.md`](specs/AGENTS.md). Spec index: [`specs/README.md`](specs/README.md). Security: [`SECURITY.md`](SECURITY.md).
+**TUI:** Source lives under `src/tui/`. CI enforces **`pnpm check:tui-imports`** — no `inquirer`, `ora`, or `src/commands/**` imports under `src/tui/**` (see [`specs/tui-testing.md`](specs/tui-testing.md)).
+
+Contributing notes: [`CONTRIBUTING.md`](CONTRIBUTING.md). Module layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Project specification: [`specs/project.md`](specs/project.md). TUI spec index: [`specs/tui-README.md`](specs/tui-README.md). Definition of done (phases A–C): [`specs/tui-definition-of-done.md`](specs/tui-definition-of-done.md). Agent routing: [`specs/AGENTS.md`](specs/AGENTS.md). Spec index: [`specs/README.md`](specs/README.md). Security: [`SECURITY.md`](SECURITY.md).
 
 ## License
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadActiveProfile } from '../../profile/serializer.ts';
 import type { HealthScore } from '../../services/improve.ts';
 import { computeHealthScore } from '../../services/improve.ts';
+import { validateProfile } from '../../services/validate.ts';
 import {
   ScrollView,
   type SelectItem,
@@ -12,7 +13,8 @@ import {
 import { getDashboardVariant } from '../dashboardVariant.ts';
 import { hasApiKey } from '../env.ts';
 import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
-import { useAppDispatch, useAppState } from '../store.tsx';
+import { useNavigateToScreen } from '../navigationContext.tsx';
+import { useAppState } from '../store.tsx';
 import { suggestedNextLine } from '../suggestedNext.ts';
 import type { ScreenId } from '../types.ts';
 
@@ -34,13 +36,15 @@ export interface DashboardScreenProps {
 }
 
 export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: DashboardScreenProps) {
-  const dispatch = useAppDispatch();
+  const navigate = useNavigateToScreen();
   const { activeScreen, focusTarget } = useAppState();
   const panelActive = activeScreen === 'dashboard' && focusTarget === 'content';
   const api = hasApiKey();
   const variant = getDashboardVariant(snapshot, api);
   const [health, setHealth] = useState<HealthScore | null>(null);
   const [healthErr, setHealthErr] = useState<string | null>(null);
+  const [validationRefCount, setValidationRefCount] = useState<number | null>(null);
+  const [validationErr, setValidationErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (snapshot.loading || snapshot.error || !snapshot.hasRefined) {
@@ -66,6 +70,32 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       cancelled = true;
     };
   }, [profileDir, snapshot.loading, snapshot.error, snapshot.hasRefined]);
+
+  useEffect(() => {
+    if (snapshot.loading || snapshot.error || !snapshot.hasSource) {
+      setValidationRefCount(null);
+      setValidationErr(null);
+      return;
+    }
+    let cancelled = false;
+    void loadActiveProfile(profileDir)
+      .then((p) => {
+        if (!cancelled) {
+          const { referenceCount } = validateProfile(p);
+          setValidationRefCount(referenceCount);
+          setValidationErr(null);
+        }
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setValidationRefCount(null);
+          setValidationErr(e instanceof Error ? e.message : String(e));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileDir, snapshot.loading, snapshot.error, snapshot.hasSource]);
 
   useInput(
     (input) => {
@@ -168,6 +198,20 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
           )}
         </Box>
       )}
+      {validationRefCount != null && (
+        <Box marginBottom={1} flexDirection="column">
+          <Text bold>Validation</Text>
+          <Text>
+            {validationRefCount} reference anchor{validationRefCount === 1 ? '' : 's'} — accuracy
+            guard ready (same as suited validate).
+          </Text>
+        </Box>
+      )}
+      {validationErr != null && (
+        <Box marginBottom={1} flexDirection="column">
+          <Text color="yellow">Could not validate profile: {validationErr}</Text>
+        </Box>
+      )}
       <Text bold>Suggested next</Text>
       <Text>{next}</Text>
       <Box marginTop={1} flexDirection="column">
@@ -184,7 +228,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
           items={QUICK_ACTIONS}
           selectedIndex={quickIndex}
           onChange={(i) => setQuickIndex(i)}
-          onSubmit={(item) => dispatch({ type: 'SET_SCREEN', screen: item.value })}
+          onSubmit={(item) => navigate(item.value)}
           isActive
         />
       </Box>

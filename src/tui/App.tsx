@@ -1,5 +1,6 @@
 import { Box, useApp, useInput } from 'ink';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ConfirmPrompt } from './components/shared/ConfirmPrompt.tsx';
 import { Layout } from './components/Layout.tsx';
 import type { FlowOptions } from './flowOptions.ts';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
@@ -12,6 +13,7 @@ import { JobsScreen } from './screens/JobsScreen.tsx';
 import { ProfileEditorScreen } from './screens/ProfileEditorScreen.tsx';
 import { RefineScreen } from './screens/RefineScreen.tsx';
 import { SettingsScreen } from './screens/SettingsScreen.tsx';
+import { NavigateProvider } from './navigationContext.tsx';
 import { useAppDispatch, useAppState } from './store.tsx';
 import { SCREEN_ORDER, type ScreenId } from './types.ts';
 
@@ -31,6 +33,18 @@ export function App({ profileDir, flowOptions }: AppProps) {
   const snapshot = useProfileSnapshot(profileDir);
   const state = useAppState();
   const dispatch = useAppDispatch();
+  const [pendingNav, setPendingNav] = useState<ScreenId | null>(null);
+
+  const goToScreen = useCallback(
+    (screen: ScreenId) => {
+      if (state.profileEditorDirty && state.activeScreen === 'profile' && screen !== 'profile') {
+        setPendingNav(screen);
+        return;
+      }
+      dispatch({ type: 'SET_SCREEN', screen });
+    },
+    [dispatch, state.profileEditorDirty, state.activeScreen],
+  );
 
   const { activeScreen, focusTarget } = state;
 
@@ -85,6 +99,10 @@ export function App({ profileDir, flowOptions }: AppProps) {
 
   useInput(
     (input, key) => {
+      if (pendingNav != null) {
+        return;
+      }
+
       if (state.inTextInput) {
         return;
       }
@@ -124,22 +142,17 @@ export function App({ profileDir, flowOptions }: AppProps) {
 
       if (key.upArrow) {
         if (!(focusTarget === 'content' && screenUsesContentArrows(activeScreen))) {
-          dispatch({
-            type: 'SET_SCREEN',
-            screen:
-              SCREEN_ORDER[
-                (SCREEN_ORDER.indexOf(activeScreen) - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length
-              ],
-          });
+          const next =
+            SCREEN_ORDER[
+              (SCREEN_ORDER.indexOf(activeScreen) - 1 + SCREEN_ORDER.length) % SCREEN_ORDER.length
+            ];
+          goToScreen(next);
         }
         return;
       }
       if (key.downArrow) {
         if (!(focusTarget === 'content' && screenUsesContentArrows(activeScreen))) {
-          dispatch({
-            type: 'SET_SCREEN',
-            screen: SCREEN_ORDER[(SCREEN_ORDER.indexOf(activeScreen) + 1) % SCREEN_ORDER.length],
-          });
+          goToScreen(SCREEN_ORDER[(SCREEN_ORDER.indexOf(activeScreen) + 1) % SCREEN_ORDER.length]);
         }
         return;
       }
@@ -153,7 +166,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
         const idx = parseInt(input, 10) - 1;
         const next = SCREEN_ORDER[idx];
         if (next && next !== activeScreen) {
-          dispatch({ type: 'SET_SCREEN', screen: next });
+          goToScreen(next);
         }
         return;
       }
@@ -191,10 +204,10 @@ export function App({ profileDir, flowOptions }: AppProps) {
       };
       const mapped = letterMap[input];
       if (mapped && mapped !== activeScreen) {
-        dispatch({ type: 'SET_SCREEN', screen: mapped });
+        goToScreen(mapped);
       }
     },
-    { isActive: true },
+    { isActive: pendingNav == null },
   );
 
   const content = (() => {
@@ -235,20 +248,37 @@ export function App({ profileDir, flowOptions }: AppProps) {
   })();
 
   return (
-    <Box flexDirection="column" width={cols} height={rows}>
-      <Layout
-        activeScreen={activeScreen}
-        focusTarget={focusTarget}
-        footerHint={footerHint}
-        panelFocusBanner={panelFocusBanner}
-        name={snapshot.name}
-        positionCount={snapshot.positionCount}
-        skillCount={snapshot.skillCount}
-        hasRefined={snapshot.hasRefined}
-        hasSource={snapshot.hasSource}
-      >
-        {content}
-      </Layout>
-    </Box>
+    <NavigateProvider value={goToScreen}>
+      <Box flexDirection="column" width={cols} height={rows}>
+        {pendingNav != null && (
+          <Box marginBottom={1} flexDirection="column">
+            <ConfirmPrompt
+              message="Profile has unsaved changes. Leave without saving?"
+              active
+              onConfirm={() => {
+                dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
+                const target = pendingNav;
+                setPendingNav(null);
+                dispatch({ type: 'SET_SCREEN', screen: target });
+              }}
+              onCancel={() => setPendingNav(null)}
+            />
+          </Box>
+        )}
+        <Layout
+          activeScreen={activeScreen}
+          focusTarget={focusTarget}
+          footerHint={footerHint}
+          panelFocusBanner={panelFocusBanner}
+          name={snapshot.name}
+          positionCount={snapshot.positionCount}
+          skillCount={snapshot.skillCount}
+          hasRefined={snapshot.hasRefined}
+          hasSource={snapshot.hasSource}
+        >
+          {content}
+        </Layout>
+      </Box>
+    </NavigateProvider>
   );
 }

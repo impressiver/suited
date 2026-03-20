@@ -24,7 +24,7 @@ describe('runFlow non-TTY', () => {
     const { runFlow } = await import('./flow.ts');
     await runFlow({});
     expect(stderrSpy).toHaveBeenCalledWith(
-      'suited: open an interactive terminal to use the dashboard, or run e.g. suited --help, suited refine',
+      'suited: open an interactive terminal to use the TUI, or run e.g. suited --help, suited refine',
     );
     expect(process.exitCode).toBe(0);
   });

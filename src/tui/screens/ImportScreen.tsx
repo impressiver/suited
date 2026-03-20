@@ -6,6 +6,7 @@ import { missingContactDetailPromptLabels } from '../../utils/contact.ts';
 import { MultilineInput, SelectList, Spinner, TextInput } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
+import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 export interface ImportScreenProps {
@@ -18,6 +19,7 @@ type Phase = 'idle' | 'running' | 'done' | 'error';
 
 export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: ImportScreenProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigateToScreen();
   const { focusTarget, activeScreen, inTextInput } = useAppState();
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>('idle');
@@ -157,7 +159,7 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
               onSubmit={(item) => {
                 if (item.value === 'settings') {
                   setApiFailureStreak(0);
-                  dispatch({ type: 'SET_SCREEN', screen: 'settings' });
+                  navigate('settings');
                   dispatch({ type: 'SET_FOCUS', target: 'content' });
                   setPhase('idle');
                   setErr(null);

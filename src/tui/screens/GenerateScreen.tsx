@@ -3,9 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
 import { runTuiGeneratePdf } from '../../services/generateResume.ts';
-import { MultilineInput, SelectList, Spinner } from '../components/shared/index.ts';
+import {
+  MultilineInput,
+  ProgressSteps,
+  SelectList,
+  Spinner,
+} from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
+import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 type Phase =
@@ -34,6 +40,21 @@ type PickFlairSnapshot = {
 
 type GenerateRunCtx = PickFlairSnapshot & { flair: FlairLevel };
 
+const JOB_PROGRESS_LABELS = [
+  'Job prep (analyze & curate)',
+  'Build & polish resume',
+  'Layout HTML & fit pages',
+  'Export PDF',
+  'Save metadata',
+] as const;
+
+const FULL_PROGRESS_LABELS = [
+  'Build document',
+  'Layout HTML & fit pages',
+  'Export PDF',
+  'Save metadata',
+] as const;
+
 const FLAIR_CHOICES: { flair: FlairLevel; label: string }[] = [
   { flair: 1, label: '1 — Classic (ATS-safe, serif)' },
   { flair: 2, label: '2 — Classic+ (minimal accents)' },
@@ -48,6 +69,7 @@ export interface GenerateScreenProps {
 
 export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigateToScreen();
   const { pendingJobId, activeScreen, focusTarget } = useAppState();
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ p: 'pick-source' });
@@ -55,6 +77,8 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const [sourceIdx, setSourceIdx] = useState(0);
   const [apiFailureStreak, setApiFailureStreak] = useState(0);
   const [errMenuIdx, setErrMenuIdx] = useState(0);
+  const [runStepIndex, setRunStepIndex] = useState(0);
+  const [doneMenuIdx, setDoneMenuIdx] = useState(0);
 
   const recoverFlairRef = useRef<PickFlairSnapshot | null>(null);
   const lastGenCtxRef = useRef<GenerateRunCtx | null>(null);
@@ -102,6 +126,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         idx: ctx.idx,
       };
       lastGenCtxRef.current = ctx;
+      setRunStepIndex(0);
       setPhase({ p: 'run' });
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
       const ac = createController();
@@ -114,6 +139,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           jobTitle: ctx.title,
           company: ctx.company,
           signal: ac.signal,
+          onProgress: setRunStepIndex,
         });
         setApiFailureStreak(0);
         setPhase({ p: 'done', path: outputPath });
@@ -139,10 +165,17 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   );
 
   if (phase.p === 'run') {
+    const labels = lastGenCtxRef.current?.jd
+      ? [...JOB_PROGRESS_LABELS]
+      : [...FULL_PROGRESS_LABELS];
+    const cap = Math.max(0, Math.min(runStepIndex, labels.length));
     return (
       <Box flexDirection="column">
         <Text bold>Generate</Text>
-        <Spinner label="Building PDF…" />
+        <ProgressSteps steps={labels} currentIndex={cap} />
+        <Box marginTop={1}>
+          <Spinner label="Running pipeline…" />
+        </Box>
       </Box>
     );
   }
@@ -154,7 +187,51 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           PDF ready
         </Text>
         <Text>{phase.path}</Text>
-        <Text dimColor>Pick another flow from the sidebar, or g / j to jump screens.</Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text bold>Next</Text>
+          <SelectList
+            items={[
+              { value: 'again', label: 'Regenerate with same options' },
+              { value: 'flair', label: 'Change flair / job options' },
+              { value: 'source', label: 'New source (paste / saved job / full resume)' },
+              { value: 'jobs', label: 'Jobs — manage saved JDs' },
+              { value: 'dash', label: 'Dashboard' },
+            ]}
+            selectedIndex={doneMenuIdx}
+            onChange={(i) => setDoneMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'again') {
+                const ctx = lastGenCtxRef.current;
+                if (ctx) {
+                  void runGenerate(ctx);
+                }
+                return;
+              }
+              if (item.value === 'flair') {
+                const snap = recoverFlairRef.current;
+                if (snap) {
+                  setPhase({ p: 'pick-flair', ...snap });
+                } else {
+                  setPhase({ p: 'pick-source' });
+                }
+                return;
+              }
+              if (item.value === 'source') {
+                setPhase({ p: 'pick-source' });
+                return;
+              }
+              if (item.value === 'jobs') {
+                navigate('jobs');
+                dispatch({ type: 'SET_FOCUS', target: 'content' });
+                return;
+              }
+              navigate('dashboard');
+              dispatch({ type: 'SET_FOCUS', target: 'content' });
+            }}
+          />
+        </Box>
+        <Text dimColor>Or use the sidebar / letter keys (unchanged).</Text>
       </Box>
     );
   }
@@ -211,7 +288,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
             onSubmit={(item) => {
               if (item.value === 'settings') {
                 setApiFailureStreak(0);
-                dispatch({ type: 'SET_SCREEN', screen: 'settings' });
+                navigate('settings');
                 dispatch({ type: 'SET_FOCUS', target: 'content' });
                 const snap = recoverFlairRef.current;
                 if (snap) {

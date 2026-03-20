@@ -1,6 +1,6 @@
 # TUI specification (index)
 
-These documents are the **product + engineering contract** for the full-screen Ink TUI that replaces `runDashboard` when users run `suited` with no subcommand in a real TTY. They are split so **vision**, **phasing**, and **checklists** stay navigable.
+These documents are the **product + engineering contract** for the full-screen **Ink** TUI — the **default** when users run `suited` with no subcommand in a real TTY (`runFlow` → `runTui`). They are split so **vision**, **phasing**, and **checklists** stay navigable. **Phase C** is marked complete in [`tui-definition-of-done.md`](./tui-definition-of-done.md); residual items are *post–Phase C polish*.
 
 **Implementers:** **[`AGENTS.md`](./AGENTS.md)** assigns **parallel workstreams** (P0, S1, T0–T2, L1, Q1), dependencies, and PR discipline — read that before splitting work across people.
 
@@ -16,7 +16,7 @@ The same files are **grouped by phase** in [`specs/README.md`](./README.md). Use
 
 | Doc | Purpose |
 |-----|---------|
-| [Phased delivery & current implementation](./tui-phased-delivery.md) | **Start here:** Phase A/B/C, what the repo does today vs north star |
+| [Phased delivery & current implementation](./tui-phased-delivery.md) | Phase A/B/C status, what shipped vs optional follow-ups |
 | [Goals & constraints](./tui-goals-and-constraints.md) | Goals, non-goals, breakout rule, service extraction, rollback |
 | [UX & workflow](./tui-ux.md) | Pipeline, discoverability, mermaid pipeline diagram |
 | [Stack & structure](./tui-stack-and-structure.md) | Ink/React versions, directory tree, modified files |
@@ -29,7 +29,7 @@ The same files are **grouped by phase** in [`specs/README.md`](./README.md). Use
 | [Screen details](./tui-screens.md) | Per-screen loads, states, components (Settings API probe semantics) |
 | [Build](./tui-build.md) | deps, tsconfig, Vitest glob |
 | [Implementation order](./tui-implementation-order.md) | **Sequential** rollout steps (single implementer); parallel lanes → [`AGENTS.md`](./AGENTS.md) |
-| [Definition of done](./tui-definition-of-done.md) | **MVP** vs **full vision** checklists |
+| [Definition of done](./tui-definition-of-done.md) | Phases A–C + **post–Phase C** polish list |
 | [Open questions](./tui-open-questions.md) | Decisions to lock |
 | [Scope estimate](./tui-scope.md) | File counts, LOC ballpark |
 

@@ -23,6 +23,7 @@ import {
 } from '../../profile/serializer.ts';
 import { fileExists } from '../../utils/fs.ts';
 import { ConfirmPrompt, InlineEditor, SelectList, Spinner } from '../components/shared/index.ts';
+import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 function cloneProfile(p: Profile): Profile {
@@ -71,6 +72,7 @@ export interface ProfileEditorScreenProps {
 
 export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigateToScreen();
   const { activeScreen, focusTarget, inTextInput } = useAppState();
   const active = activeScreen === 'profile' && focusTarget === 'content';
 
@@ -97,7 +99,13 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const [certDeletePrompt, setCertDeletePrompt] = useState<{ certIdx: number } | null>(null);
   const [projDeletePrompt, setProjDeletePrompt] = useState<{ projIdx: number } | null>(null);
   const [positionDeletePrompt, setPositionDeletePrompt] = useState<{ posIdx: number } | null>(null);
+  const [saveFailStreak, setSaveFailStreak] = useState(0);
+  const [saveErrMenuIdx, setSaveErrMenuIdx] = useState(0);
   const top = stack.at(-1);
+
+  useEffect(() => {
+    dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: dirty });
+  }, [dirty, dispatch]);
 
   useEffect(() => {
     void (async () => {
@@ -121,12 +129,20 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
           setSession(null);
         }
         setPhase('ready');
+        setSaveFailStreak(0);
       } catch (e) {
         setErrMsg((e as Error).message);
         setPhase('err');
       }
     })();
   }, [profileDir, loadNonce]);
+
+  useEffect(
+    () => () => {
+      dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
+    },
+    [dispatch],
+  );
 
   useInput(
     (input) => {
@@ -155,7 +171,10 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
       }
       setPhase('ready');
+      setSaveFailStreak(0);
     } catch (e) {
+      setSaveFailStreak((n) => n + 1);
+      setSaveErrMenuIdx(0);
       setErrMsg((e as Error).message);
       setPhase('err');
     } finally {
@@ -774,12 +793,66 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     );
   }
 
-  if (phase === 'err' || !profile) {
+  if (phase === 'err' && !profile) {
     return (
       <Box flexDirection="column">
         <Text bold>Improve profile</Text>
         <Text color="red">{errMsg ?? 'Unknown error'}</Text>
         <Text dimColor>Press r to retry · Tab → sidebar</Text>
+      </Box>
+    );
+  }
+
+  if (phase === 'err' && profile) {
+    const showSettings = saveFailStreak >= 3;
+    const saveErrItems = [
+      { value: 'retry' as const, label: 'Retry save' },
+      ...(showSettings
+        ? [{ value: 'settings' as const, label: 'Check Settings (API key / disk)' }]
+        : []),
+      { value: 'dismiss' as const, label: 'Dismiss — continue editing' },
+    ];
+    return (
+      <Box flexDirection="column">
+        <Text bold>Improve profile — save failed</Text>
+        <Text color="red">{errMsg ?? 'Unknown error'}</Text>
+        {showSettings && (
+          <Box marginTop={1}>
+            <Text dimColor>Several save failures — check API keys or disk space if relevant.</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <SelectList
+            items={saveErrItems}
+            selectedIndex={saveErrMenuIdx}
+            onChange={(i) => setSaveErrMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'settings') {
+                setSaveFailStreak(0);
+                navigate('settings');
+                dispatch({ type: 'SET_FOCUS', target: 'content' });
+                setPhase('ready');
+                return;
+              }
+              if (item.value === 'dismiss') {
+                setSaveFailStreak(0);
+                setPhase('ready');
+                return;
+              }
+              setSaveErrMenuIdx(0);
+              void save();
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">No profile loaded</Text>
       </Box>
     );
   }

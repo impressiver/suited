@@ -24,14 +24,14 @@ Each row is a **parallelizable lane** when dependencies are satisfied. Prefer **
 | **S1** | **Service extraction** | Callable modules from commands; no new UI | [`tui-goals-and-constraints.md`](./tui-goals-and-constraints.md), [`tui-phased-delivery.md`](./tui-phased-delivery.md) (Phase B), [`tui-implementation-order.md`](./tui-implementation-order.md) step 1 | `src/services/` (new/refactors), `src/commands/*` | P0 for contracts |
 | **T0** | **TUI bootstrap** | Ink app, store, layout, TTY gate, build | [`tui-stack-and-structure.md`](./tui-stack-and-structure.md), [`tui-build.md`](./tui-build.md), [`tui-terminal.md`](./tui-terminal.md), [`tui-README.md`](./tui-README.md) (non-TTY SSOT) | `src/tui/**`, `src/commands/flow.ts`, `tsconfig` | — |
 | **T1** | **Shared TUI components** | Reusable inputs, lists, spinners, diff, scroll | [`tui-architecture.md`](./tui-architecture.md), [`tui-ui-mockups.md`](./tui-ui-mockups.md) | `src/tui/components/**` | T0 |
-| **T2** | **Screens** | One screen per assignment; wire to services or documented delegation | [`tui-screens.md`](./tui-screens.md), [`tui-ux.md`](./tui-ux.md), [`tui-state-machines.md`](./tui-state-machines.md) as needed | `src/tui/screens/**` | T0+T1; **S1** for Phase B “real” data (Phase A may delegate per phased-delivery) |
+| **T2** | **Screens** | One screen per assignment; wire to **`src/services/`** (no `commands/` imports) | [`tui-screens.md`](./tui-screens.md), [`tui-ux.md`](./tui-ux.md), [`tui-state-machines.md`](./tui-state-machines.md) as needed | `src/tui/screens/**` | T0+T1; **S1** for service-backed data |
 | **L1** | **LLM streaming** | `callWithToolStreaming`, tool events, AbortSignal | [`tui-architecture.md`](./tui-architecture.md), [`tui-testing.md`](./tui-testing.md) | `src/claude/**`, TUI consumers | P0; coordinate with T2 on Refine/Generate |
 | **Q1** | **QA / CI** | Tests, forbidden-import gates, footers | [`tui-testing.md`](./tui-testing.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) | `src/**/*.test.*`, CI scripts | After `src/tui/**` exists |
 
 **Routing hints**
 
 - **Default entry / non-TTY** behavior is specified in [`tui-README.md`](./tui-README.md) and implemented in **`flow.ts`** — do not fork SSOT across files.
-- **Phase A** allows subprocess delegation; **Phase B** expects services — see [`tui-phased-delivery.md`](./tui-phased-delivery.md). If you add delegation, **document it** in phased-delivery or PR description per spec.
+- **Phases A–C** are complete in-repo; **post–Phase C** polish is listed in [`tui-definition-of-done.md`](./tui-definition-of-done.md). If you reintroduce subprocess delegation for a screen, **document it** in phased-delivery or the PR (normally **MUST NOT**).
 - **Forbidden:** `src/tui/**` importing `inquirer`, `ora`, or `src/commands/**` — enforce in Q1 ([`tui-testing.md`](./tui-testing.md)).
 
 ---
@@ -106,7 +106,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
 | **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, flair, `pendingJobId` | **Done** (2026-03-19) |
 | **8** | **Refine + Profile MVP** — Refine: Q&A, `applyRefinements`, `DiffView`, `saveRefined`; Profile: stack + summary/bullets, persist like CLI `profile-editor` | **Done** (2026-03-19) |
-| **9+** | Close gaps vs [`tui-screens.md`](./tui-screens.md) + Phase C | See **[`tui-definition-of-done.md` § What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c)**; [`tui-implementation-order.md`](./tui-implementation-order.md) §10–15 |
+| **9+** | Phase C + post-C polish | **Phase C** checklist: [`tui-definition-of-done.md` § Phase C](./tui-definition-of-done.md#phase-c--full-vision-north-star). Optional follow-ups: [`post–Phase C`](./tui-definition-of-done.md#whats-left-postphase-c-polish). |
 
 ### Phase 1 — completed work
 
@@ -140,7 +140,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/tui/dashboardVariant.ts`** (+ test) — maps snapshot + `hasApiKey()` to the five dashboard states.
 - **`src/tui/settings/`** — `probeProvider.ts` (Anthropic / OpenRouter key probes), `upsertEnvFile.ts` (+ test) for `.env` merges.
-- **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant, optional health via `loadActiveProfile` + `computeHealthScore`, `ScrollView` pipeline/activity, `SelectList` quick actions.
+- **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant; health (`computeHealthScore`) when refined; **validation** (`validateProfile` reference count) when source exists; `ScrollView` pipeline/activity; `SelectList` quick actions via **`NavigateProvider`**.
 - **`src/tui/screens/SettingsScreen.tsx`** — provider list + masked `TextInput`, **`s`** save (probe + write `.env`), shortcuts **`a`/`A`**, **`o`/`O`**, **`e`**, **`l`**.
 - **`src/tui/App.tsx`** — on **Dashboard** with **content** focus, **↑↓** move quick-action list (not global screen nav); **1–8** / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save).
 
@@ -150,7 +150,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/services/importProfile.ts`** — `importProfileFromInput()` (detect/scrape/parse/save); **`commands/import.ts`** delegates the core path and keeps CLI logging + `ensureContactDetails`.
 - **`src/tui/runTui.tsx`** — single `render` + `waitUntilExit` (removed `exitBag` / `spawnSync` loop).
-- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); removed Enter-to-CLI and **`cliArgs.ts`**; **Contact** + **Import** inline; **Tab** passes through on Contact content for field cycling; **↑↓** reserved on Contact for fields (with Dashboard). (Generate / Refine / Profile were stubs here; see phases 7–8 for current screens.)
+- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); **NavigateProvider** + Profile dirty guard on global nav; all eight screens inline (**Import**, **Contact**, **Jobs**, **Generate**, **Refine**, **Profile**, **Dashboard**, **Settings**); **Tab** / **↑↓** / letter keys per [`tui-screens.md`](./tui-screens.md).
 - **`src/tui/hooks/useTerminalSize.ts`** — listens to `stdout` `resize`.
 - **`src/tui/components/Layout.tsx`** — main row `flexGrow={1}` for usable height.
 - **Removed** — `DelegateScreen.tsx`, `cliArgs.ts`, **`TuiExitBag`**.
@@ -160,7 +160,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/services/jobRefinement.ts`** — `runJobRefinementPipeline()` (analyze + curate + `saveJobRefinement`); **`commands/prepare.ts`** delegates curation to it (CLI spinners removed for that path; behavior preserved).
 - **`src/tui/store.tsx`** — `deferLetterShortcutsFor` + `SET_DEFER_LETTER_SHORTCUTS` so Jobs can own **a / d / g / p** without colliding with global **`p`→profile** / **`g`→generate**.
 - **`src/tui/App.tsx`** — Jobs content: defer those letters; **Esc** chain owned by Jobs (not forced to sidebar); **↑↓** screen-cycle suppressed on Jobs like Dashboard.
-- **`src/tui/screens/JobsScreen.tsx`** — Full Phase-A jobs flow per [`tui-screens.md`](./tui-screens.md) (minus prepare streaming UI and two-panel layout polish).
+- **`src/tui/screens/JobsScreen.tsx`** — Jobs list/detail, prepare (`runJobRefinementPipeline`), **curation preview** (`formatCurationPreviewLines`), **job-fit feedback** (`evaluateForJob` / `applyJobFeedback`), generate hand-off, split layout at 80+ cols.
 
 ### Phase 7 — completed work
 
@@ -171,7 +171,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 ### Phase 8 — completed work (MVP)
 
-- **`src/tui/screens/RefineScreen.tsx`** — `loadSource` → optional already-refined menu + md/json sync → Q&A → `applyRefinements` → `DiffView` + **`SelectList`** (accept / edit proposed summary / discard) → `saveRefined` + `profileToMarkdown`; `profileDir` from `App`.
+- **`src/tui/screens/RefineScreen.tsx`** — `loadSource` → already-refined menu (Q&A, **polish**, **direct edit**, Jobs link) + md/json sync → Q&A → `applyRefinements` → `DiffView` + **`SelectList`** → `saveRefined` / **keep-session** saves for polish & direct edit; `profileDir` from `App`.
 - **`src/tui/screens/ProfileEditorScreen.tsx`** — loads refined (preserve session) or source; sections include summary, experience (positions/bullets), **skills**, **education**, **certifications**, **projects** (list + a/d/`[`/`]` + primary-field edit); **`s`** save, Esc with unsaved overlay (**s** / **d**/**n** / Esc); `App` defers **a**/**d** from global nav; `InlineEditor` + `SelectList`.
 - **`src/tui/App.tsx`** — passes `profileDir` into Refine/Profile; footer hints; **↑↓** screen-cycle suppressed on Refine/Profile content like other list screens.
 
@@ -187,6 +187,6 @@ Phase A checklist in [`tui-definition-of-done.md`](./tui-definition-of-done.md) 
 - **`GenerateScreen`** — `runTuiGeneratePdf({ signal })`; generate errors: Retry / Settings / back to flair; preflight errors (e.g. no saved jobs): back to source.
 - Refine refactored to **`useOperationAbort`** (replaces inline `operationCancelSeq` effect).
 
-### What’s next (Phase 9+ preview)
+### Post–Phase C polish
 
-- **Single backlog:** [`tui-definition-of-done.md` — What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c) (infrastructure, Refine, Profile, Generate, Jobs, Dashboard).
+- **Optional follow-ups:** first section of [`tui-definition-of-done.md`](./tui-definition-of-done.md) (*What’s left (post–Phase C polish)*) — streaming UI, Generate JD checkpoints, deep profile forms, etc.

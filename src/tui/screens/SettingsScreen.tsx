@@ -4,9 +4,9 @@ import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SelectList, TextInput } from '../components/shared/index.ts';
 import { hasApiKey } from '../env.ts';
+import { maskApiKeyForDisplay } from '../settings/maskApiKey.ts';
 import type { ProviderId } from '../settings/probeProvider.ts';
 import { probeApiKey } from '../settings/probeProvider.ts';
-import { maskApiKeyForDisplay } from '../settings/maskApiKey.ts';
 import { upsertEnvFileContents } from '../settings/upsertEnvFile.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 

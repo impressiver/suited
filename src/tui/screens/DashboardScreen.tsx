@@ -234,7 +234,8 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text dimColor>
-          Nav: i import · c contact · j jobs · r refine · p improve · g generate · s settings · Tab sidebar
+          Nav: i import · c contact · j jobs · r refine · p improve · g generate · s settings · Tab
+          sidebar
         </Text>
       </Box>
     </Box>

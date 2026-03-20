@@ -30,5 +30,5 @@ export function upsertEnvFileContents(content: string, env: Record<string, strin
     out.push(`${key}=${env[key]}`);
   }
 
-  return out.join('\n').replace(/\n+$/, '') + '\n';
+  return `${out.join('\n').replace(/\n+$/, '')}\n`;
 }

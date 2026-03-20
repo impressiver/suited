@@ -40,6 +40,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   const [loadNonce, setLoadNonce] = useState(0);
 
   useEffect(() => {
+    void loadNonce;
     void (async () => {
       try {
         const profile = await loadActiveProfile(profileDir);

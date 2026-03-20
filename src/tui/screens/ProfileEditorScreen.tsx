@@ -35,6 +35,14 @@ function userEdit(value: string): Sourced<string> {
   return { value, source: { kind: 'user-edit', editedAt: now } };
 }
 
+function swapByIndex<T>(items: T[], a: number, b: number): void {
+  const x = items[a];
+  const y = items[b];
+  if (x === undefined || y === undefined) return;
+  items[a] = y;
+  items[b] = x;
+}
+
 async function persistProfile(
   profile: Profile,
   profileDir: string,
@@ -108,6 +116,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   }, [dirty, dispatch]);
 
   useEffect(() => {
+    void loadNonce;
     void (async () => {
       setPhase('loading');
       setErrMsg(null);
@@ -315,10 +324,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const arr = next.positions;
-            const tmp = arr[pi - 1]!;
-            arr[pi - 1] = arr[pi]!;
-            arr[pi] = tmp;
+            swapByIndex(next.positions, pi - 1, pi);
             return next;
           });
           setDirty(true);
@@ -339,10 +345,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const arr = next.positions;
-            const tmp = arr[pi]!;
-            arr[pi] = arr[pi + 1]!;
-            arr[pi + 1] = tmp;
+            swapByIndex(next.positions, pi, pi + 1);
             return next;
           });
           setDirty(true);
@@ -396,10 +399,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
             if (!np?.bullets[bi - 1] || !np.bullets[bi]) {
               return p;
             }
-            const bs = np.bullets;
-            const tmp = bs[bi - 1]!;
-            bs[bi - 1] = bs[bi]!;
-            bs[bi] = tmp;
+            swapByIndex(np.bullets, bi - 1, bi);
             return next;
           });
           setDirty(true);
@@ -424,10 +424,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
             if (!np?.bullets[bi] || !np.bullets[bi + 1]) {
               return p;
             }
-            const bs = np.bullets;
-            const tmp = bs[bi]!;
-            bs[bi] = bs[bi + 1]!;
-            bs[bi + 1] = tmp;
+            swapByIndex(np.bullets, bi, bi + 1);
             return next;
           });
           setDirty(true);
@@ -473,10 +470,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const sk = next.skills;
-            const tmp = sk[si - 1]!;
-            sk[si - 1] = sk[si]!;
-            sk[si] = tmp;
+            swapByIndex(next.skills, si - 1, si);
             return next;
           });
           setDirty(true);
@@ -497,10 +491,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const sk = next.skills;
-            const tmp = sk[si]!;
-            sk[si] = sk[si + 1]!;
-            sk[si + 1] = tmp;
+            swapByIndex(next.skills, si, si + 1);
             return next;
           });
           setDirty(true);
@@ -550,10 +541,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const ed = next.education;
-            const tmp = ed[ei - 1]!;
-            ed[ei - 1] = ed[ei]!;
-            ed[ei] = tmp;
+            swapByIndex(next.education, ei - 1, ei);
             return next;
           });
           setDirty(true);
@@ -574,10 +562,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const ed = next.education;
-            const tmp = ed[ei]!;
-            ed[ei] = ed[ei + 1]!;
-            ed[ei + 1] = tmp;
+            swapByIndex(next.education, ei, ei + 1);
             return next;
           });
           setDirty(true);
@@ -627,10 +612,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const cr = next.certifications;
-            const tmp = cr[ci - 1]!;
-            cr[ci - 1] = cr[ci]!;
-            cr[ci] = tmp;
+            swapByIndex(next.certifications, ci - 1, ci);
             return next;
           });
           setDirty(true);
@@ -651,10 +633,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const cr = next.certifications;
-            const tmp = cr[ci]!;
-            cr[ci] = cr[ci + 1]!;
-            cr[ci + 1] = tmp;
+            swapByIndex(next.certifications, ci, ci + 1);
             return next;
           });
           setDirty(true);
@@ -704,10 +683,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const pr = next.projects;
-            const tmp = pr[pi - 1]!;
-            pr[pi - 1] = pr[pi]!;
-            pr[pi] = tmp;
+            swapByIndex(next.projects, pi - 1, pi);
             return next;
           });
           setDirty(true);
@@ -728,10 +704,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
               return p;
             }
             const next = cloneProfile(p);
-            const pr = next.projects;
-            const tmp = pr[pi]!;
-            pr[pi] = pr[pi + 1]!;
-            pr[pi + 1] = tmp;
+            swapByIndex(next.projects, pi, pi + 1);
             return next;
           });
           setDirty(true);
@@ -949,7 +922,13 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       <Text dimColor>{breadcrumb.join(' › ')}</Text>
 
       {unsaved && (
-        <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
+        <Box
+          marginTop={1}
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="yellow"
+          paddingX={1}
+        >
           <Text bold color="yellow">
             Unsaved changes
           </Text>
@@ -1011,9 +990,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
                     return next;
                   });
                 } else {
-                  setProfile((p) =>
-                    p ? { ...p, summary: userEdit(trimmed) } : p,
-                  );
+                  setProfile((p) => (p ? { ...p, summary: userEdit(trimmed) } : p));
                 }
                 setDirty(true);
                 setEditingSummary(false);
@@ -1030,9 +1007,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
 
       {top.k === 'positions' && (
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>
-            ↑↓ select · [ ] reorder · a add · d delete · Enter → bullets
-          </Text>
+          <Text dimColor>↑↓ select · [ ] reorder · a add · d delete · Enter → bullets</Text>
           {positionDeletePrompt && (
             <Box marginTop={1}>
               <ConfirmPrompt
@@ -1092,547 +1067,562 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
         </Box>
       )}
 
-      {top.k === 'skills' && (() => {
-        const skillItems = profile.skills.map((s, i) => ({
-          value: String(i),
-          label: s.name.value.length > 72 ? `${s.name.value.slice(0, 72)}…` : s.name.value || '(empty)',
-        }));
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>
-              ↑↓ select · [ ] move up/down · a add · d delete · Enter edit name
-            </Text>
-            {skillDeletePrompt && (
-              <Box marginTop={1}>
-                <ConfirmPrompt
-                  message="Delete this skill?"
-                  active={active && skillDeletePrompt !== null}
-                  onConfirm={() => {
-                    const ctx = skillDeletePrompt;
-                    setSkillDeletePrompt(null);
-                    if (!ctx) {
-                      return;
+      {top.k === 'skills' &&
+        (() => {
+          const skillItems = profile.skills.map((s, i) => ({
+            value: String(i),
+            label:
+              s.name.value.length > 72
+                ? `${s.name.value.slice(0, 72)}…`
+                : s.name.value || '(empty)',
+          }));
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>
+                ↑↓ select · [ ] move up/down · a add · d delete · Enter edit name
+              </Text>
+              {skillDeletePrompt && (
+                <Box marginTop={1}>
+                  <ConfirmPrompt
+                    message="Delete this skill?"
+                    active={active && skillDeletePrompt !== null}
+                    onConfirm={() => {
+                      const ctx = skillDeletePrompt;
+                      setSkillDeletePrompt(null);
+                      if (!ctx) {
+                        return;
+                      }
+                      setProfile((p) => {
+                        if (!p) {
+                          return p;
+                        }
+                        const next = cloneProfile(p);
+                        if (ctx.skillIdx < 0 || ctx.skillIdx >= next.skills.length) {
+                          return p;
+                        }
+                        next.skills.splice(ctx.skillIdx, 1);
+                        return next;
+                      });
+                      setDirty(true);
+                      setMenuIdx((i) => {
+                        if (i > ctx.skillIdx) {
+                          return i - 1;
+                        }
+                        if (i === ctx.skillIdx) {
+                          return Math.max(0, ctx.skillIdx - 1);
+                        }
+                        return i;
+                      });
+                    }}
+                    onCancel={() => {
+                      setSkillDeletePrompt(null);
+                    }}
+                  />
+                </Box>
+              )}
+              {skillItems.length === 0 ? (
+                <Text dimColor>No skills — press a to add.</Text>
+              ) : (
+                <SelectList
+                  items={skillItems}
+                  selectedIndex={menuIdx}
+                  onChange={(i) => setMenuIdx(i)}
+                  isActive={active && !unsaved && !skillDeletePrompt}
+                  onSubmit={(item) => {
+                    const si = Number.parseInt(item.value, 10);
+                    if (!Number.isNaN(si)) {
+                      setStack((s) => [...s, { k: 'skill-edit', skillIdx: si }]);
                     }
-                    setProfile((p) => {
-                      if (!p) {
-                        return p;
-                      }
-                      const next = cloneProfile(p);
-                      if (ctx.skillIdx < 0 || ctx.skillIdx >= next.skills.length) {
-                        return p;
-                      }
-                      next.skills.splice(ctx.skillIdx, 1);
-                      return next;
-                    });
-                    setDirty(true);
-                    setMenuIdx((i) => {
-                      if (i > ctx.skillIdx) {
-                        return i - 1;
-                      }
-                      if (i === ctx.skillIdx) {
-                        return Math.max(0, ctx.skillIdx - 1);
-                      }
-                      return i;
-                    });
-                  }}
-                  onCancel={() => {
-                    setSkillDeletePrompt(null);
                   }}
                 />
-              </Box>
-            )}
-            {skillItems.length === 0 ? (
-              <Text dimColor>No skills — press a to add.</Text>
-            ) : (
-              <SelectList
-                items={skillItems}
-                selectedIndex={menuIdx}
-                onChange={(i) => setMenuIdx(i)}
-                isActive={active && !unsaved && !skillDeletePrompt}
-                onSubmit={(item) => {
-                  const si = Number.parseInt(item.value, 10);
-                  if (!Number.isNaN(si)) {
-                    setStack((s) => [...s, { k: 'skill-edit', skillIdx: si }]);
-                  }
+              )}
+            </Box>
+          );
+        })()}
+
+      {top.k === 'skill-edit' &&
+        (() => {
+          const sk = profile.skills[top.skillIdx];
+          if (!sk) {
+            return <Text color="red">Invalid skill.</Text>;
+          }
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <InlineEditor
+                value={sk.name.value}
+                onChange={(v) => {
+                  setProfile((p) => {
+                    if (!p) {
+                      return p;
+                    }
+                    const next = cloneProfile(p);
+                    const s = next.skills[top.skillIdx];
+                    if (!s) {
+                      return p;
+                    }
+                    s.name = userEdit(v);
+                    return next;
+                  });
+                  setDirty(true);
+                }}
+                isEditing
+                inputFocused={active}
+                onSubmit={() => {
+                  popStack();
                 }}
               />
-            )}
-          </Box>
-        );
-      })()}
-
-      {top.k === 'skill-edit' && (() => {
-        const sk = profile.skills[top.skillIdx];
-        if (!sk) {
-          return <Text color="red">Invalid skill.</Text>;
-        }
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <InlineEditor
-              value={sk.name.value}
-              onChange={(v) => {
-                setProfile((p) => {
-                  if (!p) {
-                    return p;
-                  }
-                  const next = cloneProfile(p);
-                  const s = next.skills[top.skillIdx];
-                  if (!s) {
-                    return p;
-                  }
-                  s.name = userEdit(v);
-                  return next;
-                });
-                setDirty(true);
-              }}
-              isEditing
-              inputFocused={active}
-              onSubmit={() => {
-                popStack();
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Enter save · Esc back</Text>
-            </Box>
-          </Box>
-        );
-      })()}
-
-      {top.k === 'education' && (() => {
-        const eduItems = profile.education.map((e, i) => ({
-          value: String(i),
-          label:
-            e.institution.value.length > 72
-              ? `${e.institution.value.slice(0, 72)}…`
-              : e.institution.value || '(no institution)',
-        }));
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>
-              ↑↓ select · [ ] reorder · a add · d delete · Enter edit institution
-            </Text>
-            {eduDeletePrompt && (
               <Box marginTop={1}>
-                <ConfirmPrompt
-                  message="Delete this education entry?"
-                  active={active && eduDeletePrompt !== null}
-                  onConfirm={() => {
-                    const ctx = eduDeletePrompt;
-                    setEduDeletePrompt(null);
-                    if (!ctx) {
-                      return;
+                <Text dimColor>Enter save · Esc back</Text>
+              </Box>
+            </Box>
+          );
+        })()}
+
+      {top.k === 'education' &&
+        (() => {
+          const eduItems = profile.education.map((e, i) => ({
+            value: String(i),
+            label:
+              e.institution.value.length > 72
+                ? `${e.institution.value.slice(0, 72)}…`
+                : e.institution.value || '(no institution)',
+          }));
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>
+                ↑↓ select · [ ] reorder · a add · d delete · Enter edit institution
+              </Text>
+              {eduDeletePrompt && (
+                <Box marginTop={1}>
+                  <ConfirmPrompt
+                    message="Delete this education entry?"
+                    active={active && eduDeletePrompt !== null}
+                    onConfirm={() => {
+                      const ctx = eduDeletePrompt;
+                      setEduDeletePrompt(null);
+                      if (!ctx) {
+                        return;
+                      }
+                      setProfile((p) => {
+                        if (!p) {
+                          return p;
+                        }
+                        const next = cloneProfile(p);
+                        if (ctx.eduIdx < 0 || ctx.eduIdx >= next.education.length) {
+                          return p;
+                        }
+                        next.education.splice(ctx.eduIdx, 1);
+                        return next;
+                      });
+                      setDirty(true);
+                      setMenuIdx((i) => {
+                        if (i > ctx.eduIdx) {
+                          return i - 1;
+                        }
+                        if (i === ctx.eduIdx) {
+                          return Math.max(0, ctx.eduIdx - 1);
+                        }
+                        return i;
+                      });
+                    }}
+                    onCancel={() => {
+                      setEduDeletePrompt(null);
+                    }}
+                  />
+                </Box>
+              )}
+              {eduItems.length === 0 ? (
+                <Text dimColor>No education entries — press a to add.</Text>
+              ) : (
+                <SelectList
+                  items={eduItems}
+                  selectedIndex={menuIdx}
+                  onChange={(i) => setMenuIdx(i)}
+                  isActive={active && !unsaved && !eduDeletePrompt}
+                  onSubmit={(item) => {
+                    const ei = Number.parseInt(item.value, 10);
+                    if (!Number.isNaN(ei)) {
+                      setStack((s) => [...s, { k: 'education-edit', eduIdx: ei }]);
                     }
-                    setProfile((p) => {
-                      if (!p) {
-                        return p;
-                      }
-                      const next = cloneProfile(p);
-                      if (ctx.eduIdx < 0 || ctx.eduIdx >= next.education.length) {
-                        return p;
-                      }
-                      next.education.splice(ctx.eduIdx, 1);
-                      return next;
-                    });
-                    setDirty(true);
-                    setMenuIdx((i) => {
-                      if (i > ctx.eduIdx) {
-                        return i - 1;
-                      }
-                      if (i === ctx.eduIdx) {
-                        return Math.max(0, ctx.eduIdx - 1);
-                      }
-                      return i;
-                    });
-                  }}
-                  onCancel={() => {
-                    setEduDeletePrompt(null);
                   }}
                 />
-              </Box>
-            )}
-            {eduItems.length === 0 ? (
-              <Text dimColor>No education entries — press a to add.</Text>
-            ) : (
-              <SelectList
-                items={eduItems}
-                selectedIndex={menuIdx}
-                onChange={(i) => setMenuIdx(i)}
-                isActive={active && !unsaved && !eduDeletePrompt}
-                onSubmit={(item) => {
-                  const ei = Number.parseInt(item.value, 10);
-                  if (!Number.isNaN(ei)) {
-                    setStack((s) => [...s, { k: 'education-edit', eduIdx: ei }]);
-                  }
+              )}
+            </Box>
+          );
+        })()}
+
+      {top.k === 'education-edit' &&
+        (() => {
+          const e = profile.education[top.eduIdx];
+          if (!e) {
+            return <Text color="red">Invalid education entry.</Text>;
+          }
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>Institution (degree & dates: CLI or future editor)</Text>
+              <InlineEditor
+                value={e.institution.value}
+                onChange={(v) => {
+                  setProfile((p) => {
+                    if (!p) {
+                      return p;
+                    }
+                    const next = cloneProfile(p);
+                    const row = next.education[top.eduIdx];
+                    if (!row) {
+                      return p;
+                    }
+                    row.institution = userEdit(v);
+                    return next;
+                  });
+                  setDirty(true);
+                }}
+                isEditing
+                inputFocused={active}
+                onSubmit={() => {
+                  popStack();
                 }}
               />
-            )}
-          </Box>
-        );
-      })()}
-
-      {top.k === 'education-edit' && (() => {
-        const e = profile.education[top.eduIdx];
-        if (!e) {
-          return <Text color="red">Invalid education entry.</Text>;
-        }
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>Institution (degree & dates: CLI or future editor)</Text>
-            <InlineEditor
-              value={e.institution.value}
-              onChange={(v) => {
-                setProfile((p) => {
-                  if (!p) {
-                    return p;
-                  }
-                  const next = cloneProfile(p);
-                  const row = next.education[top.eduIdx];
-                  if (!row) {
-                    return p;
-                  }
-                  row.institution = userEdit(v);
-                  return next;
-                });
-                setDirty(true);
-              }}
-              isEditing
-              inputFocused={active}
-              onSubmit={() => {
-                popStack();
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Enter save · Esc back</Text>
-            </Box>
-          </Box>
-        );
-      })()}
-
-      {top.k === 'certifications' && (() => {
-        const certItems = profile.certifications.map((c, i) => ({
-          value: String(i),
-          label: c.name.value.length > 72 ? `${c.name.value.slice(0, 72)}…` : c.name.value || '(empty)',
-        }));
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>
-              ↑↓ select · [ ] reorder · a add · d delete · Enter edit name
-            </Text>
-            {certDeletePrompt && (
               <Box marginTop={1}>
-                <ConfirmPrompt
-                  message="Delete this certification?"
-                  active={active && certDeletePrompt !== null}
-                  onConfirm={() => {
-                    const ctx = certDeletePrompt;
-                    setCertDeletePrompt(null);
-                    if (!ctx) {
-                      return;
+                <Text dimColor>Enter save · Esc back</Text>
+              </Box>
+            </Box>
+          );
+        })()}
+
+      {top.k === 'certifications' &&
+        (() => {
+          const certItems = profile.certifications.map((c, i) => ({
+            value: String(i),
+            label:
+              c.name.value.length > 72
+                ? `${c.name.value.slice(0, 72)}…`
+                : c.name.value || '(empty)',
+          }));
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>↑↓ select · [ ] reorder · a add · d delete · Enter edit name</Text>
+              {certDeletePrompt && (
+                <Box marginTop={1}>
+                  <ConfirmPrompt
+                    message="Delete this certification?"
+                    active={active && certDeletePrompt !== null}
+                    onConfirm={() => {
+                      const ctx = certDeletePrompt;
+                      setCertDeletePrompt(null);
+                      if (!ctx) {
+                        return;
+                      }
+                      setProfile((p) => {
+                        if (!p) {
+                          return p;
+                        }
+                        const next = cloneProfile(p);
+                        if (ctx.certIdx < 0 || ctx.certIdx >= next.certifications.length) {
+                          return p;
+                        }
+                        next.certifications.splice(ctx.certIdx, 1);
+                        return next;
+                      });
+                      setDirty(true);
+                      setMenuIdx((i) => {
+                        if (i > ctx.certIdx) {
+                          return i - 1;
+                        }
+                        if (i === ctx.certIdx) {
+                          return Math.max(0, ctx.certIdx - 1);
+                        }
+                        return i;
+                      });
+                    }}
+                    onCancel={() => {
+                      setCertDeletePrompt(null);
+                    }}
+                  />
+                </Box>
+              )}
+              {certItems.length === 0 ? (
+                <Text dimColor>No certifications — press a to add.</Text>
+              ) : (
+                <SelectList
+                  items={certItems}
+                  selectedIndex={menuIdx}
+                  onChange={(i) => setMenuIdx(i)}
+                  isActive={active && !unsaved && !certDeletePrompt}
+                  onSubmit={(item) => {
+                    const ci = Number.parseInt(item.value, 10);
+                    if (!Number.isNaN(ci)) {
+                      setStack((s) => [...s, { k: 'cert-edit', certIdx: ci }]);
                     }
-                    setProfile((p) => {
-                      if (!p) {
-                        return p;
-                      }
-                      const next = cloneProfile(p);
-                      if (ctx.certIdx < 0 || ctx.certIdx >= next.certifications.length) {
-                        return p;
-                      }
-                      next.certifications.splice(ctx.certIdx, 1);
-                      return next;
-                    });
-                    setDirty(true);
-                    setMenuIdx((i) => {
-                      if (i > ctx.certIdx) {
-                        return i - 1;
-                      }
-                      if (i === ctx.certIdx) {
-                        return Math.max(0, ctx.certIdx - 1);
-                      }
-                      return i;
-                    });
-                  }}
-                  onCancel={() => {
-                    setCertDeletePrompt(null);
                   }}
                 />
-              </Box>
-            )}
-            {certItems.length === 0 ? (
-              <Text dimColor>No certifications — press a to add.</Text>
-            ) : (
-              <SelectList
-                items={certItems}
-                selectedIndex={menuIdx}
-                onChange={(i) => setMenuIdx(i)}
-                isActive={active && !unsaved && !certDeletePrompt}
-                onSubmit={(item) => {
-                  const ci = Number.parseInt(item.value, 10);
-                  if (!Number.isNaN(ci)) {
-                    setStack((s) => [...s, { k: 'cert-edit', certIdx: ci }]);
-                  }
+              )}
+            </Box>
+          );
+        })()}
+
+      {top.k === 'cert-edit' &&
+        (() => {
+          const c = profile.certifications[top.certIdx];
+          if (!c) {
+            return <Text color="red">Invalid certification.</Text>;
+          }
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <InlineEditor
+                value={c.name.value}
+                onChange={(v) => {
+                  setProfile((p) => {
+                    if (!p) {
+                      return p;
+                    }
+                    const next = cloneProfile(p);
+                    const row = next.certifications[top.certIdx];
+                    if (!row) {
+                      return p;
+                    }
+                    row.name = userEdit(v);
+                    return next;
+                  });
+                  setDirty(true);
+                }}
+                isEditing
+                inputFocused={active}
+                onSubmit={() => {
+                  popStack();
                 }}
               />
-            )}
-          </Box>
-        );
-      })()}
-
-      {top.k === 'cert-edit' && (() => {
-        const c = profile.certifications[top.certIdx];
-        if (!c) {
-          return <Text color="red">Invalid certification.</Text>;
-        }
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <InlineEditor
-              value={c.name.value}
-              onChange={(v) => {
-                setProfile((p) => {
-                  if (!p) {
-                    return p;
-                  }
-                  const next = cloneProfile(p);
-                  const row = next.certifications[top.certIdx];
-                  if (!row) {
-                    return p;
-                  }
-                  row.name = userEdit(v);
-                  return next;
-                });
-                setDirty(true);
-              }}
-              isEditing
-              inputFocused={active}
-              onSubmit={() => {
-                popStack();
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Enter save · Esc back</Text>
-            </Box>
-          </Box>
-        );
-      })()}
-
-      {top.k === 'projects' && (() => {
-        const projItems = profile.projects.map((pr, i) => ({
-          value: String(i),
-          label: pr.title.value.length > 72 ? `${pr.title.value.slice(0, 72)}…` : pr.title.value || '(empty)',
-        }));
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>
-              ↑↓ select · [ ] reorder · a add · d delete · Enter edit title
-            </Text>
-            {projDeletePrompt && (
               <Box marginTop={1}>
-                <ConfirmPrompt
-                  message="Delete this project?"
-                  active={active && projDeletePrompt !== null}
-                  onConfirm={() => {
-                    const ctx = projDeletePrompt;
-                    setProjDeletePrompt(null);
-                    if (!ctx) {
-                      return;
+                <Text dimColor>Enter save · Esc back</Text>
+              </Box>
+            </Box>
+          );
+        })()}
+
+      {top.k === 'projects' &&
+        (() => {
+          const projItems = profile.projects.map((pr, i) => ({
+            value: String(i),
+            label:
+              pr.title.value.length > 72
+                ? `${pr.title.value.slice(0, 72)}…`
+                : pr.title.value || '(empty)',
+          }));
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>↑↓ select · [ ] reorder · a add · d delete · Enter edit title</Text>
+              {projDeletePrompt && (
+                <Box marginTop={1}>
+                  <ConfirmPrompt
+                    message="Delete this project?"
+                    active={active && projDeletePrompt !== null}
+                    onConfirm={() => {
+                      const ctx = projDeletePrompt;
+                      setProjDeletePrompt(null);
+                      if (!ctx) {
+                        return;
+                      }
+                      setProfile((p) => {
+                        if (!p) {
+                          return p;
+                        }
+                        const next = cloneProfile(p);
+                        if (ctx.projIdx < 0 || ctx.projIdx >= next.projects.length) {
+                          return p;
+                        }
+                        next.projects.splice(ctx.projIdx, 1);
+                        return next;
+                      });
+                      setDirty(true);
+                      setMenuIdx((i) => {
+                        if (i > ctx.projIdx) {
+                          return i - 1;
+                        }
+                        if (i === ctx.projIdx) {
+                          return Math.max(0, ctx.projIdx - 1);
+                        }
+                        return i;
+                      });
+                    }}
+                    onCancel={() => {
+                      setProjDeletePrompt(null);
+                    }}
+                  />
+                </Box>
+              )}
+              {projItems.length === 0 ? (
+                <Text dimColor>No projects — press a to add.</Text>
+              ) : (
+                <SelectList
+                  items={projItems}
+                  selectedIndex={menuIdx}
+                  onChange={(i) => setMenuIdx(i)}
+                  isActive={active && !unsaved && !projDeletePrompt}
+                  onSubmit={(item) => {
+                    const pi = Number.parseInt(item.value, 10);
+                    if (!Number.isNaN(pi)) {
+                      setStack((s) => [...s, { k: 'project-edit', projIdx: pi }]);
                     }
-                    setProfile((p) => {
-                      if (!p) {
-                        return p;
-                      }
-                      const next = cloneProfile(p);
-                      if (ctx.projIdx < 0 || ctx.projIdx >= next.projects.length) {
-                        return p;
-                      }
-                      next.projects.splice(ctx.projIdx, 1);
-                      return next;
-                    });
-                    setDirty(true);
-                    setMenuIdx((i) => {
-                      if (i > ctx.projIdx) {
-                        return i - 1;
-                      }
-                      if (i === ctx.projIdx) {
-                        return Math.max(0, ctx.projIdx - 1);
-                      }
-                      return i;
-                    });
-                  }}
-                  onCancel={() => {
-                    setProjDeletePrompt(null);
                   }}
                 />
-              </Box>
-            )}
-            {projItems.length === 0 ? (
-              <Text dimColor>No projects — press a to add.</Text>
-            ) : (
-              <SelectList
-                items={projItems}
-                selectedIndex={menuIdx}
-                onChange={(i) => setMenuIdx(i)}
-                isActive={active && !unsaved && !projDeletePrompt}
-                onSubmit={(item) => {
-                  const pi = Number.parseInt(item.value, 10);
-                  if (!Number.isNaN(pi)) {
-                    setStack((s) => [...s, { k: 'project-edit', projIdx: pi }]);
-                  }
+              )}
+            </Box>
+          );
+        })()}
+
+      {top.k === 'project-edit' &&
+        (() => {
+          const pr = profile.projects[top.projIdx];
+          if (!pr) {
+            return <Text color="red">Invalid project.</Text>;
+          }
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <InlineEditor
+                value={pr.title.value}
+                onChange={(v) => {
+                  setProfile((p) => {
+                    if (!p) {
+                      return p;
+                    }
+                    const next = cloneProfile(p);
+                    const row = next.projects[top.projIdx];
+                    if (!row) {
+                      return p;
+                    }
+                    row.title = userEdit(v);
+                    return next;
+                  });
+                  setDirty(true);
+                }}
+                isEditing
+                inputFocused={active}
+                onSubmit={() => {
+                  popStack();
                 }}
               />
-            )}
-          </Box>
-        );
-      })()}
-
-      {top.k === 'project-edit' && (() => {
-        const pr = profile.projects[top.projIdx];
-        if (!pr) {
-          return <Text color="red">Invalid project.</Text>;
-        }
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <InlineEditor
-              value={pr.title.value}
-              onChange={(v) => {
-                setProfile((p) => {
-                  if (!p) {
-                    return p;
-                  }
-                  const next = cloneProfile(p);
-                  const row = next.projects[top.projIdx];
-                  if (!row) {
-                    return p;
-                  }
-                  row.title = userEdit(v);
-                  return next;
-                });
-                setDirty(true);
-              }}
-              isEditing
-              inputFocused={active}
-              onSubmit={() => {
-                popStack();
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Enter save · Esc back</Text>
-            </Box>
-          </Box>
-        );
-      })()}
-
-      {top.k === 'bullets' && (() => {
-        const pos = profile.positions[top.posIdx];
-        if (!pos) {
-          return <Text color="red">Invalid position.</Text>;
-        }
-        const bulletItems = pos.bullets.map((b, i) => ({
-          value: String(i),
-          label:
-            b.value.length > 72 ? `${b.value.slice(0, 72)}…` : b.value || '(empty bullet)',
-        }));
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>
-              ↑↓ select · [ ] move up/down · a add · d delete · Enter edit
-            </Text>
-            {bulletDeletePrompt && (
               <Box marginTop={1}>
-                <ConfirmPrompt
-                  message="Delete this bullet?"
-                  active={active && bulletDeletePrompt !== null}
-                  onConfirm={() => {
-                    const ctx = bulletDeletePrompt;
-                    setBulletDeletePrompt(null);
-                    if (!ctx) {
-                      return;
+                <Text dimColor>Enter save · Esc back</Text>
+              </Box>
+            </Box>
+          );
+        })()}
+
+      {top.k === 'bullets' &&
+        (() => {
+          const pos = profile.positions[top.posIdx];
+          if (!pos) {
+            return <Text color="red">Invalid position.</Text>;
+          }
+          const bulletItems = pos.bullets.map((b, i) => ({
+            value: String(i),
+            label: b.value.length > 72 ? `${b.value.slice(0, 72)}…` : b.value || '(empty bullet)',
+          }));
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>↑↓ select · [ ] move up/down · a add · d delete · Enter edit</Text>
+              {bulletDeletePrompt && (
+                <Box marginTop={1}>
+                  <ConfirmPrompt
+                    message="Delete this bullet?"
+                    active={active && bulletDeletePrompt !== null}
+                    onConfirm={() => {
+                      const ctx = bulletDeletePrompt;
+                      setBulletDeletePrompt(null);
+                      if (!ctx) {
+                        return;
+                      }
+                      setProfile((p) => {
+                        if (!p) {
+                          return p;
+                        }
+                        const next = cloneProfile(p);
+                        const np = next.positions[ctx.posIdx];
+                        if (!np || ctx.bulletIdx < 0 || ctx.bulletIdx >= np.bullets.length) {
+                          return p;
+                        }
+                        np.bullets.splice(ctx.bulletIdx, 1);
+                        return next;
+                      });
+                      setDirty(true);
+                      setMenuIdx((i) => {
+                        if (i > ctx.bulletIdx) {
+                          return i - 1;
+                        }
+                        if (i === ctx.bulletIdx) {
+                          return Math.max(0, ctx.bulletIdx - 1);
+                        }
+                        return i;
+                      });
+                    }}
+                    onCancel={() => {
+                      setBulletDeletePrompt(null);
+                    }}
+                  />
+                </Box>
+              )}
+              {bulletItems.length === 0 ? (
+                <Text dimColor>No bullets — press a to add.</Text>
+              ) : (
+                <SelectList
+                  items={bulletItems}
+                  selectedIndex={menuIdx}
+                  onChange={(i) => setMenuIdx(i)}
+                  isActive={active && !unsaved && !bulletDeletePrompt}
+                  onSubmit={(item) => {
+                    const bi = Number.parseInt(item.value, 10);
+                    if (!Number.isNaN(bi)) {
+                      setStack((s) => [
+                        ...s,
+                        { k: 'bullet-edit', posIdx: top.posIdx, bulletIdx: bi },
+                      ]);
+                      setMenuIdx(0);
                     }
-                    setProfile((p) => {
-                      if (!p) {
-                        return p;
-                      }
-                      const next = cloneProfile(p);
-                      const np = next.positions[ctx.posIdx];
-                      if (!np || ctx.bulletIdx < 0 || ctx.bulletIdx >= np.bullets.length) {
-                        return p;
-                      }
-                      np.bullets.splice(ctx.bulletIdx, 1);
-                      return next;
-                    });
-                    setDirty(true);
-                    setMenuIdx((i) => {
-                      if (i > ctx.bulletIdx) {
-                        return i - 1;
-                      }
-                      if (i === ctx.bulletIdx) {
-                        return Math.max(0, ctx.bulletIdx - 1);
-                      }
-                      return i;
-                    });
-                  }}
-                  onCancel={() => {
-                    setBulletDeletePrompt(null);
                   }}
                 />
-              </Box>
-            )}
-            {bulletItems.length === 0 ? (
-              <Text dimColor>No bullets — press a to add.</Text>
-            ) : (
-              <SelectList
-                items={bulletItems}
-                selectedIndex={menuIdx}
-                onChange={(i) => setMenuIdx(i)}
-                isActive={active && !unsaved && !bulletDeletePrompt}
-                onSubmit={(item) => {
-                  const bi = Number.parseInt(item.value, 10);
-                  if (!Number.isNaN(bi)) {
-                    setStack((s) => [...s, { k: 'bullet-edit', posIdx: top.posIdx, bulletIdx: bi }]);
-                    setMenuIdx(0);
-                  }
+              )}
+            </Box>
+          );
+        })()}
+
+      {top.k === 'bullet-edit' &&
+        (() => {
+          const pos = profile.positions[top.posIdx];
+          const bullet = pos?.bullets[top.bulletIdx];
+          if (!pos || !bullet) {
+            return <Text color="red">Invalid bullet.</Text>;
+          }
+          return (
+            <Box marginTop={1} flexDirection="column">
+              <InlineEditor
+                value={bullet.value}
+                onChange={(v) => {
+                  setProfile((p) => {
+                    if (!p) {
+                      return p;
+                    }
+                    const next = cloneProfile(p);
+                    const np = next.positions[top.posIdx];
+                    if (!np?.bullets[top.bulletIdx]) {
+                      return p;
+                    }
+                    np.bullets[top.bulletIdx] = userEdit(v);
+                    return next;
+                  });
+                  setDirty(true);
+                }}
+                isEditing
+                inputFocused={active}
+                onSubmit={() => {
+                  popStack();
                 }}
               />
-            )}
-          </Box>
-        );
-      })()}
-
-      {top.k === 'bullet-edit' && (() => {
-        const pos = profile.positions[top.posIdx];
-        const bullet = pos?.bullets[top.bulletIdx];
-        if (!pos || !bullet) {
-          return <Text color="red">Invalid bullet.</Text>;
-        }
-        return (
-          <Box marginTop={1} flexDirection="column">
-            <InlineEditor
-              value={bullet.value}
-              onChange={(v) => {
-                setProfile((p) => {
-                  if (!p) {
-                    return p;
-                  }
-                  const next = cloneProfile(p);
-                  const np = next.positions[top.posIdx];
-                  if (!np?.bullets[top.bulletIdx]) {
-                    return p;
-                  }
-                  np.bullets[top.bulletIdx] = userEdit(v);
-                  return next;
-                });
-                setDirty(true);
-              }}
-              isEditing
-              inputFocused={active}
-              onSubmit={() => {
-                popStack();
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Enter save · Esc cancel</Text>
+              <Box marginTop={1}>
+                <Text dimColor>Enter save · Esc cancel</Text>
+              </Box>
             </Box>
-          </Box>
-        );
-      })()}
+          );
+        })()}
     </Box>
   );
 }

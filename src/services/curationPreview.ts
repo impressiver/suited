@@ -39,9 +39,7 @@ export function formatCurationPreviewLines(
         }
       }
     } else {
-      lines.push(
-        `  – ${pos.title.value} @ ${pos.company.value}  ${dateRange}  (excluded)`,
-      );
+      lines.push(`  – ${pos.title.value} @ ${pos.company.value}  ${dateRange}  (excluded)`);
     }
   }
 

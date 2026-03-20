@@ -182,11 +182,15 @@ export function assembleResumeDocument(
       const pos = profile.positions.find((p) => p.id === selPos.positionId);
       if (!pos) throw new Error(`Position "${selPos.positionId}" not found`);
       const bullets = selPos.bulletRefs.map((ref) => resolveRef(profile, refMap, ref));
+      const startDate = formatDate(pos.startDate.value);
+      if (startDate === undefined) {
+        throw new Error(`Position "${selPos.positionId}" is missing a valid start date`);
+      }
       return {
         title: pos.title.value,
         company: pos.company.value,
         location: filterLocation(pos.location?.value),
-        startDate: formatDate(pos.startDate.value)!,
+        startDate,
         endDate: formatDate(pos.endDate?.value),
         bullets,
       };
@@ -298,14 +302,20 @@ export function assembleFullResumeDocument(
     contact,
     summary: profile.summary?.value,
     positions: mergeConsecutiveRoles(
-      profile.positions.map((pos) => ({
-        title: pos.title.value,
-        company: pos.company.value,
-        location: filterLocation(pos.location?.value),
-        startDate: formatDate(pos.startDate.value)!,
-        endDate: formatDate(pos.endDate?.value),
-        bullets: pos.bullets.map((b) => b.value),
-      })),
+      profile.positions.map((pos) => {
+        const startDate = formatDate(pos.startDate.value);
+        if (startDate === undefined) {
+          throw new Error(`Position "${pos.id}" is missing a valid start date`);
+        }
+        return {
+          title: pos.title.value,
+          company: pos.company.value,
+          location: filterLocation(pos.location?.value),
+          startDate,
+          endDate: formatDate(pos.endDate?.value),
+          bullets: pos.bullets.map((b) => b.value),
+        };
+      }),
     ),
     education: profile.education.map((edu) => ({
       institution: edu.institution.value,

@@ -83,9 +83,10 @@ export async function runJobs(options: JobsOptions): Promise<void> {
     );
 
     const jobChoices = refinementStatuses.map(({ job, hasPrepared, preparedDate }) => {
-      const status = hasPrepared
-        ? `${c.ok} ${c.muted(`prepared ${new Date(preparedDate!).toLocaleDateString()}`)}`
-        : c.muted('not prepared');
+      const status =
+        hasPrepared && preparedDate !== undefined
+          ? `${c.ok} ${c.muted(`prepared ${new Date(preparedDate).toLocaleDateString()}`)}`
+          : c.muted('not prepared');
       return {
         name: `${job.title} @ ${job.company}  ${status}`,
         value: job.id,

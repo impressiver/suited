@@ -37,9 +37,7 @@ describe('formatCurationPreviewLines', () => {
   it('includes selected position and skills', () => {
     const profile = tinyProfile();
     const plan: CurationPlan = {
-      selectedPositions: [
-        { positionId: 'pos-0', bulletRefs: ['b:pos-0:0'] },
-      ],
+      selectedPositions: [{ positionId: 'pos-0', bulletRefs: ['b:pos-0:0'] }],
       selectedSkillIds: ['s1'],
       selectedProjectIds: [],
       selectedEducationIds: [],

@@ -1,10 +1,11 @@
 import { Box, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ConfirmPrompt } from './components/shared/ConfirmPrompt.tsx';
 import { Layout } from './components/Layout.tsx';
+import { ConfirmPrompt } from './components/shared/ConfirmPrompt.tsx';
 import type { FlowOptions } from './flowOptions.ts';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
 import { useTerminalSize } from './hooks/useTerminalSize.ts';
+import { NavigateProvider } from './navigationContext.tsx';
 import { ContactScreen } from './screens/ContactScreen.tsx';
 import { DashboardScreen } from './screens/DashboardScreen.tsx';
 import { GenerateScreen } from './screens/GenerateScreen.tsx';
@@ -13,7 +14,6 @@ import { JobsScreen } from './screens/JobsScreen.tsx';
 import { ProfileEditorScreen } from './screens/ProfileEditorScreen.tsx';
 import { RefineScreen } from './screens/RefineScreen.tsx';
 import { SettingsScreen } from './screens/SettingsScreen.tsx';
-import { NavigateProvider } from './navigationContext.tsx';
 import { useAppDispatch, useAppState } from './store.tsx';
 import { SCREEN_ORDER, type ScreenId } from './types.ts';
 

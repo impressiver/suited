@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Profile, RefinementSession } from '../profile/schema.ts';
 import { saveJob, saveRefined, saveSource } from '../profile/serializer.ts';
 import { getDashboardVariant } from './dashboardVariant.ts';
-import { fetchProfileSnapshot } from './fetchProfileSnapshot.ts';
 import { hasApiKey } from './env.ts';
+import { fetchProfileSnapshot } from './fetchProfileSnapshot.ts';
 
 const u = (s: string) => ({
   value: s,

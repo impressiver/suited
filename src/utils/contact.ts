@@ -10,6 +10,8 @@ import {
 import { c } from './colors.ts';
 import { fileExists } from './fs.ts';
 
+type InquirerCLI = typeof import('inquirer').default;
+
 /** Same fields as `ensureContactDetails` prompts for (human-readable labels). */
 export function missingContactDetailPromptLabels(profile: Profile): string[] {
   const missing: string[] = [];
@@ -28,8 +30,7 @@ export function missingContactDetailPromptLabels(profile: Profile): string[] {
 export async function ensureContactDetails(
   profile: Profile,
   profileDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
 ): Promise<Profile> {
   const missing = missingContactDetailPromptLabels(profile);
   if (missing.length === 0) return profile;

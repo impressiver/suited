@@ -32,11 +32,10 @@ export class AccuracyGuardError extends Error {
  */
 export function resolvePath(profile: Profile, path: string): string | undefined {
   const segments = path.replace(/\[(\d+)\]/g, '.$1').split('.');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = profile;
+  let current: unknown = profile;
   for (const seg of segments) {
-    if (current == null) return undefined;
-    current = current[seg];
+    if (current == null || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[seg];
   }
   return typeof current === 'string' ? current : undefined;
 }

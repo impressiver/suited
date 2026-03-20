@@ -377,13 +377,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
-    [
-      createController,
-      dispatch,
-      persistRefinedKeepSession,
-      profileDir,
-      releaseController,
-    ],
+    [createController, dispatch, persistRefinedKeepSession, profileDir, releaseController],
   );
 
   const runDirectEdit = useCallback(
@@ -699,12 +693,12 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                 setPhase({ k: 'done', note: 'Discarded — refined.json unchanged.' });
               } else if (item.value === 'edit-summary') {
                 setSummaryTweakDraft(phase.proposed.summary?.value ?? '');
-              setPhase({
-                k: 'diff-edit-summary',
-                original: phase.original,
-                proposed: phase.proposed,
-                diffSaveMode: phase.diffSaveMode,
-              });
+                setPhase({
+                  k: 'diff-edit-summary',
+                  original: phase.original,
+                  proposed: phase.proposed,
+                  diffSaveMode: phase.diffSaveMode,
+                });
               }
             }}
           />
@@ -772,10 +766,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         : []),
       {
         value: 'back' as const,
-        label:
-          phase.retryKind === 'apply'
-            ? 'Back to last question'
-            : 'Back to refined menu',
+        label: phase.retryKind === 'apply' ? 'Back to last question' : 'Back to refined menu',
       },
     ];
     return (

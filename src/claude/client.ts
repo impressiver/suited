@@ -32,16 +32,24 @@ let _openrouter: OpenAI | null = null;
 
 function getAnthropicClient(): Anthropic {
   if (!_anthropic) {
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY is not set');
+    }
+    _anthropic = new Anthropic({ apiKey });
   }
   return _anthropic;
 }
 
 function getOpenRouterClient(): OpenAI {
   if (!_openrouter) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENROUTER_API_KEY is not set');
+    }
     _openrouter = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY!,
+      apiKey,
     });
   }
   return _openrouter;

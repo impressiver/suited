@@ -61,6 +61,8 @@ import { fileExists } from '../utils/fs.ts';
 import { openInEditor } from '../utils/interactive.ts';
 import { createSpinner } from '../utils/spinner.ts';
 
+type InquirerCLI = typeof import('inquirer').default;
+
 export interface GenerateOptions {
   profileDir?: string;
   output?: string;
@@ -853,8 +855,7 @@ async function openPdf(filePath: string): Promise<void> {
 
 async function buildConfig(
   options: GenerateOptions,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileDir: string,
   profile?: Profile,
 ): Promise<GenerationConfig> {
@@ -1018,8 +1019,7 @@ async function autoSaveJob(
 }
 
 async function pickSavedJob(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   jobs: SavedJob[],
   profileDir: string,
 ): Promise<{ text: string; id: string } | undefined> {
@@ -1073,8 +1073,7 @@ async function pickSavedJob(
 
 async function selectSections(
   doc: ResumeDocument,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   savedSelection?: string[],
 ): Promise<{ doc: ResumeDocument; selected: string[] }> {
   const savedSet = savedSelection ? new Set(savedSelection) : null;
@@ -1229,8 +1228,7 @@ async function generateAllTemplates(
   baseDoc: ResumeDocument,
   namePart: string,
   resumesDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileDir: string,
 ): Promise<string[]> {
   const paths: string[] = [];
@@ -1320,8 +1318,7 @@ async function generateAllTemplates(
 
 async function collectTimelineLogos(
   doc: ResumeDocument,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileDir: string,
 ): Promise<Record<string, string>> {
   const names = [

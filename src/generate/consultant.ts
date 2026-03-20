@@ -22,6 +22,8 @@ import { profileToRefineText } from '../claude/prompts/refine.ts';
 import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.ts';
 import { c } from '../utils/colors.ts';
 
+type InquirerCLI = typeof import('inquirer').default;
+
 /** Run the hiring consultant evaluation on a general (non-tailored) profile. */
 export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluation> {
   return callWithTool<ProfileEvaluation>(
@@ -53,10 +55,9 @@ export async function evaluateForJob(
  * isn't already in the profile. Prompts the user only for those specific facts,
  * then returns findings enriched with the answers.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function enrichFindingsWithUserInput(
   findings: ConsultantFinding[],
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileContext: string,
 ): Promise<ConsultantFinding[]> {
   let questionsOutput: FeedbackQuestionsOutput;

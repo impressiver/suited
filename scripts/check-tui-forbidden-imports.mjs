@@ -33,10 +33,7 @@ function checkLine(line) {
     hits.push({ rule: 'inquirer', detail: 'import of package "inquirer"' });
   }
 
-  if (
-    /from\s+['"]ora(?:['"`]|\/)/.test(line) ||
-    /import\s*\(\s*['"]ora(?:['"`]|\/)/.test(line)
-  ) {
+  if (/from\s+['"]ora(?:['"`]|\/)/.test(line) || /import\s*\(\s*['"]ora(?:['"`]|\/)/.test(line)) {
     hits.push({ rule: 'ora', detail: 'import of package "ora"' });
   }
 

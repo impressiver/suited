@@ -154,12 +154,14 @@ function parseCertifications(rows: Row[], file: string): Certification[] {
         id: `cert-${i}`,
         name: s(r.Name?.trim() ?? '', file, 'Name'),
         authority: opt(r, 'Authority', file),
-        startDate: opt(r, 'Started On', file)
-          ? s(normalizeDate(r['Started On']!), file, 'Started On')
-          : undefined,
-        endDate: opt(r, 'Finished On', file)
-          ? s(normalizeDate(r['Finished On']!), file, 'Finished On')
-          : undefined,
+        startDate: (() => {
+          const raw = opt(r, 'Started On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Started On') : undefined;
+        })(),
+        endDate: (() => {
+          const raw = opt(r, 'Finished On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Finished On') : undefined;
+        })(),
         licenseNumber: opt(r, 'License Number', file),
         url: opt(r, 'Url', file),
       }) satisfies Certification,
@@ -174,12 +176,14 @@ function parseProjects(rows: Row[], file: string): Project[] {
         title: s(r.Title?.trim() ?? '', file, 'Title'),
         description: opt(r, 'Description', file),
         url: opt(r, 'Url', file),
-        startDate: opt(r, 'Started On', file)
-          ? s(normalizeDate(r['Started On']!), file, 'Started On')
-          : undefined,
-        endDate: opt(r, 'Finished On', file)
-          ? s(normalizeDate(r['Finished On']!), file, 'Finished On')
-          : undefined,
+        startDate: (() => {
+          const raw = opt(r, 'Started On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Started On') : undefined;
+        })(),
+        endDate: (() => {
+          const raw = opt(r, 'Finished On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Finished On') : undefined;
+        })(),
       }) satisfies Project,
   );
 }
@@ -191,9 +195,10 @@ function parsePublications(rows: Row[], file: string): Publication[] {
         id: `pub-${i}`,
         title: s(r.Title?.trim() ?? '', file, 'Title'),
         publisher: opt(r, 'Publisher', file),
-        publishedOn: opt(r, 'Published On', file)
-          ? s(normalizeDate(r['Published On']!), file, 'Published On')
-          : undefined,
+        publishedOn: (() => {
+          const raw = opt(r, 'Published On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Published On') : undefined;
+        })(),
         description: opt(r, 'Description', file),
         url: opt(r, 'Url', file),
       }) satisfies Publication,
@@ -219,12 +224,14 @@ function parseVolunteer(rows: Row[], file: string): VolunteerRole[] {
         organization: s(r.Organization?.trim() ?? '', file, 'Organization'),
         role: opt(r, 'Role', file),
         cause: opt(r, 'Cause', file),
-        startDate: opt(r, 'Started On', file)
-          ? s(normalizeDate(r['Started On']!), file, 'Started On')
-          : undefined,
-        endDate: opt(r, 'Finished On', file)
-          ? s(normalizeDate(r['Finished On']!), file, 'Finished On')
-          : undefined,
+        startDate: (() => {
+          const raw = opt(r, 'Started On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Started On') : undefined;
+        })(),
+        endDate: (() => {
+          const raw = opt(r, 'Finished On', file);
+          return raw ? s(normalizeDate(raw.value), file, 'Finished On') : undefined;
+        })(),
         description: opt(r, 'Description', file),
       }) satisfies VolunteerRole,
   );

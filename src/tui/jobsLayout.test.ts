@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  JOBS_SPLIT_PANE_MIN_COLS,
-  jobsListPaneWidth,
-  jobsUseSplitPane,
-} from './jobsLayout.ts';
+import { JOBS_SPLIT_PANE_MIN_COLS, jobsListPaneWidth, jobsUseSplitPane } from './jobsLayout.ts';
 
 describe('jobsUseSplitPane', () => {
   it('is false below 80 columns', () => {

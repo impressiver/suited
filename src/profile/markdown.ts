@@ -686,24 +686,24 @@ export async function markdownToProfile(
 
   // Reassemble in original order (preserves ordering even if parser doesn't re-order)
   const positions = originalProfile.positions
-    .filter((p) => posMap.has(p.id))
-    .map((p) => posMap.get(p.id)!);
+    .map((p) => posMap.get(p.id))
+    .filter((p): p is NonNullable<typeof p> => p !== undefined);
 
   const education = originalProfile.education
-    .filter((e) => eduMap.has(e.id))
-    .map((e) => eduMap.get(e.id)!);
+    .map((e) => eduMap.get(e.id))
+    .filter((e): e is NonNullable<typeof e> => e !== undefined);
 
   const certifications = originalProfile.certifications
-    .filter((c) => certMap.has(c.id))
-    .map((c) => certMap.get(c.id)!);
+    .map((c) => certMap.get(c.id))
+    .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
   const projects = originalProfile.projects
-    .filter((p) => projMap.has(p.id))
-    .map((p) => projMap.get(p.id)!);
+    .map((p) => projMap.get(p.id))
+    .filter((p): p is NonNullable<typeof p> => p !== undefined);
 
   const volunteer = originalProfile.volunteer
-    .filter((v) => volMap.has(v.id))
-    .map((v) => volMap.get(v.id)!);
+    .map((v) => volMap.get(v.id))
+    .filter((v): v is NonNullable<typeof v> => v !== undefined);
 
   // Skills: use parsed list if any were found, else keep originals
   const skills = parsedSkills.length > 0 ? deduplicateSkills(parsedSkills) : originalProfile.skills;

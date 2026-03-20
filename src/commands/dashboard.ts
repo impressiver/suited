@@ -41,7 +41,9 @@ export async function runDashboard(options: FlowOptions): Promise<void> {
 
       const config = await loadGenerationConfig(profileDir);
       if (config && (config.company || config.jobTitle)) {
-        const target = config.company ? `${config.company} – ${config.jobTitle}` : config.jobTitle;
+        const target = config.company
+          ? [config.company, config.jobTitle].filter(Boolean).join(' – ')
+          : (config.jobTitle ?? '');
         const date = new Date(config.updatedAt).toLocaleDateString();
         let template = config.resolvedTemplate ?? config.templateOverride;
         if (!template) {
@@ -52,7 +54,7 @@ export async function runDashboard(options: FlowOptions): Promise<void> {
           template = effectiveTemplate;
         }
         console.log(
-          `  ${c.label('Last PDF:')} ${c.accent(target!)}  ${c.muted(`(${date}, ${template})`)}`,
+          `  ${c.label('Last PDF:')} ${c.accent(target)}  ${c.muted(`(${date}, ${template})`)}`,
         );
       }
 

@@ -157,7 +157,8 @@ export async function runPrepare(options: PrepareOptions): Promise<void> {
 
     if (jobId === '__back__') return;
 
-    const statusEntry = refinementStatuses.find((s) => s.job.id === jobId)!;
+    const statusEntry = refinementStatuses.find((s) => s.job.id === jobId);
+    if (!statusEntry) continue;
     const job = statusEntry.job;
     let refinement = statusEntry.refinement;
 

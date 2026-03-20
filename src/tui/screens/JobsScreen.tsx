@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JobEvaluation } from '../../claude/prompts/consultant.ts';
-import { buildRefMapForProfile } from '../../generate/curator.ts';
 import { applyJobFeedback, evaluateForJob } from '../../generate/consultant.ts';
+import { buildRefMapForProfile } from '../../generate/curator.ts';
 import { assembleResumeDocument, getFlairInfo } from '../../generate/resume-builder.ts';
 import type { SavedJob } from '../../profile/schema.ts';
 import {
@@ -127,6 +127,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }, [detailJobId, profileDir]);
 
   useEffect(() => {
+    void detailRefinement;
     if (mode.m === 'detail') {
       setMenuIndex(0);
     }
@@ -257,12 +258,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         const existing = await loadJobRefinement(profileDir, job.id);
         const r = await runJobRefinementPipeline(profileDir, job, existing);
         const profile = await loadActiveProfile(profileDir);
-        const previewLines = formatCurationPreviewLines(
-          profile,
-          r.plan,
-          job.company,
-          job.title,
-        );
+        const previewLines = formatCurationPreviewLines(profile, r.plan, job.company, job.title);
         setPrepareFailStreak(0);
         setMode({
           m: 'prepareOk',
@@ -421,8 +417,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         mode.m === 'feedbackView'
           ? Math.max(4, Math.min(16, rows - 14))
           : Math.max(4, Math.min(18, rows - 12));
-      const lines =
-        mode.m === 'prepareOk' ? mode.previewLines : mode.lines;
+      const lines = mode.m === 'prepareOk' ? mode.previewLines : mode.lines;
       const scroll = mode.m === 'prepareOk' ? mode.prepScroll : mode.scroll;
       const maxScroll = Math.max(0, lines.length - h);
       if (key.upArrow) {
@@ -448,8 +443,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     },
     {
       isActive:
-        active &&
-        (mode.m === 'prepareOk' || mode.m === 'viewPrep' || mode.m === 'feedbackView'),
+        active && (mode.m === 'prepareOk' || mode.m === 'viewPrep' || mode.m === 'feedbackView'),
     },
   );
 
@@ -526,11 +520,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         </Text>
         <Text dimColor>↑↓ scroll summary · Esc → list</Text>
         <Box marginTop={1}>
-          <ScrollView
-            lines={mode.previewLines}
-            height={h}
-            scrollOffset={mode.prepScroll}
-          />
+          <ScrollView lines={mode.previewLines} height={h} scrollOffset={mode.prepScroll} />
         </Box>
       </Box>
     );
@@ -540,7 +530,9 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     const h = Math.max(4, Math.min(18, rows - 12));
     return (
       <Box flexDirection="column">
-        <Text bold>Preparation — {mode.job.title} @ {mode.job.company}</Text>
+        <Text bold>
+          Preparation — {mode.job.title} @ {mode.job.company}
+        </Text>
         <Text dimColor>↑↓ scroll · Esc → job menu</Text>
         <Box marginTop={1}>
           <ScrollView lines={mode.lines} height={h} scrollOffset={mode.scroll} />
@@ -614,9 +606,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   if (mode.m === 'err') {
     const showSettings = prepareFailStreak >= 3 && mode.canRetryPrepare;
     const errItems = [
-      ...(mode.canRetryPrepare
-        ? [{ value: 'retry' as const, label: 'Retry prepare' }]
-        : []),
+      ...(mode.canRetryPrepare ? [{ value: 'retry' as const, label: 'Retry prepare' }] : []),
       ...(showSettings ? [{ value: 'settings' as const, label: 'Check Settings (API key)' }] : []),
       { value: 'back' as const, label: 'Back to list' },
     ];

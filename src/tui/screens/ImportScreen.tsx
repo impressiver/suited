@@ -184,8 +184,8 @@ export function ImportScreen({ profileDir, headed: headedOpt, clearSession }: Im
           {doneContactGap != null && (
             <Box marginTop={1}>
               <Text color="yellow">
-                Missing contact: {doneContactGap}. Open Contact (c from Dashboard, or sidebar) to add
-                these — same fields the CLI prompts after import.
+                Missing contact: {doneContactGap}. Open Contact (c from Dashboard, or sidebar) to
+                add these — same fields the CLI prompts after import.
               </Text>
             </Box>
           )}

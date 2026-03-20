@@ -3,12 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
 import { runTuiGeneratePdf } from '../../services/generateResume.ts';
-import {
-  MultilineInput,
-  ProgressSteps,
-  SelectList,
-  Spinner,
-} from '../components/shared/index.ts';
+import { MultilineInput, ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -165,9 +160,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   );
 
   if (phase.p === 'run') {
-    const labels = lastGenCtxRef.current?.jd
-      ? [...JOB_PROGRESS_LABELS]
-      : [...FULL_PROGRESS_LABELS];
+    const labels = lastGenCtxRef.current?.jd ? [...JOB_PROGRESS_LABELS] : [...FULL_PROGRESS_LABELS];
     const cap = Math.max(0, Math.min(runStepIndex, labels.length));
     return (
       <Box flexDirection="column">

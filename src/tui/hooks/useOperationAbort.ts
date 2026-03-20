@@ -10,6 +10,7 @@ export function useOperationAbort() {
   const opAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    void operationCancelSeq;
     opAbortRef.current?.abort();
   }, [operationCancelSeq]);
 

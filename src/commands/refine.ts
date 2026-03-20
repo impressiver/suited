@@ -218,7 +218,8 @@ async function reviewRefinements(original: Profile, refined: Profile): Promise<P
 
   // Show summary of all proposed changes
   for (const rpos of changedPositions) {
-    const opos = original.positions.find((p) => p.id === rpos.id)!;
+    const opos = original.positions.find((p) => p.id === rpos.id);
+    if (!opos) continue;
     console.log(`\n  ${c.value(`${rpos.title.value} @ ${rpos.company.value}`)}`);
     for (const b of opos.bullets) {
       console.log(`    ${c.removed(`- ${b.value}`)}`);
@@ -264,7 +265,8 @@ async function reviewRefinements(original: Profile, refined: Profile): Promise<P
   const result: Profile = { ...refined, positions: [...refined.positions] };
 
   for (const rpos of changedPositions) {
-    const opos = original.positions.find((p) => p.id === rpos.id)!;
+    const opos = original.positions.find((p) => p.id === rpos.id);
+    if (!opos) continue;
     const label = `${rpos.title.value} @ ${rpos.company.value}`;
     const finalBullets = await reviewBullets(
       inquirer,
@@ -599,7 +601,9 @@ async function runJobRefinements(
 
   if (jobId === '__back__') return;
 
-  const { job, refinement } = refinementStatus.find((r) => r.job.id === jobId)!;
+  const picked = refinementStatus.find((r) => r.job.id === jobId);
+  if (!picked) return;
+  const { job, refinement } = picked;
 
   if (refinement) {
     console.log(`\n${c.ok} Stored refinement for ${c.value(`${job.company} — ${job.title}`)}`);

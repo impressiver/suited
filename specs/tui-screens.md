@@ -19,20 +19,16 @@ Every screen documents: what loads on mount, the full state machine (every state
 
 ### ImportScreen
 
-**Loads on mount:** check if source exists (pre-fill "re-import" mode).
+**Loads on mount:** optional `clearSession` clears LinkedIn cookies file.
 
-**States:**
-- `idle` — show input field + headed checkbox
-- `detecting` — `useAsyncOp` running `detectInput()`
-- `scraping` — `useAsyncOp` running `scrapeLinkedInProfile()` with `AbortSignal`; `ProgressSteps` at step 2/4
-- `parsing-export` — running `parseLinkedInExport()`
-- `parsing-paste` — multiline input → calling `parseLinkedInPaste()` via Claude
-- `normalizing` — running `normalizeProfile()`
-- `contact-prompt` — if contact fields missing: inline form (not a CLI prompt); Tab between fields; Enter/s to save
-- `done` — success summary: name, N positions, N skills; action row (→ Refine, → Dashboard)
-- `error` — error message + Retry / Edit URL / Back
+**States (current implementation):**
+- `idle` / `done` / `error` — single-line or paste input; **h** toggles headed Chrome for URL scrape; **p** toggles paste mode
+- `running` — `Spinner`; `importProfileFromInput({ signal })` drives detect → scrape (URL, cooperative **`AbortSignal`** between nav steps) / ZIP+CSV / dir / Claude paste parse; **Esc** aborts via global `operationCancelSeq` + `useOperationAbort`
+- `error` — message + **`SelectList`**: Retry (same input), optional **Check Settings** after 3 consecutive failures, Dismiss (return to idle)
 
-**Components:** `TextInput`, `ProgressSteps`, `Spinner`, `MultilineInput` (for paste mode), `StatusBadge`, `ConfirmPrompt` (for re-import).
+**Still aspirational vs early spec:** granular `ProgressSteps`, dedicated `detecting`/`scraping` labels, post-import contact-only prompt as a separate state (contact is merged in the service today).
+
+**Components:** `TextInput`, `Spinner`, `MultilineInput`, `SelectList` (error recovery).
 
 ### RefineScreen
 
@@ -74,9 +70,11 @@ already-refined:
 
 ### GenerateScreen
 
-**Loads on mount:** `loadRefined()` or `loadSource()`, `loadJobs()`, `loadGenerationConfig()` (pre-populate last template/flair). If `pendingJobId` is set in `AppState`, dispatch `SET_PENDING_JOB(null)` to clear it and skip the JD source picker, jumping directly to `jd-confirmed` with the pre-selected job.
+**Loads on mount:** If `pendingJobId` is set in `AppState`, clear it and jump to flair picker with that job’s JD.
 
-**States:**
+**Current implementation (MVP):** source picker (paste / saved / full resume) → optional MultilineInput → flair **`SelectList`** → single **`Spinner`** while `runTuiGeneratePdf` runs. **`runTuiGeneratePdf({ signal })`** checks `throwIfAborted` between major steps; **Esc** cancels via **`useOperationAbort`**. Errors: **`SelectList`** with Retry / optional Check Settings (after 3 failures) / back to flair; preflight errors (e.g. no saved jobs) offer back to source.
+
+**States (target / north star):**
 ```
 idle:
   → jd-source-picker      (SelectList: paste / use saved / no JD)

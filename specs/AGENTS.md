@@ -175,6 +175,14 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/tui/screens/ProfileEditorScreen.tsx`** — loads refined (preserve session) or source; sections include summary, experience (positions/bullets), **skills**, **education**, **certifications**, **projects** (list + a/d/`[`/`]` + primary-field edit); **`s`** save, Esc with unsaved overlay (**s** / **d**/**n** / Esc); `App` defers **a**/**d** from global nav; `InlineEditor` + `SelectList`.
 - **`src/tui/App.tsx`** — passes `profileDir` into Refine/Profile; footer hints; **↑↓** screen-cycle suppressed on Refine/Profile content like other list screens.
 
+### Phase 9+ — incremental (living)
+
+- **`useOperationAbort`** (`src/tui/hooks/useOperationAbort.ts`) + **`isUserAbort`** (`src/tui/isUserAbort.ts`) — Esc ↔ `AbortController` for Refine / Import / Generate.
+- **`src/utils/abort.ts`** — `throwIfAborted` used by LinkedIn scraper + `runTuiGeneratePdf` between major steps.
+- **`ImportScreen`** — `importProfileFromInput({ signal })`; error **`SelectList`** (Retry / Settings after 3 / Dismiss).
+- **`GenerateScreen`** — `runTuiGeneratePdf({ signal })`; generate errors: Retry / Settings / back to flair; preflight errors (e.g. no saved jobs): back to source.
+- Refine refactored to **`useOperationAbort`** (replaces inline `operationCancelSeq` effect).
+
 ### What’s next (Phase 9+ preview)
 
 - **Single backlog:** [`tui-definition-of-done.md` — What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c) (infrastructure, Refine, Profile, Generate, Jobs, Dashboard).

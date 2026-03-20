@@ -18,6 +18,8 @@ export interface ImportProfileOptions {
   headed?: boolean;
   /** Optional progress hook (CLI uses chalk; TUI omits). */
   onPhase?: (message: string) => void;
+  /** Cooperative cancel (TUI Esc) for URL scrape + Claude parse paths. */
+  signal?: AbortSignal;
 }
 
 export interface ImportProfileResult {
@@ -32,16 +34,16 @@ export interface ImportProfileResult {
 export async function importProfileFromInput(
   options: ImportProfileOptions,
 ): Promise<ImportProfileResult> {
-  const { input, profileDir, headed, onPhase } = options;
+  const { input, profileDir, headed, onPhase, signal } = options;
   const detected = await detectInput(input.trim());
 
   let profile: Profile;
 
   if (detected.kind === 'linkedin-url') {
     onPhase?.('Scraping LinkedIn profile...');
-    const pageText = await scrapeLinkedInProfile(detected.value, { headed });
+    const pageText = await scrapeLinkedInProfile(detected.value, { headed, signal });
     onPhase?.('Extracting data with Claude (verbatim only, no embellishment)...');
-    profile = await parseLinkedInPaste(pageText);
+    profile = await parseLinkedInPaste(pageText, signal);
   } else if (detected.kind === 'export-zip') {
     onPhase?.('Unzipping the goods...');
     const extracted = await extractZip(detected.value);
@@ -56,7 +58,7 @@ export async function importProfileFromInput(
     profile = await parseLinkedInExport(detected.value);
   } else {
     onPhase?.('Parsing with Claude (verbatim extraction only)...');
-    profile = await parseLinkedInPaste(detected.value);
+    profile = await parseLinkedInPaste(detected.value, signal);
   }
 
   const contactMeta = await loadContactMeta(profileDir);

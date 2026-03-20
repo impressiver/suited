@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { markdownToProfile, profileToMarkdown } from '../../profile/markdown.ts';
 import type {
   Profile,
@@ -29,6 +29,8 @@ import {
   Spinner,
   TextInput,
 } from '../components/shared/index.ts';
+import { useOperationAbort } from '../hooks/useOperationAbort.ts';
+import { isUserAbort } from '../isUserAbort.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 function cloneProfile(p: Profile): Profile {
@@ -52,7 +54,11 @@ type Phase =
   | { k: 'diff-edit-summary'; original: Profile; proposed: Profile }
   | { k: 'saving' }
   | { k: 'done'; note: string }
-  | { k: 'err'; msg: string };
+  | {
+      k: 'err';
+      msg: string;
+      retryKind: 'gen-questions' | 'apply' | 'save' | 'sync';
+    };
 
 export interface RefineScreenProps {
   profileDir: string;
@@ -61,6 +67,7 @@ export interface RefineScreenProps {
 export function RefineScreen({ profileDir }: RefineScreenProps) {
   const dispatch = useAppDispatch();
   const { activeScreen, focusTarget, inTextInput } = useAppState();
+  const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ k: 'loading' });
   const [source, setSource] = useState<Profile | null>(null);
   const [autoStartQa, setAutoStartQa] = useState(false);
@@ -70,6 +77,13 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [menuIdx, setMenuIdx] = useState(0);
   const [diffSelectIdx, setDiffSelectIdx] = useState(0);
   const [summaryTweakDraft, setSummaryTweakDraft] = useState('');
+  const [apiFailureStreak, setApiFailureStreak] = useState(0);
+  const [errMenuIdx, setErrMenuIdx] = useState(0);
+  const persistCtxRef = useRef<{
+    profile: Profile;
+    qs: RefinementQuestion[];
+    ans: Record<string, string>;
+  } | null>(null);
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
 
@@ -93,6 +107,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
 
   const persistRefined = useCallback(
     async (profile: Profile, qs: RefinementQuestion[], ans: Record<string, string>) => {
+      persistCtxRef.current = { profile, qs, ans };
       setPhase({ k: 'saving' });
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
       try {
@@ -106,9 +121,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         await saveRefined({ profile, session }, profileDir);
         await profileToMarkdown(profile, refinedMdPath(profileDir));
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
+        setApiFailureStreak(0);
         setPhase({ k: 'done', note: 'Refinements saved to refined.json / refined.md' });
       } catch (e) {
-        setPhase({ k: 'err', msg: (e as Error).message });
+        setErrMenuIdx(0);
+        setPhase({
+          k: 'err',
+          msg: (e as Error).message,
+          retryKind: 'save',
+        });
       } finally {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
@@ -125,7 +146,12 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
       setPhase({ k: 'has-refined-menu', syncPrompt: false });
     } catch (e) {
-      setPhase({ k: 'err', msg: (e as Error).message });
+      setErrMenuIdx(0);
+      setPhase({
+        k: 'err',
+        msg: (e as Error).message,
+        retryKind: 'sync',
+      });
     } finally {
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
@@ -135,10 +161,11 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     if (!source) {
       return;
     }
+    const ac = createController();
     setPhase({ k: 'gen-questions' });
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
     try {
-      const qs = await generateRefinementQuestions(source);
+      const qs = await generateRefinementQuestions(source, ac.signal);
       setQuestions(qs);
       if (qs.length === 0) {
         const sourceHash = await hashSource(profileDir);
@@ -151,18 +178,31 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         await saveRefined({ profile: source, session }, profileDir);
         await profileToMarkdown(source, refinedMdPath(profileDir));
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
+        setApiFailureStreak(0);
         setPhase({ k: 'done', note: 'No gaps found — saved source as refined (no edits).' });
         return;
       }
       setAnswers({});
       setAnswerDraft('');
+      setApiFailureStreak(0);
       setPhase({ k: 'qa', questions: qs, index: 0 });
     } catch (e) {
-      setPhase({ k: 'err', msg: (e as Error).message });
+      if (isUserAbort(e)) {
+        setPhase({ k: 'has-refined-menu', syncPrompt: false });
+        return;
+      }
+      setApiFailureStreak((n) => n + 1);
+      setErrMenuIdx(0);
+      setPhase({
+        k: 'err',
+        msg: (e as Error).message,
+        retryKind: 'gen-questions',
+      });
     } finally {
+      releaseController(ac);
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
-  }, [dispatch, profileDir, source]);
+  }, [createController, dispatch, profileDir, releaseController, source]);
 
   useEffect(() => {
     void (async () => {
@@ -196,22 +236,35 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     if (!source) {
       return;
     }
+    const ac = createController();
     setPhase({ k: 'apply' });
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
     try {
-      const proposed = await applyRefinements(source, questions, answers);
+      const proposed = await applyRefinements(source, questions, answers, ac.signal);
       const blocks = computeRefinementDiff(source, proposed);
       if (blocks.length === 0) {
         await persistRefined(proposed, questions, answers);
         return;
       }
+      setApiFailureStreak(0);
       setPhase({ k: 'diff', original: source, proposed });
     } catch (e) {
-      setPhase({ k: 'err', msg: (e as Error).message });
+      if (isUserAbort(e)) {
+        setPhase({ k: 'qa', questions, index: Math.max(0, questions.length - 1) });
+        return;
+      }
+      setApiFailureStreak((n) => n + 1);
+      setErrMenuIdx(0);
+      setPhase({
+        k: 'err',
+        msg: (e as Error).message,
+        retryKind: 'apply',
+      });
     } finally {
+      releaseController(ac);
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
-  }, [answers, dispatch, persistRefined, questions, source]);
+  }, [answers, createController, dispatch, persistRefined, questions, releaseController, source]);
 
   if (phase.k === 'loading') {
     return (
@@ -436,9 +489,72 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   }
 
   if (phase.k === 'err') {
+    const showSettings = apiFailureStreak >= 3;
+    const errItems = [
+      { value: 'retry' as const, label: 'Retry' },
+      ...(showSettings
+        ? [{ value: 'settings' as const, label: 'Check Settings (API key / provider)' }]
+        : []),
+      {
+        value: 'back' as const,
+        label:
+          phase.retryKind === 'apply'
+            ? 'Back to last question'
+            : 'Back to refined menu',
+      },
+    ];
     return (
       <Box flexDirection="column">
+        <Text bold>Refine — error</Text>
         <Text color="red">{phase.msg}</Text>
+        {showSettings && (
+          <Box marginTop={1}>
+            <Text dimColor>
+              Several failures in a row — verify your API key and provider in Settings.
+            </Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <SelectList
+            items={errItems}
+            selectedIndex={errMenuIdx}
+            onChange={(i) => setErrMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'settings') {
+                setApiFailureStreak(0);
+                dispatch({ type: 'SET_SCREEN', screen: 'settings' });
+                dispatch({ type: 'SET_FOCUS', target: 'content' });
+                setPhase({ k: 'has-refined-menu', syncPrompt: false });
+                return;
+              }
+              if (item.value === 'back') {
+                setApiFailureStreak(0);
+                if (phase.retryKind === 'apply') {
+                  setPhase({ k: 'qa', questions, index: Math.max(0, questions.length - 1) });
+                  return;
+                }
+                setPhase({ k: 'has-refined-menu', syncPrompt: false });
+                return;
+              }
+              if (item.value === 'retry') {
+                setErrMenuIdx(0);
+                if (phase.retryKind === 'gen-questions') {
+                  void beginQaFlow();
+                } else if (phase.retryKind === 'apply') {
+                  void runApply();
+                } else if (phase.retryKind === 'save') {
+                  const ctx = persistCtxRef.current;
+                  if (ctx) {
+                    void persistRefined(ctx.profile, ctx.qs, ctx.ans);
+                  }
+                } else {
+                  void syncRefinedFromMarkdown();
+                }
+              }
+            }}
+          />
+        </Box>
       </Box>
     );
   }

@@ -133,7 +133,7 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 ## Streaming (`callWithToolStreaming`)
 
-A **stub** already exists in `claude/client.ts` (calls `callWithTool` non-streaming and yields a single `done` event). Phase B replaces the stub body with `client.messages.stream()`.
+**Anthropic:** `claude/client.ts` uses `client.messages.stream()` and yields `text` / `tool_start` / `tool_end` / `done` (no raw partial tool JSON in yields). **OpenRouter:** still yields a single `done` via `callWithTool` until a streaming tool path is implemented there.
 
 Generator signature (already defined; do not redefine):
 
@@ -160,7 +160,11 @@ export async function* callWithToolStreaming<T>(
 
 ---
 
-## Long-running async (`useAsyncOp`)
+## Long-running async
+
+**Implemented:** `useOperationAbort()` in `src/tui/hooks/useOperationAbort.ts` — returns `createController` / `releaseController`. Subscribes to store `operationCancelSeq` (incremented on `CANCEL_OPERATION` / Esc while locked) and aborts the active `AbortController`. Screens pair this with `SET_OPERATION_IN_PROGRESS` and pass `ac.signal` into services (`importProfileFromInput`, `generateRefinementQuestions`, `runTuiGeneratePdf`, …).
+
+**Optional future:** a higher-level `useAsyncOp<T>()` that also owns `{ status, result, error }` in local state:
 
 ```typescript
 function useAsyncOp<T>() {

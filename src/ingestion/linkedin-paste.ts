@@ -16,7 +16,10 @@ function s<T>(value: T, inputHash: string): Sourced<T> {
   return { value, source: makeSource(inputHash) };
 }
 
-export async function parseLinkedInPaste(pastedText: string): Promise<Profile> {
+export async function parseLinkedInPaste(
+  pastedText: string,
+  signal?: AbortSignal,
+): Promise<Profile> {
   const now = new Date().toISOString();
   const inputHash = createHash('sha256').update(pastedText).digest('hex');
 
@@ -24,6 +27,8 @@ export async function parseLinkedInPaste(pastedText: string): Promise<Profile> {
     PARSE_LINKEDIN_SYSTEM,
     `Please extract the profile data from this LinkedIn profile text:\n\n${pastedText}`,
     parseLinkedInTool,
+    undefined,
+    signal,
   );
 
   const positions = (extracted.positions ?? []).map((p, i) => {

@@ -31,6 +31,7 @@ import {
   saveJobRefinedProfile,
   saveJobRefinement,
 } from '../profile/serializer.ts';
+import { throwIfAborted } from '../utils/abort.ts';
 import { selectAllSections } from './sectionSelection.ts';
 
 export interface RunTuiGeneratePdfOptions {
@@ -42,6 +43,8 @@ export interface RunTuiGeneratePdfOptions {
   jobId?: string;
   jobTitle?: string;
   company?: string;
+  /** Checked between major pipeline steps (not mid–single Claude call). */
+  signal?: AbortSignal;
 }
 
 export interface RunTuiGeneratePdfResult {
@@ -135,7 +138,9 @@ export async function runTuiGeneratePdf(
 ): Promise<RunTuiGeneratePdfResult> {
   const profileDir = options.profileDir;
   const resumesDir = options.resumesDir ?? `${profileDir}/resumes`;
+  const { signal } = options;
   const profile = await loadActiveProfile(profileDir);
+  throwIfAborted(signal);
 
   const nowIso = new Date().toISOString();
   const config: GenerationConfig = {
@@ -165,7 +170,10 @@ export async function runTuiGeneratePdf(
     } else {
       try {
         jobAnalysis = await analyzeJobDescription(config.jd);
-      } catch {
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') {
+          throw e;
+        }
         jobAnalysis = {
           company: options.company ?? 'Unknown',
           title: options.jobTitle ?? 'Role',
@@ -177,8 +185,10 @@ export async function runTuiGeneratePdf(
           summary: config.jd.slice(0, 200),
         };
       }
+      throwIfAborted(signal);
 
       curatorResult = await curateForJob(profile, jobAnalysis);
+      throwIfAborted(signal);
 
       if (options.jobId) {
         const refinement: JobRefinement = {
@@ -190,6 +200,8 @@ export async function runTuiGeneratePdf(
         await saveJobRefinement(refinement, profileDir);
       }
     }
+
+    throwIfAborted(signal);
 
     config.jobAnalysis = jobAnalysis;
     config.company = jobAnalysis.company;
@@ -208,6 +220,7 @@ export async function runTuiGeneratePdf(
     );
 
     resumeDoc = await polishResumeForJob(resumeDoc, jobAnalysis);
+    throwIfAborted(signal);
 
     const slug = makeJobSlug(config.company, config.jobTitle);
     const jobProfile = resumeDocToJobProfile(resumeDoc, profile);
@@ -220,6 +233,8 @@ export async function runTuiGeneratePdf(
     const { effectiveFlair } = getFlairInfo(config.flair, 'general');
     resumeDoc = { ...resumeDoc, flair: effectiveFlair };
   }
+
+  throwIfAborted(signal);
 
   if (options.templateOverride) {
     resumeDoc = { ...resumeDoc, template: options.templateOverride };
@@ -246,8 +261,10 @@ export async function runTuiGeneratePdf(
 
   let html = await renderResumeHtml(resumeDoc);
   html = await trySqueeze(html, resumeDoc);
+  throwIfAborted(signal);
 
   for (let step = 0; step < 6; step += 1) {
+    throwIfAborted(signal);
     const fit = await measurePageFit(html);
     if (!fit.overflows) {
       break;
@@ -257,6 +274,7 @@ export async function runTuiGeneratePdf(
     html = await trySqueeze(html, resumeDoc);
   }
 
+  throwIfAborted(signal);
   await exportToPdf(html, { template: resumeDoc.template, outputPath });
 
   config.profileUpdatedAt = profile.updatedAt;

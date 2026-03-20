@@ -25,9 +25,10 @@ src/
     store.tsx                   ← Context + useReducer global state
     hooks/
       useProfile.ts
-      useAsyncOp.ts
+      useOperationAbort.ts   ← Esc ↔ AbortController (see tui-architecture.md)
       useKeymap.ts
       useStreaming.ts
+    isUserAbort.ts             ← shared user-cancel detection (Import / Refine / Generate errors)
     components/
       layout/
         Header.tsx
@@ -66,7 +67,8 @@ src/
 |------|--------|
 | `src/index.ts` | Default action invokes `runFlow()` (TTY vs non-TTY); keep in sync with [README](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth) |
 | `src/commands/flow.ts` | **New file.** **`runTui()`** dynamic import when interactive; **one-line stderr + exit** when not (canonical behavior) |
-| `src/claude/client.ts` | `callWithToolStreaming()` — **stub already exists**; Phase B wires real `client.messages.stream()` |
+| `src/claude/client.ts` | `callWithToolStreaming()` — Anthropic streaming + tool events; OpenRouter falls back to `callWithTool` |
+| `src/utils/abort.ts` | `throwIfAborted(signal)` for cooperative cancel in scraper / generate pipeline |
 | `src/commands/refine.ts` | Refactor to `src/services/refine.ts` |
 | `src/commands/improve.ts` | Refactor to `src/services/improve.ts` |
 | `src/commands/validate.ts` | Refactor to `src/services/validate.ts` |

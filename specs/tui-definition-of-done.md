@@ -6,10 +6,10 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 
 ### Infrastructure / cross-cutting
 
-- [ ] **`callWithToolStreaming`** — real `client.messages.stream()` implementation; `tool_start` / `tool_end` / `done`; no raw partial JSON in the UI (see [implementation order](./tui-implementation-order.md) §12).
-- [ ] **`useAsyncOp` + `AbortSignal`** — Esc cancels long-running work everywhere it applies; not only Import scrape.
-- [ ] **Retry limit** — after 3 consecutive failures from the same operation, offer **Check Settings** (navigate to Settings) instead of infinite Retry.
-- [ ] **Errors** — always mapped message + Retry / Edit / Back (or equivalent); no frozen UI; audit screens for gaps.
+- [x] **`callWithToolStreaming`** — Anthropic: real `messages.stream()`; yields `text` / `tool_start` / `tool_end` / `done`; optional `AbortSignal`. OpenRouter: still delegates to `callWithTool` (single `done`) until a streaming tool path exists.
+- [ ] **`useAsyncOp` + `AbortSignal`** — **`useOperationAbort`** (`src/tui/hooks/useOperationAbort.ts`) + `operationCancelSeq` tie Esc to local `AbortController`s on **Refine** (Q&A / apply), **Import** (scrape + Claude parse), **Generate** (`runTuiGeneratePdf` checks signal between major steps). Shared **`useAsyncOp`** state machine hook from [architecture](./tui-architecture.md) is still optional / future. Still open: Jobs prepare LLM, Profile long saves, mid–single-call cancel inside Claude requests beyond existing client `signal`.
+- [ ] **Retry limit** — **Refine**, **Import**, **Generate**: after **3** consecutive failures, error UI offers **Check Settings**. Still open: Jobs, Profile, global policy.
+- [ ] **Errors** — **Refine**, **Import**, **Generate**: mapped message + **Retry** / **Back** (or dismiss) / optional **Settings**. Still open: Jobs, Profile, Contact edge cases.
 
 ### Refine
 
@@ -29,7 +29,7 @@ Single list of gaps vs [Screen details](./tui-screens.md) and [Goals & constrain
 ### Generate
 
 - [ ] **Full pipeline UX** — per [GenerateScreen](./tui-screens.md#generatescreen): JD analysis review, curation preview + manual bullet pick, step indicators, consulting output, **done** action row (regenerate, change template/flair, different job, tweak, back), optional tweak-only path.
-- [ ] **Streaming** — show streaming for analyze / curate / polish / consult where the CLI does.
+- [ ] **Streaming** — show streaming for analyze / curate / polish / consult where the CLI does. *(Generate pipeline still uses spinners; `callWithToolStreaming` available for future UI.)*
 
 ### Jobs
 
@@ -53,7 +53,7 @@ Ship when **all** of the following are true:
 - [ ] **Settings** reachable; saves API key to `.env`; masked display confirmed visually.
 - [x] **`q`** does not quit while a `<TextInput>` is focused (`inTextInput` guard in `App` + `TextInput` wiring). Automated coverage: store + component tests; manual spot-check on Contact still recommended.
 - [ ] **Jobs** renders without visual breakage at terminal width 79 (stacked) and 80+ (two-panel). Verified with `process.stdout.columns` stubbed in an integration test.
-- [ ] Errors from async ops show a **mapped message** + at least one recovery action (not a blank or frozen screen).
+- [ ] Errors from async ops show a **mapped message** + at least one recovery action (not a blank or frozen screen). *(Import / Generate / Refine covered; others pending.)*
 - [x] `pnpm test` is green; `pnpm ci` includes build + forbidden-import check for TUI.
 
 **Not acceptable at any phase:** subprocess delegation, `DelegateScreen` placeholders, or `exitBag`/`cliArgs.ts`-style breakout. Every screen renders inline within the Ink tree.
@@ -68,8 +68,8 @@ Add to Phase A:
 - [x] **Import** completes end-to-end in Ink (URL → scrape → parse → contact form if needed → done).
 - [x] **Refine** — fresh Q&A + diff review + save in Ink (see backlog above for full parity with already-refined menu and external MD).
 - [x] **Generate** — end-to-end in Ink for paste / saved JD / full resume via `runTuiGeneratePdf` (see backlog for full pipeline UX).
-- [ ] `callWithToolStreaming` real implementation (see backlog).
-- [ ] `useAsyncOp` + Esc cancel wired broadly (Import scrape is the primary example; extend per backlog).
+- [x] `callWithToolStreaming` real implementation for Anthropic (see backlog).
+- [x] Esc cancel + `AbortSignal` wired for **Refine**, **Import**, **Generate** (`useOperationAbort`, `importProfileFromInput` / `scrapeLinkedInProfile` / `parseLinkedInPaste`, `runTuiGeneratePdf`). Full **`useAsyncOp`** hook remains optional (see backlog).
 - [x] **Service extraction** — `src/services/refine.ts`, `improve.ts`, `validate.ts`, `contact.ts` exist; CLI delegates.
 
 ---
@@ -84,8 +84,8 @@ Add to Phase B:
 - [ ] **Refine** — full parity with [RefineScreen](./tui-screens.md#refinescreen) (see backlog).
 - [ ] **Generate** — full pipeline (see backlog).
 - [x] **`isMdNewerThanJson`** — done in Refine (see backlog for other Refine gaps).
-- [ ] **Retry limit** (see backlog).
-- [ ] Errors always show mapped message + Retry/Edit/Back; no frozen UI.
+- [ ] **Retry limit** (see backlog; Refine / Import / Generate have “Check Settings” after 3 failures).
+- [ ] Errors always show mapped message + Retry/Edit/Back; no frozen UI. *(Refine / Import / Generate covered for primary async paths.)*
 - [ ] Validate and improve surfaced via Dashboard (health score, validation status). No standalone screens needed.
 
 ---

@@ -65,7 +65,8 @@ src/
 |------|----------------|
 | `store` reducer | All transitions; `pendingJobId` set/clear; `inTextInput` set/clear; invalid combos impossible by type |
 | Keymap / input mode | `q` and `1–8` suppressed when `inTextInput=true`; fire when `inTextInput=false` |
-| `useAsyncOp` | `run()` → running; success clears error; AbortSignal cancels; concurrent `run()` rejected (document chosen behavior) |
+| `useOperationAbort` / `throwIfAborted` | `operationCancelSeq` bumps abort active controller; `throwIfAborted` throws `AbortError` when aborted |
+| `useAsyncOp` (future) | `run()` → running; success clears error; AbortSignal cancels; concurrent `run()` rejected (document chosen behavior) |
 | `DiffView` helpers | Given old/new pairs → required `-`/`+` prefixes; blocks have boundaries; accessible without color |
 | `MultilineInput` | Input accumulated into ref; state update fires after debounce interval, not per-keystroke |
 | Service functions | Pure logic contracts; inject mock `callWithTool`; assert return types |

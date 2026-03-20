@@ -18,6 +18,8 @@ export interface AppState {
   focusTarget: FocusTarget;
   inTextInput: boolean;
   operationInProgress: boolean;
+  /** Incremented on `CANCEL_OPERATION` (Esc during a locked op) so screens can abort in-flight work. */
+  operationCancelSeq: number;
   lastError: string | null;
   pendingJobId: string | null;
   /**
@@ -49,6 +51,7 @@ export function createInitialAppState(profileDir: string): AppState {
     focusTarget: 'sidebar',
     inTextInput: false,
     operationInProgress: false,
+    operationCancelSeq: 0,
     lastError: null,
     pendingJobId: null,
     deferLetterShortcutsFor: null,
@@ -76,7 +79,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_DEFER_LETTER_SHORTCUTS':
       return { ...state, deferLetterShortcutsFor: action.screen };
     case 'CANCEL_OPERATION':
-      return { ...state, operationInProgress: false };
+      return {
+        ...state,
+        operationInProgress: false,
+        operationCancelSeq: state.operationCancelSeq + 1,
+      };
   }
 }
 

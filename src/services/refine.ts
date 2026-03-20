@@ -205,13 +205,15 @@ export function computeRefinementDiff(original: Profile, refined: Profile): Diff
 
 export async function generateRefinementQuestions(
   profile: Profile,
-  _signal?: AbortSignal,
+  signal?: AbortSignal,
 ): Promise<RefinementQuestion[]> {
   const profileText = profileToRefineText(profile);
   const { questions } = await callWithTool<QuestionsOutput>(
     REFINE_QUESTIONS_SYSTEM,
     `Here is the candidate's profile:\n\n${profileText}`,
     questionsToolSchema,
+    undefined,
+    signal,
   );
   return questions;
 }
@@ -223,13 +225,15 @@ export async function applyRefinements(
   profile: Profile,
   questions: RefinementQuestion[],
   answers: Record<string, string>,
-  _signal?: AbortSignal,
+  signal?: AbortSignal,
 ): Promise<Profile> {
   const profileText = profileToRefineText(profile);
   const rawRefinements = await callWithTool<RefinementsOutput>(
     REFINE_APPLY_SYSTEM,
     `${profileText}\n\n${buildQAContext(questions, answers)}`,
     refinementsToolSchema,
+    undefined,
+    signal,
   );
   return applyRefinementsFromTool(profile, rawRefinements);
 }
@@ -268,13 +272,15 @@ function buildPolishInstruction(
 export async function* polishProfile(
   profile: Profile,
   opts: { sections: string[]; positionIds?: string[] },
-  _signal?: AbortSignal,
+  signal?: AbortSignal,
 ): AsyncGenerator<RefineStreamYield> {
   const instruction = buildPolishInstruction(profile, opts);
   const gen = callWithToolStreaming<RefinementsOutput>(
     EXPERT_POLISH_SYSTEM,
     instruction,
     refinementsToolSchema,
+    undefined,
+    signal,
   );
   let last: RefinementsOutput | undefined;
   for await (const ev of gen) {
@@ -291,7 +297,7 @@ export async function* polishProfile(
 export async function* applyDirectEdit(
   profile: Profile,
   instructions: string,
-  _signal?: AbortSignal,
+  signal?: AbortSignal,
 ): AsyncGenerator<RefineStreamYield> {
   const trimmed = instructions.trim();
   if (!trimmed) {
@@ -303,6 +309,8 @@ export async function* applyDirectEdit(
     DIRECT_EDIT_SYSTEM,
     `${profileText}\n\n## User Instruction\n${trimmed}`,
     refinementsToolSchema,
+    undefined,
+    signal,
   );
   let last: RefinementsOutput | undefined;
   for await (const ev of gen) {

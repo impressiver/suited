@@ -1,9 +1,11 @@
 import { Box, Text } from 'ink';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob } from '../../profile/schema.ts';
 import { loadJobs } from '../../profile/serializer.ts';
 import { runTuiGeneratePdf } from '../../services/generateResume.ts';
 import { MultilineInput, SelectList, Spinner } from '../components/shared/index.ts';
+import { useOperationAbort } from '../hooks/useOperationAbort.ts';
+import { isUserAbort } from '../isUserAbort.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 type Phase =
@@ -20,7 +22,17 @@ type Phase =
     }
   | { p: 'run' }
   | { p: 'done'; path: string }
-  | { p: 'err'; msg: string };
+  | { p: 'err'; msg: string; kind: 'preflight' | 'generate' };
+
+type PickFlairSnapshot = {
+  jd?: string;
+  jobId?: string;
+  title: string;
+  company: string;
+  idx: number;
+};
+
+type GenerateRunCtx = PickFlairSnapshot & { flair: FlairLevel };
 
 const FLAIR_CHOICES: { flair: FlairLevel; label: string }[] = [
   { flair: 1, label: '1 — Classic (ATS-safe, serif)' },
@@ -37,9 +49,15 @@ export interface GenerateScreenProps {
 export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const dispatch = useAppDispatch();
   const { pendingJobId, activeScreen, focusTarget } = useAppState();
+  const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ p: 'pick-source' });
   const [pasteBuf, setPasteBuf] = useState('');
   const [sourceIdx, setSourceIdx] = useState(0);
+  const [apiFailureStreak, setApiFailureStreak] = useState(0);
+  const [errMenuIdx, setErrMenuIdx] = useState(0);
+
+  const recoverFlairRef = useRef<PickFlairSnapshot | null>(null);
+  const lastGenCtxRef = useRef<GenerateRunCtx | null>(null);
 
   const active = activeScreen === 'generate' && focusTarget === 'content';
 
@@ -75,15 +93,18 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   );
 
   const runGenerate = useCallback(
-    async (ctx: {
-      jd?: string;
-      jobId?: string;
-      title: string;
-      company: string;
-      flair: FlairLevel;
-    }) => {
+    async (ctx: GenerateRunCtx) => {
+      recoverFlairRef.current = {
+        jd: ctx.jd,
+        jobId: ctx.jobId,
+        title: ctx.title,
+        company: ctx.company,
+        idx: ctx.idx,
+      };
+      lastGenCtxRef.current = ctx;
       setPhase({ p: 'run' });
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      const ac = createController();
       try {
         const { outputPath } = await runTuiGeneratePdf({
           profileDir,
@@ -92,15 +113,29 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           jobId: ctx.jobId,
           jobTitle: ctx.title,
           company: ctx.company,
+          signal: ac.signal,
         });
+        setApiFailureStreak(0);
         setPhase({ p: 'done', path: outputPath });
       } catch (e) {
-        setPhase({ p: 'err', msg: (e as Error).message });
+        if (isUserAbort(e)) {
+          const snap = recoverFlairRef.current;
+          if (snap) {
+            setPhase({ p: 'pick-flair', ...snap });
+          } else {
+            setPhase({ p: 'pick-source' });
+          }
+          return;
+        }
+        setApiFailureStreak((n) => n + 1);
+        setErrMenuIdx(0);
+        setPhase({ p: 'err', msg: (e as Error).message, kind: 'generate' });
       } finally {
+        releaseController(ac);
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
-    [dispatch, profileDir],
+    [createController, dispatch, profileDir, releaseController],
   );
 
   if (phase.p === 'run') {
@@ -125,10 +160,85 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   }
 
   if (phase.p === 'err') {
+    if (phase.kind === 'preflight') {
+      return (
+        <Box flexDirection="column">
+          <Text bold color="red">
+            Generate
+          </Text>
+          <Text color="red">{phase.msg}</Text>
+          <Box marginTop={1}>
+            <SelectList
+              items={[{ value: 'back', label: 'Back to source options' }]}
+              selectedIndex={0}
+              onChange={() => {}}
+              isActive={active}
+              onSubmit={() => {
+                setPhase({ p: 'pick-source' });
+              }}
+            />
+          </Box>
+        </Box>
+      );
+    }
+
+    const showSettings = apiFailureStreak >= 3;
     return (
       <Box flexDirection="column">
+        <Text bold color="red">
+          Generate — error
+        </Text>
         <Text color="red">{phase.msg}</Text>
-        <Text dimColor>Esc or choose source again from sidebar after focusing nav.</Text>
+        {showSettings && (
+          <Box marginTop={1}>
+            <Text dimColor>
+              Several failures in a row — verify API key and provider in Settings.
+            </Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <SelectList
+            items={[
+              { value: 'retry', label: 'Retry' },
+              ...(showSettings
+                ? [{ value: 'settings', label: 'Check Settings (API key / provider)' }]
+                : []),
+              { value: 'back', label: 'Back to flair / job options' },
+            ]}
+            selectedIndex={errMenuIdx}
+            onChange={(i) => setErrMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'settings') {
+                setApiFailureStreak(0);
+                dispatch({ type: 'SET_SCREEN', screen: 'settings' });
+                dispatch({ type: 'SET_FOCUS', target: 'content' });
+                const snap = recoverFlairRef.current;
+                if (snap) {
+                  setPhase({ p: 'pick-flair', ...snap });
+                } else {
+                  setPhase({ p: 'pick-source' });
+                }
+                return;
+              }
+              if (item.value === 'back') {
+                setApiFailureStreak(0);
+                const snap = recoverFlairRef.current;
+                if (snap) {
+                  setPhase({ p: 'pick-flair', ...snap });
+                } else {
+                  setPhase({ p: 'pick-source' });
+                }
+                return;
+              }
+              setErrMenuIdx(0);
+              const ctx = lastGenCtxRef.current;
+              if (ctx) {
+                void runGenerate(ctx);
+              }
+            }}
+          />
+        </Box>
       </Box>
     );
   }
@@ -162,6 +272,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
                 jobId: phase.jobId,
                 title: phase.title,
                 company: phase.company,
+                idx: phase.idx,
                 flair,
               });
             }}
@@ -251,7 +362,11 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
             if (item.value === 'saved') {
               const jobs = await loadJobs(profileDir);
               if (jobs.length === 0) {
-                setPhase({ p: 'err', msg: 'No saved jobs — add one from Jobs (j).' });
+                setPhase({
+                  p: 'err',
+                  msg: 'No saved jobs — add one from Jobs (j).',
+                  kind: 'preflight',
+                });
                 return;
               }
               setPhase({ p: 'pick-saved', jobs, idx: 0 });

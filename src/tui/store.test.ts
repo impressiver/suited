@@ -12,8 +12,10 @@ describe('appReducer', () => {
   it('toggles operation lock and cancel', () => {
     let s = appReducer(base, { type: 'SET_OPERATION_IN_PROGRESS', value: true });
     expect(s.operationInProgress).toBe(true);
+    expect(s.operationCancelSeq).toBe(0);
     s = appReducer(s, { type: 'CANCEL_OPERATION' });
     expect(s.operationInProgress).toBe(false);
+    expect(s.operationCancelSeq).toBe(1);
   });
 
   it('sets text-input gate', () => {

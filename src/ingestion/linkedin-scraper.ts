@@ -15,6 +15,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import puppeteer, { type Browser, type CookieData, type Page } from 'puppeteer-core';
+import { throwIfAborted } from '../utils/abort.ts';
 import { findChromePath } from '../utils/chrome.ts';
 import { fileExists } from '../utils/fs.ts';
 
@@ -410,7 +411,7 @@ async function gotoProfile(page: Page, url: string): Promise<void> {
  * Poll until LinkedIn's nav shows an authenticated session, then return.
  * Times out after 5 minutes.
  */
-async function waitForManualLogin(page: Page): Promise<void> {
+async function waitForManualLogin(page: Page, signal?: AbortSignal): Promise<void> {
   console.log('  Browser is open — log in to LinkedIn in the browser window...');
 
   const POLL_MS = 2_000;
@@ -418,6 +419,7 @@ async function waitForManualLogin(page: Page): Promise<void> {
   const deadline = Date.now() + TIMEOUT_MS;
 
   while (Date.now() < deadline) {
+    throwIfAborted(signal);
     await new Promise((r) => setTimeout(r, POLL_MS));
     // li_at is LinkedIn's primary session cookie — present immediately after
     // a successful login regardless of which page the browser has landed on.
@@ -439,6 +441,8 @@ export interface ScrapeOptions {
   credentials?: { email: string; password: string };
   /** Show the browser window (useful for 2FA / CAPTCHA) */
   headed?: boolean;
+  /** When aborted (e.g. TUI Esc), scraper stops between navigation steps. */
+  signal?: AbortSignal;
 }
 
 export async function scrapeLinkedInProfile(
@@ -446,6 +450,8 @@ export async function scrapeLinkedInProfile(
   options: ScrapeOptions = {},
 ): Promise<string> {
   const url = validateAndNormaliseUrl(rawUrl);
+  const { signal } = options;
+  throwIfAborted(signal);
 
   let browser: Browser | undefined;
 
@@ -463,6 +469,8 @@ export async function scrapeLinkedInProfile(
         );
       });
 
+    throwIfAborted(signal);
+
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
     await page.setViewport({ width: 1280, height: 900 });
@@ -475,12 +483,13 @@ export async function scrapeLinkedInProfile(
 
     console.log(`  Navigating to ${url} ...`);
     await gotoProfile(page, url);
+    throwIfAborted(signal);
 
     // Handle auth wall — in headed mode, wait for the user to log in manually;
     // in headless mode, prompt for credentials and drive the login form.
     if (!(await isLoggedIn(page))) {
       if (options.headed) {
-        await waitForManualLogin(page);
+        await waitForManualLogin(page, signal);
       } else {
         let creds = options.credentials;
 
@@ -508,6 +517,7 @@ export async function scrapeLinkedInProfile(
 
       console.log('  Loading profile...');
       await gotoProfile(page, url);
+      throwIfAborted(signal);
 
       // Save session after confirmed successful navigation to the profile
       await saveSession((await page.cookies()) as CookieData[]);
@@ -523,8 +533,10 @@ export async function scrapeLinkedInProfile(
     }
 
     // Step 1: expand inline content on profile page, scroll, extract main profile text
+    throwIfAborted(signal);
     await expandInlineContent(page);
     await scrollAndWait(page);
+    throwIfAborted(signal);
 
     const profileText = await extractProfileText(page);
     assertLooksLikeProfile(profileText, url);
@@ -540,6 +552,7 @@ export async function scrapeLinkedInProfile(
     // Step 3: visit each detail page and extract its full content
     const sectionTexts: string[] = [profileText];
     for (const detailUrl of detailUrls) {
+      throwIfAborted(signal);
       const sectionName = detailUrl.match(/\/details\/([^/]+)/)?.[1] ?? 'section';
       console.log(`  Scraping ${sectionName}...`);
       try {

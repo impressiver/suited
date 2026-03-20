@@ -2,9 +2,9 @@
 
 ## Stack
 
-- **Ink** (major version pinned in `package.json`; **Ink 6** + **React 18/19** as resolved by the lockfile — verify peers at install time).
+- **Ink 6.8.0**, **React 19.2.4**, **ink-text-input 6.0.0** — all already installed; do **not** re-install or change major versions. See [Build](./tui-build.md) for peer version caveats.
 - **TypeScript** ESM, `jsx: react-jsx`.
-- **ink-text-input** (or equivalent) for focused text fields.
+- **ink-text-input 6.0.0** for focused text fields (already installed).
 
 **Invariant (Phase C):** The TUI is a UI shell over **`src/services/`** and domain modules. See [Phased delivery](./tui-phased-delivery.md) for Phase A allowances.
 
@@ -65,8 +65,8 @@ src/
 | File | Change |
 |------|--------|
 | `src/index.ts` | Default action invokes `runFlow()` (TTY vs non-TTY); keep in sync with [README](./tui-README.md#canonical-non-tty-behavior-single-source-of-truth) |
-| `src/commands/flow.ts` | **`runTui()`** dynamic import when interactive; **one-line stderr + exit** when not (canonical behavior) |
-| `src/claude/client.ts` | `callWithToolStreaming()` export alongside `callWithTool` |
+| `src/commands/flow.ts` | **New file.** **`runTui()`** dynamic import when interactive; **one-line stderr + exit** when not (canonical behavior) |
+| `src/claude/client.ts` | `callWithToolStreaming()` — **stub already exists**; Phase B wires real `client.messages.stream()` |
 | `src/commands/refine.ts` | Refactor to `src/services/refine.ts` |
 | `src/commands/improve.ts` | Refactor to `src/services/improve.ts` |
 | `src/commands/validate.ts` | Refactor to `src/services/validate.ts` |

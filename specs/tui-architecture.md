@@ -10,18 +10,24 @@ interface AppState {
   profile: Profile | null;
   hasRefined: boolean;
   activeScreen: Screen;
-  focusTarget: 'sidebar' | 'content' | string; // screens may define sub-regions
+  focusTarget: string; // 'sidebar' | 'content' | screen-specific sub-region
+  inTextInput: boolean; // true when any TextInput/MultilineInput has focus — gates global shortcuts
   operationInProgress: boolean;
   lastError: string | null;
+  pendingJobId: string | null; // set by JobsScreen 'g' action; consumed + cleared by GenerateScreen on mount
 }
 
 type Action =
   | { type: 'SET_SCREEN'; screen: Screen }
   | { type: 'SET_PROFILE'; profile: Profile; hasRefined: boolean }
   | { type: 'SET_FOCUS'; target: string }
+  | { type: 'SET_IN_TEXT_INPUT'; value: boolean }
   | { type: 'SET_OPERATION_IN_PROGRESS'; value: boolean }
-  | { type: 'SET_ERROR'; error: string | null };
+  | { type: 'SET_ERROR'; error: string | null }
+  | { type: 'SET_PENDING_JOB'; jobId: string | null };
 ```
+
+`pendingJobId` solves the Jobs → Generate navigation: `JobsScreen` dispatches `SET_SCREEN + SET_PENDING_JOB`, then `GenerateScreen` reads and clears it on mount.
 
 Start simple. Cross-screen state growth is an implementation detail.
 
@@ -34,18 +40,63 @@ Start simple. Cross-screen state growth is an implementation detail.
 | Key | Behavior |
 |-----|----------|
 | `Tab` | Advance focus to next region in active screen's Tab order |
-| `Shift+Tab` | Previous focus region (implement if Ink allows) |
+| `Shift+Tab` | Previous focus region. In Ink, detect via raw escape sequence `\x1b[Z` inside `useInput`; terminal support varies — treat as best-effort. |
 | `↑↓` | Move selection in focused list or diff block |
 | `Enter` | Confirm / activate; submit single-line input |
 | `Esc` | Pop one level: blur input → cancel sub-state → go back → (only then) quit prompt |
-| `1–8` | Direct screen jump (suppressed when `operationInProgress` or focus is in text input) |
-| Letter shortcuts | `g/j/i/d/r/p/c/s` screen jump (same suppression rules) |
+| `1–8` | Direct screen jump (suppressed when `operationInProgress` or `inTextInput`) |
+| Letter shortcuts | `g/j/i/d/r/p/c/s` screen jump (same suppression rules as `1–8`) |
 | `:` or `/` | Open command palette |
-| `q` | Quit (suppressed during any text input, including TextInput, MultilineInput) |
+| `q` | Quit (suppressed during any text input) |
 | `Ctrl+C` | Hard exit (always works; documented in footer when relevant) |
 | `Ctrl+D` | Submit MultilineInput (the "done" key for multi-line fields) |
 
 **Precedence:** See [README — Key handling precedence](./tui-README.md#key-handling-precedence).
+
+### Concrete `useInput` suppression design
+
+Ink 6's `useInput` fires for **every** keypress on **every** registered handler — there is no built-in priority system. Fighting handlers cause the classic bug where `q` quits inside a text field.
+
+**Required approach:** A **single top-level `useInput` in `App.tsx`** reads `AppState` and routes or suppresses:
+
+```typescript
+useInput((input, key) => {
+  // 1. Modal / confirm — always wins; handled by ConfirmPrompt's own useInput
+  // 2. Text input mode — suppress global shortcuts
+  if (state.inTextInput) return; // q, 1-8, letter jumps do nothing
+  // 3. Async lock — suppress navigation
+  if (state.operationInProgress) {
+    if (key.escape) dispatch({ type: 'CANCEL_OPERATION' });
+    return;
+  }
+  // 4. Global navigation
+  if (input === 'q') { /* quit */ }
+  if (/^[1-8]$/.test(input)) { /* SET_SCREEN */ }
+  // ... letter shortcuts
+});
+```
+
+All other components **MUST NOT** call `useInput` for navigation keys. They may call `useInput` only for keys scoped to their own interaction (e.g. `↑↓` inside a `SelectList`, `Enter` inside a form).
+
+**`inTextInput` update rule:** Every `<TextInput>` and `<MultilineInput>` component **MUST** dispatch `SET_IN_TEXT_INPUT(true)` when it receives focus (`isFocused=true` from `ink-text-input`) and `SET_IN_TEXT_INPUT(false)` when it loses focus. This is the mechanism the global handler uses — it does **not** query Ink's focus internals.
+
+**Per-screen shortcuts** (`a`/`d` on Jobs, `s` for save on Contact/Profile) are handled inside their screen components' `useInput`, **only** when `!state.inTextInput && !state.operationInProgress`. They **MUST** be documented per screen and listed in [Open questions](./tui-open-questions.md) if they risk conflict.
+
+### Esc double-press during streaming
+
+"First Esc aborts; second Esc navigates back" requires explicit state, not a toggle:
+
+```
+streaming → (user presses Esc) → abort-requested [shows "Cancelling…"] → aborted [shows action row: Back / Retry]
+```
+
+The `App.tsx` global handler maps Esc to `CANCEL_OPERATION` when an op is running. After cancellation, the screen transitions to `aborted` sub-state. A second Esc (or Esc from `aborted`) navigates back via the normal pop-level logic. **Never implement this as a toggle** — two rapid Esc presses must not navigate back before the abort completes.
+
+### MultilineInput — paste performance
+
+Ink processes input one character at a time via `useInput`. Pasting a large block (e.g. a 3,000-char JD) triggers hundreds of consecutive state updates, causing render thrashing.
+
+**Required:** `<MultilineInput>` **MUST** accumulate input into a `useRef` buffer and **debounce** state updates (e.g. 16ms idle before flushing to `useState`). This is an implementation detail of the component — callers see only the final `onChange(value)` callback. Show character count from the debounced value, not live per-keystroke.
 
 ---
 
@@ -82,7 +133,9 @@ Start simple. Cross-screen state growth is an implementation detail.
 
 ## Streaming (`callWithToolStreaming`)
 
-Add to `claude/client.ts`. Yields structured events so the UI shows stable progress lines instead of flashing partial JSON:
+A **stub** already exists in `claude/client.ts` (calls `callWithTool` non-streaming and yields a single `done` event). Phase B replaces the stub body with `client.messages.stream()`.
+
+Generator signature (already defined; do not redefine):
 
 ```typescript
 export async function* callWithToolStreaming<T>(
@@ -98,6 +151,8 @@ export async function* callWithToolStreaming<T>(
   | { type: 'done'; result: T }
 >
 ```
+
+**Phase B implementation note:** Use `client.messages.stream()` from `@anthropic-ai/sdk`. Listen for `text` deltas and `input_json` events. Emit `tool_start` when the tool use block begins, `tool_end` + parse the accumulated JSON when the block closes, `done` when the full result is validated. Pass `signal` to the SDK's `AbortController` support. Do **not** yield raw partial JSON from the tool input accumulation — hold it until `tool_end`.
 
 `useStreaming` hook accumulates text + tool events. `AbortSignal` from the screen so Esc can cancel.
 
@@ -135,7 +190,7 @@ During `running`: `operationInProgress = true`, sidebar and screen-jump blocked,
 - `Tab` advances within the current ordered region list.
 - `Esc` pops one level of focus before considering screen navigation: blur input → exit sub-state → (if at top level) prompt quit.
 - When `operationInProgress`, screen-jump and sidebar navigation are blocked; scrolling and Esc (for cancel) still work.
-- When focus is inside any `<TextInput>` or `<MultilineInput>`, `q`, `1–8`, and letter shortcuts do nothing.
+- When `inTextInput` is true, `q`, `1–8`, and letter shortcuts do nothing (enforced by top-level `useInput` in App.tsx).
 
 ---
 

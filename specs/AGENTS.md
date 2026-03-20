@@ -102,10 +102,11 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **2** | **T0 — TUI infrastructure hardening** (`store.tsx`, `store.test.ts`, global `useInput` per architecture, non-TTY tests) | **Done** (2026-03-19) |
 | **3** | **T1 — Shared components** (Spinner, SelectList, … per order §3) | **Done** (2026-03-19) |
 | **4** | **T2 — Dashboard + Settings** (variants, health, quick actions; API key probe + `.env`) | **Done** (2026-03-19) |
-| **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Refine/Generate/Profile stubs) | **Done** (2026-03-19) |
+| **5** | **Single full-screen shell + inline Import/Contact** (no subprocess; Generate/Refine/Profile were stubs at phase close — now superseded by phases 7–8) | **Done** (2026-03-19) |
 | **6** | **Jobs screen (T2)** — list/add/delete/view JD/prepare/generate nav | **Done** (2026-03-19) |
 | **7** | **Generate screen (T2)** — `runTuiGeneratePdf`, JD sources, flair, `pendingJobId` | **Done** (2026-03-19) |
-| **8+** | Full Refine/Profile, generate sub-states (analysis review, curation UI, done menu), streaming, CI | Follow [`tui-implementation-order.md`](./tui-implementation-order.md) §9–15 |
+| **8** | **Refine + Profile MVP** — Refine: Q&A, `applyRefinements`, `DiffView`, `saveRefined`; Profile: stack + summary/bullets, persist like CLI `profile-editor` | **Done** (2026-03-19) |
+| **9+** | Close gaps vs [`tui-screens.md`](./tui-screens.md) + Phase C | See **[`tui-definition-of-done.md` § What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c)**; [`tui-implementation-order.md`](./tui-implementation-order.md) §10–15 |
 
 ### Phase 1 — completed work
 
@@ -149,7 +150,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/services/importProfile.ts`** — `importProfileFromInput()` (detect/scrape/parse/save); **`commands/import.ts`** delegates the core path and keeps CLI logging + `ensureContactDetails`.
 - **`src/tui/runTui.tsx`** — single `render` + `waitUntilExit` (removed `exitBag` / `spawnSync` loop).
-- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); removed Enter-to-CLI and **`cliArgs.ts`**; **Contact** + **Import** inline; **Refine** / **Generate** / **Profile** stub screens; **Tab** passes through on Contact content for field cycling; **↑↓** reserved on Contact for fields (with Dashboard).
+- **`src/tui/App.tsx`** — root `Box` sized to terminal (`useTerminalSize`); removed Enter-to-CLI and **`cliArgs.ts`**; **Contact** + **Import** inline; **Tab** passes through on Contact content for field cycling; **↑↓** reserved on Contact for fields (with Dashboard). (Generate / Refine / Profile were stubs here; see phases 7–8 for current screens.)
 - **`src/tui/hooks/useTerminalSize.ts`** — listens to `stdout` `resize`.
 - **`src/tui/components/Layout.tsx`** — main row `flexGrow={1}` for usable height.
 - **Removed** — `DelegateScreen.tsx`, `cliArgs.ts`, **`TuiExitBag`**.
@@ -168,6 +169,12 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 - **`src/services/generateResume.ts`** — `runTuiGeneratePdf()` — reuse job refinement when `jobId` set; else analyze + curate + save refinement; polish; job-scoped profile write; trim/fit loop; PDF + `saveGenerationConfig`.
 - **`src/tui/screens/GenerateScreen.tsx`** — source picker (paste / saved / full), MultilineInput paste, flair SelectList, consumes `pendingJobId` from Jobs.
 
-### What’s next (Phase 8 preview)
+### Phase 8 — completed work (MVP)
 
-- **Refine / Profile** — full screens per [`tui-screens.md`](./tui-screens.md); Generate polish: analysis confirm, curation preview, done action row, streaming; optional CI forbidden-import gates.
+- **`src/tui/screens/RefineScreen.tsx`** — `loadSource` → optional already-refined menu → `generateRefinementQuestions` → per-question `TextInput` → `applyRefinements` → `computeRefinementDiff` + `DiffView` + `ConfirmPrompt` → `saveRefined` + `profileToMarkdown`; empty-questions short-circuit; `profileDir` from `App`.
+- **`src/tui/screens/ProfileEditorScreen.tsx`** — loads refined (preserve session) or source; local stack (sections → summary / positions → bullets → bullet-edit); **`s`** save, Esc with unsaved overlay (**s** / **d**/**n** / Esc); `InlineEditor` + `SelectList`.
+- **`src/tui/App.tsx`** — passes `profileDir` into Refine/Profile; footer hints; **↑↓** screen-cycle suppressed on Refine/Profile content like other list screens.
+
+### What’s next (Phase 9+ preview)
+
+- **Single backlog:** [`tui-definition-of-done.md` — What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c) (infrastructure, Refine, Profile, Generate, Jobs, Dashboard).

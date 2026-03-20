@@ -1,5 +1,5 @@
 import { render } from 'ink';
-import type { FlowOptions } from '../commands/flow.ts';
+import type { FlowOptions } from './flowOptions.ts';
 import { App } from './App.tsx';
 import { AppStoreProvider } from './store.tsx';
 

@@ -25,7 +25,8 @@
     "check": "biome check src/ scripts/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "pnpm test && pnpm build",
+    "check:tui-imports": "node scripts/check-tui-forbidden-imports.mjs",
+    "ci": "pnpm test && pnpm check:tui-imports && pnpm build",
     "version:bump": "node scripts/version.mjs",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js"

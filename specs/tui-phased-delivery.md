@@ -30,7 +30,9 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import, Contact, **Jobs** (full Phase-A flow), and **Generate** (`runTuiGeneratePdf` + source/flair UI + `pendingJobId` hand-off from Jobs) are functional in-tree. Refine and Profile remain stubs. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Single full-screen Ink app: `runTui` renders once (no subprocess loop). Dashboard, Settings, Import, Contact, **Jobs** (full Phase-A flow), **Generate** (`runTuiGeneratePdf` + source/flair UI + `pendingJobId` hand-off from Jobs), **Refine** (Q&A → apply → diff → save), and **Profile** (section stack: summary + experience bullets; save to source or refined) are functional in-tree. No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+
+**Remaining work** — canonical list: **[Definition of done → What’s left](./tui-definition-of-done.md#whats-left-backlog-toward-phase-c)** (Refine/Profile/Generate/Jobs gaps vs `tui-screens.md`, streaming, retry policy, etc.).
 
 ---
 

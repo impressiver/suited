@@ -3,11 +3,9 @@
  * Interactive TTY → Ink TUI; otherwise a one-line hint (no hang).
  */
 
-export interface FlowOptions {
-  profileDir?: string;
-  headed?: boolean;
-  clearSession?: boolean;
-}
+import type { FlowOptions } from '../tui/flowOptions.ts';
+
+export type { FlowOptions };
 
 function isInteractiveTty(): boolean {
   return process.stdin.isTTY === true && process.stdout.isTTY === true;

@@ -1,6 +1,6 @@
 import { Box, useApp, useInput } from 'ink';
 import { useEffect, useMemo } from 'react';
-import type { FlowOptions } from '../commands/flow.ts';
+import type { FlowOptions } from './flowOptions.ts';
 import { Layout } from './components/Layout.tsx';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
 import { useTerminalSize } from './hooks/useTerminalSize.ts';
@@ -59,6 +59,12 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (activeScreen === 'generate' && focusTarget === 'content') {
       return 'Generate · ↑↓ lists · Enter confirm · paste uses Ctrl+D · Tab sidebar';
     }
+    if (activeScreen === 'refine' && focusTarget === 'content') {
+      return 'Refine · ↑↓ menu · Enter · Q&A Enter submit · y/n on diff · Tab sidebar';
+    }
+    if (activeScreen === 'profile' && focusTarget === 'content') {
+      return 'Profile · ↑↓ · Enter · Esc back · s save · Tab sidebar';
+    }
     return focusTarget === 'sidebar' ? `${base} · Enter → panel` : base;
   }, [activeScreen, focusTarget, state.inTextInput, state.operationInProgress]);
 
@@ -66,11 +72,16 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (focusTarget !== 'content') {
       return null;
     }
-    return 'Tab or Esc → return to sidebar · On Dashboard/Contact/Jobs/Generate, ↑↓ may move lists instead of changing screen';
+    return 'Tab or Esc → return to sidebar · On Dashboard/Contact/Jobs/Generate/Refine/Profile, ↑↓ may move lists instead of changing screen';
   }, [focusTarget]);
 
   const screenUsesContentArrows = (screen: ScreenId): boolean =>
-    screen === 'dashboard' || screen === 'contact' || screen === 'jobs' || screen === 'generate';
+    screen === 'dashboard' ||
+    screen === 'contact' ||
+    screen === 'jobs' ||
+    screen === 'generate' ||
+    screen === 'refine' ||
+    screen === 'profile';
 
   useInput(
     (input, key) => {
@@ -188,13 +199,13 @@ export function App({ profileDir, flowOptions }: AppProps) {
           />
         );
       case 'refine':
-        return <RefineScreen />;
+        return <RefineScreen profileDir={profileDir} />;
       case 'generate':
         return <GenerateScreen profileDir={profileDir} />;
       case 'jobs':
         return <JobsScreen profileDir={profileDir} />;
       case 'profile':
-        return <ProfileEditorScreen />;
+        return <ProfileEditorScreen profileDir={profileDir} />;
       case 'contact':
         return <ContactScreen profileDir={profileDir} />;
       case 'settings':

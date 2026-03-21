@@ -30,6 +30,11 @@ export interface AppState {
   profileEditorDirty: boolean;
   /** When set, ProfileEditorScreen root Esc (no dirty) navigates here instead of focusing sidebar. */
   profileEditorReturnTo: ScreenId | null;
+  /**
+   * Nested count of blocking confirms / error menus that must capture keys before global quit.
+   * `App.tsx` suppresses q / screen jumps when `> 0` (see specs/tui-architecture.md).
+   */
+  blockingUiDepth: number;
 }
 
 export type AppAction =
@@ -46,7 +51,9 @@ export type AppAction =
   /** Clears async lock (Esc during `operationInProgress`); extend later for AbortSignal. */
   | { type: 'CANCEL_OPERATION' }
   | { type: 'SET_PROFILE_EDITOR_DIRTY'; value: boolean }
-  | { type: 'SET_PROFILE_EDITOR_RETURN_TO'; screen: ScreenId | null };
+  | { type: 'SET_PROFILE_EDITOR_RETURN_TO'; screen: ScreenId | null }
+  | { type: 'INCREMENT_BLOCKING_UI' }
+  | { type: 'DECREMENT_BLOCKING_UI' };
 
 export function createInitialAppState(profileDir: string): AppState {
   return {
@@ -63,6 +70,7 @@ export function createInitialAppState(profileDir: string): AppState {
     deferLetterShortcutsFor: null,
     profileEditorDirty: false,
     profileEditorReturnTo: null,
+    blockingUiDepth: 0,
   };
 }
 
@@ -100,6 +108,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, profileEditorDirty: action.value };
     case 'SET_PROFILE_EDITOR_RETURN_TO':
       return { ...state, profileEditorReturnTo: action.screen };
+    case 'INCREMENT_BLOCKING_UI':
+      return { ...state, blockingUiDepth: state.blockingUiDepth + 1 };
+    case 'DECREMENT_BLOCKING_UI':
+      return {
+        ...state,
+        blockingUiDepth: Math.max(0, state.blockingUiDepth - 1),
+      };
   }
 }
 

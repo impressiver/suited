@@ -1,4 +1,5 @@
 import { Box, Text, useInput } from 'ink';
+import { useRegisterBlockingUi } from '../../hooks/useRegisterBlockingUi.ts';
 
 export interface ConfirmPromptProps {
   message: string;
@@ -6,12 +7,24 @@ export interface ConfirmPromptProps {
   active: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * When false, does not increment `blockingUiDepth` (e.g. App-level navigate-away confirm,
+   * which already disables global `useInput` via `pendingNav`).
+   */
+  registerBlocking?: boolean;
 }
 
 /**
  * Yes/no confirm. Enter / y = confirm; Esc / n = cancel (per architecture footer).
  */
-export function ConfirmPrompt({ message, active, onConfirm, onCancel }: ConfirmPromptProps) {
+export function ConfirmPrompt({
+  message,
+  active,
+  onConfirm,
+  onCancel,
+  registerBlocking = true,
+}: ConfirmPromptProps) {
+  useRegisterBlockingUi(active && registerBlocking);
   useInput(
     (input, key) => {
       if (!active) return;

@@ -14,6 +14,7 @@ import {
 } from '../../services/sectionSelection.ts';
 import { CheckboxList, ProgressSteps, SelectList, Spinner } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
+import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
@@ -118,6 +119,8 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const [sectionFocusIdx, setSectionFocusIdx] = useState(0);
 
   const active = activeScreen === 'generate' && focusTarget === 'content';
+
+  useRegisterBlockingUi(active && phase.p === 'err');
 
   const generateFooterHint = useMemo(() => {
     const sb = ' · Tab sidebar';

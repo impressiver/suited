@@ -43,6 +43,19 @@ describe('appReducer', () => {
     expect(s.profileEditorDirty).toBe(false);
   });
 
+  it('increments and decrements blocking UI depth without going negative', () => {
+    let s = appReducer(base, { type: 'INCREMENT_BLOCKING_UI' });
+    expect(s.blockingUiDepth).toBe(1);
+    s = appReducer(s, { type: 'INCREMENT_BLOCKING_UI' });
+    expect(s.blockingUiDepth).toBe(2);
+    s = appReducer(s, { type: 'DECREMENT_BLOCKING_UI' });
+    expect(s.blockingUiDepth).toBe(1);
+    s = appReducer(s, { type: 'DECREMENT_BLOCKING_UI' });
+    expect(s.blockingUiDepth).toBe(0);
+    s = appReducer(s, { type: 'DECREMENT_BLOCKING_UI' });
+    expect(s.blockingUiDepth).toBe(0);
+  });
+
   it('sets profile editor return screen and clears when leaving profile', () => {
     let s = appReducer(base, { type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: 'refine' });
     expect(s.profileEditorReturnTo).toBe('refine');

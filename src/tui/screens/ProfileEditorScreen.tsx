@@ -23,6 +23,7 @@ import {
 } from '../../profile/serializer.ts';
 import { fileExists } from '../../utils/fs.ts';
 import { ConfirmPrompt, InlineEditor, SelectList, Spinner } from '../components/shared/index.ts';
+import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch, useAppState } from '../store.tsx';
@@ -93,6 +94,8 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<RefinementSession | null>(null);
   const baselineRef = useRef<Profile | null>(null);
+
+  useRegisterBlockingUi(active && phase === 'err' && profile != null);
   const [dirty, setDirty] = useState(false);
   const [stack, setStack] = useState<Frame[]>([{ k: 'sections' }]);
   const [menuIdx, setMenuIdx] = useState(0);

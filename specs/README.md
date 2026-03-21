@@ -30,7 +30,7 @@ Grouped for **planning → design → build → verify**. Order within build fol
 |------|------|
 | [`tui-phased-delivery.md`](./tui-phased-delivery.md) | Phase A / B / C, delegation vs services |
 | [`tui-goals-and-constraints.md`](./tui-goals-and-constraints.md) | Goals, breakout rule, service extraction |
-| [`tui-ux.md`](./tui-ux.md) | Pipeline UX, discoverability, selection caret / inactive menus |
+| [`tui-ux.md`](./tui-ux.md) | Pipeline UX, holistic principles (wayfinding, trust, help), discoverability, selection caret / inactive menus |
 | [`tui-scope.md`](./tui-scope.md) | LOC / file-count ballpark |
 | [`tui-open-questions.md`](./tui-open-questions.md) | Resolved UX/tooling decisions; **Unresolved** section when a choice is still open |
 

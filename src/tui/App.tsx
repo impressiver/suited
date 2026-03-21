@@ -1,12 +1,14 @@
 import { Box, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Layout } from './components/Layout.tsx';
+import { ShortcutHelpOverlay } from './components/ShortcutHelpOverlay.tsx';
 import { ConfirmPrompt } from './components/shared/ConfirmPrompt.tsx';
 import type { FlowOptions } from './flowOptions.ts';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
 import { useTerminalSize } from './hooks/useTerminalSize.ts';
 import { NavigateProvider } from './navigationContext.tsx';
 import { PanelFooterHintProvider } from './panelFooterHintContext.tsx';
+import { formatPipelineStrip } from './pipelineStrip.ts';
 import { ContactScreen } from './screens/ContactScreen.tsx';
 import { DashboardScreen } from './screens/DashboardScreen.tsx';
 import { GenerateScreen } from './screens/GenerateScreen.tsx';
@@ -36,6 +38,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
   const dispatch = useAppDispatch();
   const [pendingNav, setPendingNav] = useState<ScreenId | null>(null);
   const [panelFooterHint, setPanelFooterHint] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const goToScreen = useCallback(
     (screen: ScreenId) => {
@@ -57,9 +60,20 @@ export function App({ profileDir, flowOptions }: AppProps) {
     }
   }, [snapshot.loading, snapshot.hasRefined, snapshot.error, dispatch]);
 
+  const pipelineStrip = useMemo(
+    () =>
+      formatPipelineStrip({
+        hasSource: snapshot.hasSource,
+        hasRefined: snapshot.hasRefined,
+        jobsCount: snapshot.jobsCount,
+        lastPdfLine: snapshot.lastPdfLine,
+      }),
+    [snapshot.hasSource, snapshot.hasRefined, snapshot.jobsCount, snapshot.lastPdfLine],
+  );
+
   const footerHint = useMemo(() => {
     const nScreens = SCREEN_ORDER.length;
-    const base = `↑↓ change screen (most views) · Tab sidebar ↔ panel · 1–${nScreens} · d i c j r g s · q quit`;
+    const base = `↑↓ change screen (most views) · Tab sidebar ↔ panel · 1–${nScreens} · d i c j r g s`;
     if (state.operationInProgress) {
       return `${base} · locked · Esc cancels op`;
     }
@@ -76,7 +90,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
     if (panelFooterHint != null && panelFooterHint !== '') {
       return panelFooterHint;
     }
-    return `${NAV_LABELS[activeScreen]} · Tab sidebar · 1–${nScreens} · letter keys · q quit`;
+    return `${NAV_LABELS[activeScreen]} · Tab sidebar · 1–${nScreens} · letter keys`;
   }, [activeScreen, focusTarget, panelFooterHint, state.inTextInput, state.operationInProgress]);
 
   const panelFocusBanner = useMemo(() => {
@@ -107,6 +121,11 @@ export function App({ profileDir, flowOptions }: AppProps) {
         if (key.escape) {
           dispatch({ type: 'CANCEL_OPERATION' });
         }
+        return;
+      }
+
+      if (input === '?') {
+        setHelpOpen(true);
         return;
       }
 
@@ -216,7 +235,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
         goToScreen(mapped);
       }
     },
-    { isActive: pendingNav == null },
+    {
+      isActive: pendingNav == null && state.blockingUiDepth === 0 && !helpOpen,
+    },
   );
 
   const content = (() => {
@@ -260,36 +281,45 @@ export function App({ profileDir, flowOptions }: AppProps) {
   return (
     <NavigateProvider value={goToScreen}>
       <Box flexDirection="column" width={cols} height={rows}>
-        {pendingNav != null && (
-          <Box marginBottom={1} flexDirection="column">
-            <ConfirmPrompt
-              message="Profile has unsaved changes. Leave without saving?"
-              active
-              onConfirm={() => {
-                dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
-                const target = pendingNav;
-                setPendingNav(null);
-                dispatch({ type: 'SET_SCREEN', screen: target });
-              }}
-              onCancel={() => setPendingNav(null)}
-            />
-          </Box>
+        {helpOpen ? (
+          <ShortcutHelpOverlay width={cols} height={rows} onClose={() => setHelpOpen(false)} />
+        ) : (
+          <>
+            {pendingNav != null && (
+              <Box marginBottom={1} flexDirection="column">
+                <ConfirmPrompt
+                  message="Profile has unsaved changes. Leave without saving?"
+                  active
+                  registerBlocking={false}
+                  onConfirm={() => {
+                    dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
+                    const target = pendingNav;
+                    setPendingNav(null);
+                    dispatch({ type: 'SET_SCREEN', screen: target });
+                  }}
+                  onCancel={() => setPendingNav(null)}
+                />
+              </Box>
+            )}
+            <PanelFooterHintProvider setHint={setPanelFooterHint}>
+              <Layout
+                activeScreen={activeScreen}
+                focusTarget={focusTarget}
+                footerHint={footerHint}
+                panelFocusBanner={panelFocusBanner}
+                name={snapshot.name}
+                positionCount={snapshot.positionCount}
+                skillCount={snapshot.skillCount}
+                hasRefined={snapshot.hasRefined}
+                hasSource={snapshot.hasSource}
+                pipelineStrip={pipelineStrip}
+                operationInProgress={state.operationInProgress}
+              >
+                {content}
+              </Layout>
+            </PanelFooterHintProvider>
+          </>
         )}
-        <PanelFooterHintProvider setHint={setPanelFooterHint}>
-          <Layout
-            activeScreen={activeScreen}
-            focusTarget={focusTarget}
-            footerHint={footerHint}
-            panelFocusBanner={panelFocusBanner}
-            name={snapshot.name}
-            positionCount={snapshot.positionCount}
-            skillCount={snapshot.skillCount}
-            hasRefined={snapshot.hasRefined}
-            hasSource={snapshot.hasSource}
-          >
-            {content}
-          </Layout>
-        </PanelFooterHintProvider>
       </Box>
     </NavigateProvider>
   );

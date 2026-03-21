@@ -69,6 +69,7 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 | **Curate screen (planned)** | [`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned), [`tui-definition-of-done.md` — post–Phase C](./tui-definition-of-done.md#whats-left-postphase-c-polish) |
 | Decide Phase A vs B scope | [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) |
 | Layout / keyboard / streaming UI | [`tui-architecture.md`](./tui-architecture.md) |
+| Holistic UX, header/footer, blocking confirms | [`tui-ux.md` — Holistic design principles](./tui-ux.md#holistic-design-principles), [`tui-architecture.md`](./tui-architecture.md) (Footer composition, Header pipeline, Blocking UI) |
 | Per-screen behavior | [`tui-screens.md`](./tui-screens.md) |
 | Errors, Esc vs Ctrl+C | [`tui-failure.md`](./tui-failure.md) |
 | Open decisions | [`tui-open-questions.md`](./tui-open-questions.md) |

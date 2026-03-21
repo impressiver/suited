@@ -25,6 +25,7 @@ import {
   TextInput,
   TextViewport,
 } from '../components/shared/index.ts';
+import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -157,6 +158,8 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   }, [jobs, prepLabel]);
 
   const active = activeScreen === 'jobs' && focusTarget === 'content';
+
+  useRegisterBlockingUi(active && mode.m === 'err');
 
   const jobsFooterHint = useMemo(() => {
     const sb = ' · Tab sidebar';

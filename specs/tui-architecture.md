@@ -15,6 +15,7 @@ interface AppState {
   operationInProgress: boolean;
   lastError: string | null;
   pendingJobId: string | null; // set by JobsScreen 'g' action; consumed + cleared by GenerateScreen on mount
+  blockingUiDepth: number; // confirms + error menus; App suppresses global q/jumps when > 0
 }
 
 type Action =
@@ -24,7 +25,9 @@ type Action =
   | { type: 'SET_IN_TEXT_INPUT'; value: boolean }
   | { type: 'SET_OPERATION_IN_PROGRESS'; value: boolean }
   | { type: 'SET_ERROR'; error: string | null }
-  | { type: 'SET_PENDING_JOB'; jobId: string | null };
+  | { type: 'SET_PENDING_JOB'; jobId: string | null }
+  | { type: 'INCREMENT_BLOCKING_UI' }
+  | { type: 'DECREMENT_BLOCKING_UI' };
 ```
 
 `pendingJobId` solves the Jobs → Generate navigation: `JobsScreen` dispatches `SET_SCREEN + SET_PENDING_JOB`, then `GenerateScreen` reads and clears it on mount.
@@ -87,7 +90,24 @@ All other components **MUST NOT** call `useInput` for navigation keys. They may 
 Ink **dispatches every active `useInput` handler** for each key; there is no built-in capture or bubbling.
 
 - **Implemented:** **Profile unsaved navigate-away** — `App` disables its global `useInput` while `pendingNav !== null`, so **q** / **1–n** / letter jumps do not run during that confirm.
-- **Gap:** Other **`ConfirmPrompt`** instances do **not** automatically block global shortcuts; **q** may still quit. **SHOULD** fix with a **`modalOpen` (or `blockingOverlay`) flag** in store that `App` checks before global navigation — **do not** overload `inTextInput` for this.
+- **Implemented:** Other **`ConfirmPrompt`** instances (default) and error **`SelectList`** menus use **`blockingUiDepth`** — **do not** overload `inTextInput` for this. Profile **navigate-away** confirm uses **`pendingNav`** only (`registerBlocking={false}` on that **`ConfirmPrompt`**).
+
+### Blocking UI and global input
+
+**Normative:** Whenever the user sees a **blocking** confirmation (y/n/Esc), **exclusive** error menu, or other overlay where accidental navigation would lose context or data, global navigation **MUST** be suppressed the same way as **`pendingNav !== null`**.
+
+| User-visible state | Global **q**, **1–n**, letter jumps |
+|--------------------|-------------------------------------|
+| Profile unsaved navigate-away (`pendingNav`) | Suppressed (today) |
+| Any other `ConfirmPrompt` / blocking menu | **MUST** be suppressed via shared mechanism |
+| `inTextInput` | Suppressed (today) |
+| `operationInProgress` | Suppressed except **Esc** → cancel where wired |
+
+**Store contract (principal developer):** Add **`blockingUiDepth: number`** (or **`blockingUiCount`**) to `AppState`. Increment when opening a blocking confirm/menu, decrement on resolve/unmount. **`App.tsx`** treats **`blockingUiDepth > 0`** like **`pendingNav !== null`** for global shortcut handling. Nested confirms increment depth twice; both must clear on exit.
+
+**Integration options:** (1) **`ConfirmPrompt`** accepts `onOpen` / `onClose` callbacks that dispatch increment/decrement; (2) a tiny **context** provider wraps prompts; (3) screens dispatch manually — **least preferred** (easy to forget). New screens **MUST** use one of the first two patterns when adding confirms.
+
+**Precedence:** Evaluates with **modal / blocking UI** before **text input** in the same tier as [README — Key handling precedence](./tui-README.md#key-handling-precedence).
 
 ### Esc double-press during streaming
 
@@ -125,6 +145,15 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 ## Footer (context-sensitive)
 
+### Footer composition (two-line model)
+
+**UX intent:** Users glance at the footer for **what they can do right now**; it should not duplicate the full shortcut list on every screen.
+
+- **Line 1 (optional, stable):** Baseline hints repeated across many screens — e.g. **`Tab` focus · `?` shortcuts** (when help ships) · **`q` quit** — **MAY** be omitted on very small terminals or when line 2 already states quit.
+- **Line 2 (contextual):** **MUST** reflect the **focused** control: list navigation, text submit keys, async cancel, diff review, confirm keys, or error recovery. This is the primary line today; formalizing two lines is **SHOULD** so T1 can evolve `Footer` without breaking every screen at once.
+
+**Principal developer:** Implement as a single **`Footer`** component that accepts **`baselineHint?: string`** and **`contextHint: string`**, concatenating or stacking per terminal height. Screen components pass only **context**; `App` passes **global** fragments when `inTextInput` / `operationInProgress` / `blockingUiDepth` change defaults.
+
 | Mode | Footer content |
 |------|----------------|
 | Navigation | `↑↓ select · Enter open · Tab focus · 1–n jump · q quit` |
@@ -136,6 +165,22 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 | Diff / bullet review | `↑↓ choose · Enter confirm · Esc: previous sub-state` |
 | Confirm prompt | `Enter: yes · n / Esc: no` |
 | Error state | `Enter: retry · Esc: back · e: edit inputs` |
+
+---
+
+## Header pipeline strip (contract)
+
+**UX intent:** The header is the **always-visible** orientation cue ([`tui-ux.md` — Wayfinding](./tui-ux.md#wayfinding)).
+
+**SHOULD** include, space permitting:
+
+1. **Product name** (e.g. `Suited`).
+2. **Profile identity** — display name from loaded profile, or `(no profile)` / honest empty.
+3. **Coarse counts** — e.g. positions / roles when available.
+4. **Refined indicator** — e.g. `refined ✓` vs source-only.
+5. **Pipeline strip** (target parity with [`tui-ui-mockups.md`](./tui-ui-mockups.md)) — **Source** / **Refined** / **Jobs** / **Last PDF** as compact **on|off** or **●|○** markers derived from the **same** rules as Dashboard pipeline badges.
+
+**Principal developer:** Prefer **one derived object** (e.g. `headerModel` from snapshot + `loadGenerationConfig`) consumed by **`Header`** and tested once, rather than per-screen string assembly. When **`operationInProgress`**, **MAY** append a subtle `…` or spinner token to the header subtitle — **MUST NOT** hide the profile identity entirely.
 
 ---
 

@@ -39,6 +39,7 @@ import {
   TextViewport,
 } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
+import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -141,6 +142,8 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const directEditViewportH = panelContentViewportRows(rows, 12);
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
+
+  useRegisterBlockingUi(active && phase.k === 'err');
 
   const goBackToRefineHub = useCallback(() => {
     void (async () => {

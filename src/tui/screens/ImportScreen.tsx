@@ -15,6 +15,7 @@ import {
   TextViewport,
 } from '../components/shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
+import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -138,6 +139,8 @@ export function ImportScreen({
   }, [clearSession]);
 
   const active = activeScreen === 'import' && focusTarget === 'content';
+
+  useRegisterBlockingUi(active && phase === 'error' && err != null);
 
   const importFooterHint = useMemo(() => {
     const sb = ' · Tab sidebar';

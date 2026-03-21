@@ -28,9 +28,9 @@ Historical decisions and **remaining** product choices. Prefer resolving ambigui
 
 7. **Per-screen letter shortcuts vs text fields vs command palette** — **RESOLVED:** Command palette (`:` / `/`) is **not implemented**; no collision today. Screen shortcuts run in screen-level `useInput` with `!inTextInput && !operationInProgress` where applicable. **When a palette exists,** it **MUST** set a global “palette open” guard so palette keys win; until then, document shortcuts only in screen specs + footers.
 
-8. **`ConfirmPrompt` and global `q` / number jumps** — **RESOLVED (split):**
+8. **`ConfirmPrompt` and global `q` / number jumps** — **RESOLVED (path forward):**
    - **Profile navigate-away** (unsaved): `App.tsx` sets its global `useInput` **`isActive: pendingNav == null`**, so **q**, **1–n**, and letter jumps do not run while the confirm is visible.
-   - **In-screen confirms** (e.g. Jobs delete): **`ConfirmPrompt` does not disable `App`’s handler** — **q** and screen jumps can still fire alongside y/n/Esc. **SHOULD** be unified later via a store flag (e.g. `modalOpen` / `blockingOverlay`) that `App` checks before global nav; **not** by overloading `inTextInput`.
+   - **All other blocking confirms / error menus:** **`blockingUiDepth`** in `AppState`; **`ConfirmPrompt`** (default) and **`useRegisterBlockingUi`** on error **`SelectList`** rows increment/decrement; **`App.tsx`** suppresses global **q** / **1–n** / letter jumps when **`blockingUiDepth > 0`**. **Normative:** [`tui-architecture.md` — Blocking UI](./tui-architecture.md#blocking-ui-and-global-input).
 
 9. **Retry limit reset scope** — **RESOLVED: per-screen React state, per streak variable.** Each screen owns counters (`apiFailureStreak`, `prepareFailStreak`, `saveFailStreak`, …). Counter **increments** on failed API/op; **resets to 0** on success, on **Retry** after failure, on **Dismiss/Back** where implemented, and when navigating to **Settings** from the error menu. **Refine** shares one `apiFailureStreak` across its error surfaces (Q&A, apply, save, polish, etc.). Counters **reset on unmount** (leaving the screen clears state). See [`tui-definition-of-done.md`](./tui-definition-of-done.md) and error rows in [`tui-screens.md`](./tui-screens.md).
 

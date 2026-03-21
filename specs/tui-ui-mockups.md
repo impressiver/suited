@@ -34,7 +34,7 @@ ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional c
 │               │  Suggested next: Configure API access                        │
 │               │  ► Open Settings                                             │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
-│ Enter: activate  ·  8: Settings  ·  q quit                                  │
+│ Enter: activate  ·  7: Settings  ·  q quit                                  │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

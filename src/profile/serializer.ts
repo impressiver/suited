@@ -245,12 +245,7 @@ export async function saveContactMeta(meta: ContactMeta, profileDir: string): Pr
     Object.entries(meta).filter(([, v]) => typeof v === 'string' && (v as string).length > 0),
   ) as ContactMeta;
   await writeJson(getGlobalContactMetaPath(), clean);
-  const legacy = legacyContactMetaPath(profileDir);
-  if (await fileExists(legacy)) {
-    await unlink(legacy).catch(() => {
-      /* already gone */
-    });
-  }
+  await unlink(legacyContactMetaPath(profileDir)).catch(() => {});
 }
 
 /**
@@ -373,12 +368,7 @@ export async function saveLogoCache(
   profileDir: string,
 ): Promise<void> {
   await writeJson(getGlobalLogoCachePath(), cache);
-  const legacyPath = legacyLogoCachePath(profileDir);
-  if (await fileExists(legacyPath)) {
-    await unlink(legacyPath).catch(() => {
-      /* already gone */
-    });
-  }
+  await unlink(legacyLogoCachePath(profileDir)).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------

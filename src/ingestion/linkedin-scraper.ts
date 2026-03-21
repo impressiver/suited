@@ -63,15 +63,12 @@ async function saveSession(cookies: CookieData[]): Promise<void> {
   try {
     await mkdir(sessionDir, { recursive: true });
     await writeFile(sessionFile, JSON.stringify(linkedInCookies, null, 2), 'utf-8');
-    const legacy = getLegacyLinkedInSessionPath();
-    if (legacy !== sessionFile && (await fileExists(legacy))) {
-      await unlink(legacy);
-    }
   } catch (err) {
     // Non-fatal: warn so the user knows why they'll be re-prompted next time
     console.warn(`  ⚠  Could not save LinkedIn session: ${(err as Error).message}`);
     console.warn(`     You will need to log in again on the next run.`);
   }
+  await unlink(getLegacyLinkedInSessionPath()).catch(() => {});
 }
 
 export async function clearLinkedInSession(): Promise<void> {

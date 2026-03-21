@@ -115,7 +115,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const { default: inquirer } = await import('inquirer');
 
   const profileDir = options.profileDir ?? 'output';
-  const resumesDir = options.output ?? `${profileDir}/resumes`;
+  const resumesDir = options.output ?? 'resumes';
 
   // Detect external edits to refined.md — sync to JSON before generating
   if (await isMdNewerThanJson(refinedMdPath(profileDir), refinedJsonPath(profileDir))) {

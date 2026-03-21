@@ -78,6 +78,10 @@ The tool MUST support `--profile-dir` so multiple profiles can coexist. Within a
 
 Exact filenames and migration rules live in code and user docs; **behavioral** expectation: **no silent overwrite** of user-edited files without confirmation where the CLI already implements that pattern.
 
+**Global directories (outside the profile tree):** Machine-local state uses **XDG Base Directory** conventions on Linux and macOS: **config** at `$XDG_CONFIG_HOME/suited` (default `~/.config/suited`), **cache** at `$XDG_CACHE_HOME/suited` (default `~/.cache/suited`). The config directory holds the LinkedIn URL import session (`linkedin-session.json`) and **global** `contact.json` (user-entered headline, email, phone, LinkedIn, etc.—one file shared across all `--profile-dir` values). The cache directory holds `logo-cache.json` (resolved employer logo data URIs). On Windows, config maps to `%APPDATA%\suited` and cache to `%LOCALAPPDATA%\suited\cache`. Legacy `~/.suited/` is still read for LinkedIn session migration; legacy `contact.json` / `logo-cache.json` under a profile directory are read and removed after migration to the global paths.
+
+**PDF output:** Unless overridden with `suited generate --output <dir>`, PDFs MUST default to a **`resumes/`** directory **relative to `process.cwd()`** at generate time (with existing job-slug subdirectories as implemented), not under `--profile-dir`.
+
 ---
 
 ## 8. Interactive UI

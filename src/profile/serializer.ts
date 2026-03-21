@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileExists } from '../utils/fs.ts';
+import { getGlobalContactMetaPath, getGlobalLogoCachePath } from '../utils/suitedDirs.ts';
 import {
   type ContactMeta,
   type GenerationConfig,
@@ -204,17 +205,38 @@ export async function deleteJob(id: string, profileDir: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Contact metadata — persisted across re-imports
+// Contact metadata — global config (XDG); legacy under profileDir migrated on read/write
 // ---------------------------------------------------------------------------
 
-export function contactMetaPath(profileDir: string): string {
+function legacyContactMetaPath(profileDir: string): string {
   return join(profileDir, 'contact.json');
 }
 
+function contactMetaHasValues(meta: ContactMeta): boolean {
+  return Object.values(meta).some((v) => typeof v === 'string' && v.length > 0);
+}
+
 export async function loadContactMeta(profileDir: string): Promise<ContactMeta> {
-  const path = contactMetaPath(profileDir);
-  if (!(await fileExists(path))) return {};
-  return readJson<ContactMeta>(path);
+  const globalPath = getGlobalContactMetaPath();
+  let fromGlobal: ContactMeta = {};
+  if (await fileExists(globalPath)) {
+    try {
+      fromGlobal = await readJson<ContactMeta>(globalPath);
+    } catch {
+      fromGlobal = {};
+    }
+  }
+  if (contactMetaHasValues(fromGlobal)) return fromGlobal;
+
+  const legacy = legacyContactMetaPath(profileDir);
+  if (await fileExists(legacy)) {
+    try {
+      return await readJson<ContactMeta>(legacy);
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 export async function saveContactMeta(meta: ContactMeta, profileDir: string): Promise<void> {
@@ -222,7 +244,13 @@ export async function saveContactMeta(meta: ContactMeta, profileDir: string): Pr
   const clean: ContactMeta = Object.fromEntries(
     Object.entries(meta).filter(([, v]) => typeof v === 'string' && (v as string).length > 0),
   ) as ContactMeta;
-  await writeJson(contactMetaPath(profileDir), clean);
+  await writeJson(getGlobalContactMetaPath(), clean);
+  const legacy = legacyContactMetaPath(profileDir);
+  if (await fileExists(legacy)) {
+    await unlink(legacy).catch(() => {
+      /* already gone */
+    });
+  }
 }
 
 /**
@@ -302,26 +330,55 @@ export async function clearGenerationConfig(profileDir: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Logo cache — persists resolved SVG data URIs keyed by company/institution name
+// Logo cache — global XDG cache; legacy under profileDir merged then removed
 // ---------------------------------------------------------------------------
 
-export function logoCachePath(profileDir: string): string {
+function legacyLogoCachePath(profileDir: string): string {
   return join(profileDir, 'logo-cache.json');
 }
 
 export async function loadLogoCache(profileDir: string): Promise<Record<string, string>> {
-  try {
-    return await readJson<Record<string, string>>(logoCachePath(profileDir));
-  } catch {
-    return {};
+  const globalPath = getGlobalLogoCachePath();
+  let globalCache: Record<string, string> = {};
+  if (await fileExists(globalPath)) {
+    try {
+      globalCache = await readJson<Record<string, string>>(globalPath);
+    } catch {
+      globalCache = {};
+    }
   }
+
+  const legacyPath = legacyLogoCachePath(profileDir);
+  let legacyCache: Record<string, string> = {};
+  if (await fileExists(legacyPath)) {
+    try {
+      legacyCache = await readJson<Record<string, string>>(legacyPath);
+    } catch {
+      legacyCache = {};
+    }
+  }
+
+  if (Object.keys(legacyCache).length === 0) return globalCache;
+
+  const merged = { ...legacyCache, ...globalCache };
+  await writeJson(globalPath, merged);
+  await unlink(legacyPath).catch(() => {
+    /* already gone */
+  });
+  return merged;
 }
 
 export async function saveLogoCache(
   cache: Record<string, string>,
   profileDir: string,
 ): Promise<void> {
-  await writeJson(logoCachePath(profileDir), cache);
+  await writeJson(getGlobalLogoCachePath(), cache);
+  const legacyPath = legacyLogoCachePath(profileDir);
+  if (await fileExists(legacyPath)) {
+    await unlink(legacyPath).catch(() => {
+      /* already gone */
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

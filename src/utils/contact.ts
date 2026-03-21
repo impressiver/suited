@@ -24,7 +24,7 @@ export function missingContactDetailPromptLabels(profile: Profile): string[] {
 
 /**
  * Prompts for any missing contact fields (headline, email, phone, LinkedIn),
- * saves them to the active profile and to contact.json for future imports.
+ * saves them to the active profile and to global contact config for future imports.
  * Returns the updated profile (unchanged if no fields were missing).
  */
 export async function ensureContactDetails(
@@ -88,7 +88,7 @@ export async function ensureContactDetails(
     await saveSource(updated, profileDir);
   }
 
-  // Also persist to contact.json so these details survive future re-imports
+  // Also persist to global contact config so these details survive future re-imports
   const existing = await loadContactMeta(profileDir);
   await saveContactMeta(
     {

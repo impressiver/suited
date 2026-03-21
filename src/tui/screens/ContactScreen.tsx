@@ -90,7 +90,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     }
     const errNote = saveErr != null ? ' · fix issue then s save' : '';
     if (phase === 'browse') {
-      return `Contact · ↑↓ Tab field · Enter edit · s save all (profile + contact.json)${errNote}${sb}`;
+      return `Contact · ↑↓ Tab field · Enter edit · s save all (profile + global contact config)${errNote}${sb}`;
     }
     return `Contact · Esc leave field · Enter next field${errNote}${sb}`;
   }, [loadErr, phase, saveErr, saving]);

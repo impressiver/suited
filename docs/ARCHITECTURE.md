@@ -22,7 +22,7 @@ Running **`suited` with no subcommand** invokes **`runFlow`** → **`runTui`** w
 2. **Refine** (`commands/refine.ts`, `claude/prompts/refine.ts`) — Q&A and structured edits → **`refined.json`** + **`refined.md`** (human-editable).
 3. **Jobs** — Saved job descriptions under the profile dir.
 4. **Prepare** (`commands/prepare.ts`) — Curate the profile **for one saved job** (selection + feedback).
-5. **Generate** (`commands/generate.ts`, `generate/`, `pdf/`) — Job-aware PDF using templates in `src/templates/`.
+5. **Generate** (`commands/generate.ts`, `generate/`, `pdf/`) — Job-aware PDF using templates in `src/templates/`. Default PDF directory is **`./resumes`** relative to **`process.cwd()`** (not under `--profile-dir`); global **contact** and **logo** persistence use XDG config/cache via `src/utils/suitedDirs.ts` (see [`specs/project.md`](../specs/project.md) §7).
 
 **Validate** checks integrity; **improve** is an interactive hub for ongoing edits, summary, and re-refinement without replacing the core refine pipeline.
 

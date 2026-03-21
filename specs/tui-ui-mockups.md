@@ -300,7 +300,7 @@ Template = **baseline layout**. Flair = **per-template** level of **creative fre
 ├───────────────┬──────────────────────────────────────────────────────────────┤
 │ ► 4 Generate  │  Resume ready                                               │
 │   …           │  ────────────────────────────────────────────────────────    │
-│               │  output/resumes/Jane_Smith_Arize_Sr_Platform_Mar_2026.pdf  │
+│               │  resumes/jane-smith-arize-sr-platform/Jane_Smith_2026-03-20-1430.pdf  │
 │               │                                                              │
 │               │    Template: Modern  ·  Flair: 3  ·  Fit: 98%             │
 │               │                                                              │

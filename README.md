@@ -125,7 +125,7 @@ suited import ~/Downloads/Basic_LinkedInDataExport/
 suited import
 ```
 
-When importing by URL, suited opens Chrome and prompts for your LinkedIn credentials on first run. The session is saved to `~/.suited/linkedin-session.json` so you only need to log in once. Only `linkedin.com` cookies are stored.
+When importing by URL, suited opens Chrome and prompts for your LinkedIn credentials on first run. The session is saved under your **config** directory (XDG-style on Linux/macOS: typically `~/.config/suited/linkedin-session.json`; override with `XDG_CONFIG_HOME`). The same config directory holds **`contact.json`** (email, phone, headline, etc.—shared across all `--profile-dir` values). **Logo** fetches are cached under **`~/.cache/suited/logo-cache.json`** (or `XDG_CACHE_HOME`; `%LOCALAPPDATA%\suited\cache` on Windows). If you still have a legacy `~/.suited/linkedin-session.json`, it is read until you save a new session, then removed. Legacy `output/contact.json` or `output/logo-cache.json` are migrated on the next read or save. Only `linkedin.com` cookies are stored.
 
 If LinkedIn requires 2FA or shows a CAPTCHA, use `--headed` to see the browser window:
 
@@ -153,7 +153,10 @@ suited import https://www.linkedin.com/in/your-username --headed
 ```bash
 suited generate --jd "path/to/job.txt"   # skip the JD prompt
 suited generate --flair 3                # set visual intensity (1–5)
+suited generate --output output/resumes  # PDF output directory (see below)
 ```
+
+**PDF output:** By default, PDFs go under **`./resumes`** relative to the **current working directory** (job-tailored runs use subfolders such as `./resumes/{job-slug}/`). Use **`--output <dir>`** for a different path (relative paths resolve from cwd). Older releases defaulted to `output/resumes` under `--profile-dir`; existing files there are not moved. To keep that layout, pass e.g. `--output output/resumes`.
 
 Settings are remembered between runs — if you regenerate without changes, you won't be re-prompted.
 
@@ -194,13 +197,20 @@ When you generate a resume for a specific job, suited saves a curated version of
 You can edit it directly — the next time you generate for that job, suited detects the change and asks whether to use your edits as the starting point instead of re-running curation.
 
 ```
-output/
+output/                               # default --profile-dir (all paths relative to cwd)
+  source.json / source.md
   refined.md                          # your full profile (editable)
+  refined.json
+  jobs.json
+  generation.json
   jobs/
     acme-corp-senior-engineer/
       refined.md                      # curated profile for this job (editable)
       refined.json
+  refinements/
 ```
+
+**Not in `output/`:** Contact overrides and LinkedIn session live under your **XDG config** directory; the logo cache lives under **XDG cache** (see [Import options](#import-options)). Generated **PDFs** default to **`./resumes/`** at the cwd (not inside `output/`).
 
 ## Multiple profiles
 

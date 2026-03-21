@@ -72,7 +72,7 @@ program
   .command('generate')
   .description('Generate a PDF resume from refined data (skips prompts if settings saved)')
   .option('--profile-dir <dir>', 'Directory containing profile files', 'output')
-  .option('--output <dir>', 'Output directory for PDFs')
+  .option('--output <dir>', 'Output directory for PDFs (default: ./resumes relative to cwd)')
   .option('--jd <text|path>', 'Job description text or file path (skips prompt)')
   .option('--flair <1-5>', 'Flair level (skips prompt)')
   .action(async (opts: { profileDir?: string; output?: string; jd?: string; flair?: string }) => {

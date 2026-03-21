@@ -15,7 +15,7 @@ Include: affected command or code path, steps to reproduce, and impact if known.
 
 ## Scope
 
-This tool stores profile data locally, may keep a LinkedIn session file under `~/.suited/`, and sends prompts to the AI provider you configure. Treat API keys and session files as sensitive.
+This tool stores profile data locally, may keep a LinkedIn session file and **contact metadata** (`contact.json`) under your config directory (e.g. `~/.config/suited/` on Linux/macOS with default XDG paths), and sends prompts to the AI provider you configure. Treat API keys, session files, and contact data as sensitive.
 
 ## LinkedIn and scraping
 

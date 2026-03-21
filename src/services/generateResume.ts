@@ -157,7 +157,7 @@ export async function runTuiGenerateBuildPhase(
   options: RunTuiGeneratePdfOptions,
 ): Promise<TuiGenerateBuiltState> {
   const profileDir = options.profileDir;
-  const resumesDir = options.resumesDir ?? `${profileDir}/resumes`;
+  const resumesDir = options.resumesDir ?? 'resumes';
   const { signal } = options;
   const profile = await loadActiveProfile(profileDir);
   throwIfAborted(signal);

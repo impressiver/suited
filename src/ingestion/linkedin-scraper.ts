@@ -11,16 +11,16 @@
  * Use responsibly and only on your own profile.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import puppeteer, { type Browser, type CookieData, type Page } from 'puppeteer-core';
 import { throwIfAborted } from '../utils/abort.ts';
 import { findChromePath } from '../utils/chrome.ts';
 import { fileExists } from '../utils/fs.ts';
-
-const SESSION_DIR = join(homedir(), '.suited');
-const SESSION_FILE = join(SESSION_DIR, 'linkedin-session.json');
+import {
+  getLegacyLinkedInSessionPath,
+  getLinkedInSessionPath,
+  getSuitedConfigDir,
+} from '../utils/suitedDirs.ts';
 
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
@@ -31,10 +31,19 @@ const USER_AGENT =
 // Session persistence — only linkedin.com cookies are saved/restored
 // ---------------------------------------------------------------------------
 
+async function resolveSessionReadPath(): Promise<string | undefined> {
+  const primary = getLinkedInSessionPath();
+  if (await fileExists(primary)) return primary;
+  const legacy = getLegacyLinkedInSessionPath();
+  if (await fileExists(legacy)) return legacy;
+  return undefined;
+}
+
 async function loadSession(): Promise<CookieData[]> {
   try {
-    if (await fileExists(SESSION_FILE)) {
-      const raw = await readFile(SESSION_FILE, 'utf-8');
+    const path = await resolveSessionReadPath();
+    if (path) {
+      const raw = await readFile(path, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed as CookieData[];
     }
@@ -49,9 +58,15 @@ async function saveSession(cookies: CookieData[]): Promise<void> {
   const linkedInCookies = cookies.filter(
     (c) => typeof c.domain === 'string' && c.domain.includes('linkedin.com'),
   );
+  const sessionDir = getSuitedConfigDir();
+  const sessionFile = getLinkedInSessionPath();
   try {
-    await mkdir(SESSION_DIR, { recursive: true });
-    await writeFile(SESSION_FILE, JSON.stringify(linkedInCookies, null, 2), 'utf-8');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionFile, JSON.stringify(linkedInCookies, null, 2), 'utf-8');
+    const legacy = getLegacyLinkedInSessionPath();
+    if (legacy !== sessionFile && (await fileExists(legacy))) {
+      await unlink(legacy);
+    }
   } catch (err) {
     // Non-fatal: warn so the user knows why they'll be re-prompted next time
     console.warn(`  ⚠  Could not save LinkedIn session: ${(err as Error).message}`);
@@ -61,10 +76,17 @@ async function saveSession(cookies: CookieData[]): Promise<void> {
 
 export async function clearLinkedInSession(): Promise<void> {
   try {
-    await writeFile(SESSION_FILE, '[]', 'utf-8');
+    await mkdir(getSuitedConfigDir(), { recursive: true });
+    await writeFile(getLinkedInSessionPath(), '[]', 'utf-8');
     console.log('LinkedIn session cleared.');
   } catch {
-    // File didn't exist — nothing to do
+    // Could not write new location — still try legacy below
+  }
+  try {
+    const legacy = getLegacyLinkedInSessionPath();
+    if (await fileExists(legacy)) await unlink(legacy);
+  } catch {
+    // ignore
   }
 }
 
@@ -521,7 +543,7 @@ export async function scrapeLinkedInProfile(
 
       // Save session after confirmed successful navigation to the profile
       await saveSession((await page.cookies()) as CookieData[]);
-      console.log(`  Session saved to ${SESSION_FILE}`);
+      console.log(`  Session saved to ${getLinkedInSessionPath()}`);
     }
 
     // Guard: confirm we're on the profile, not an auth wall or error page

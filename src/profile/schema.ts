@@ -386,10 +386,10 @@ export interface RefinedData {
 }
 
 // ---------------------------------------------------------------------------
-// Persistent contact metadata — survives re-imports
+// Persistent contact metadata — survives re-imports (global XDG config, not profile dir)
 // ---------------------------------------------------------------------------
 
-/** Plain-string contact fields entered by the user, persisted in contact.json. */
+/** Plain-string contact fields entered by the user; stored in suited config dir (see `getGlobalContactMetaPath`). */
 export interface ContactMeta {
   headline?: string; // current professional title / tagline
   email?: string;

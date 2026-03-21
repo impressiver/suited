@@ -60,7 +60,7 @@ function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profil
 }
 
 /**
- * Writes contact fields into the active profile file (refined preferred over source) and `contact.json`.
+ * Writes contact fields into the active profile file (refined preferred over source) and global contact config.
  */
 export async function mergeContactMeta(fields: ContactFields, profileDir: string): Promise<void> {
   let profile = await loadActiveProfile(profileDir);

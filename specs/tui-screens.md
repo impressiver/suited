@@ -236,11 +236,11 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **States:**
 - `form` — 7 `TextInput` fields (Name, Email, Phone, Location, LinkedIn, Website, GitHub); Tab advances
-- `saving` — spinner; calls `mergeContactMeta(fields, profileDir)` which writes both `contact.json` and updates the active profile file
+- `saving` — spinner; calls `mergeContactMeta(fields, profileDir)` which updates the active profile file and writes **global** contact config (`contact.json` under the suited XDG config directory)
 - `saved` — "Last saved: …" badge; back to `form`
 - `error` — inline error; retry / back
 
-**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and writes `contact.json`. Does **not** call inquirer. Lives in `src/services/contact.ts`.
+**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and persists the same plain-string fields to **global** contact metadata (XDG config path, not under `profileDir`). Does **not** call inquirer. Lives in `src/services/contact.ts`.
 
 **Save:** `s` saves all fields at once (browse mode). **`App`** defers global **`s`→Settings** on Contact content focus so **`s`** is not stolen. Enter on a field saves that field and advances focus. Do not rely on blur.
 

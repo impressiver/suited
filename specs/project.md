@@ -72,7 +72,7 @@ If validation fails, the pipeline MUST NOT emit a PDF for that run until the inc
 
 The tool MUST support `--profile-dir` so multiple profiles can coexist. Within a profile, artifacts include (non-exhaustive):
 
-- Global refined profile (`refined.md` / `refined.json`) — editable by the user.
+- Global refined profile (`refined.md` / `refined.json`) — editable by the user. **Planned:** durable **refinement history** under a **separate** top-level directory (e.g. **`refined-history/`**, not under `refinements/`) and **revert** to older refined states without relying on Git — see [`refinement-history.md`](./refinement-history.md).
 - Per-job curated copies under `jobs/{job-slug}/` — editable; subsequent runs SHOULD detect changes and offer reload vs re-curation as implemented in commands.
 - Per-job refinement JSON under `refinements/{jobId}.json` — stores the curation plan plus optional **`pinnedRender`**: the last successful **layout squeeze** tier (and resolved template / flair metadata) so the next generate for the same job, with the same flair and template override, can reuse the same CSS fit-override path for repeatable PDF layout. Re-prepare / re-curate SHOULD preserve `pinnedRender` until a successful export overwrites it. When the user **clears job-scoped curated content** (e.g. Curate **Clear and start over**), implementation SHOULD **clear or invalidate `pinnedRender`** for that `jobId` so the next export does not reuse a squeeze tier tied to discarded layout length; the next successful PDF export may write a fresh `pinnedRender`.
 
@@ -110,6 +110,7 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 | [`AGENTS.md`](./AGENTS.md) | Agent/human routing: streams, deps, PR discipline |
 | [`tui-README.md`](./tui-README.md) | TUI index (screens, testing, non-TTY, phasing) |
 | [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phase A/B/C + post–C polish |
+| [`refinement-history.md`](./refinement-history.md) | **Planned:** snapshots + restore for global refined profile |
 
 ---
 

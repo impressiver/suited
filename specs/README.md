@@ -18,6 +18,12 @@ User guide and module layout: [`README.md`](../README.md), [`docs/ARCHITECTURE.m
 | [`project.md`](./project.md) | Pipeline, accuracy, profile layout, TUI (default) vs CLI subcommands |
 | [`tui.md`](./tui.md) | Short bookmark → [`tui-README.md`](./tui-README.md) |
 
+### Pipeline / persistence (planned extensions)
+
+| File | Role |
+|------|------|
+| [`refinement-history.md`](./refinement-history.md) | **Planned:** durable snapshots + revert for global **`refined.json`** / **`refined.md`** |
+
 ---
 
 ## TUI specs (`tui-*.md`)

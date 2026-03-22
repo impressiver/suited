@@ -36,7 +36,7 @@ Every screen documents: what loads on mount, the full state machine (every state
 
 **Current TUI — `first-refine-menu`:** **Run Q&A from source (first refinement pass)** | **Edit profile sections (manual — source.json)** → sets `SET_PROFILE_EDITOR_RETURN_TO('refine')` and navigates to `ProfileEditorScreen`.
 
-**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **Professional consultant review (hiring manager, whole profile)**, **Edit profile sections (manual)** → same navigation to `ProfileEditorScreen` (return **Esc** at section root returns to Refine when launched from here), **Direct edit**. No duplicate “open Jobs” / “stay” rows — use the **sidebar** for navigation.
+**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **AI sniff pass** (reduce AI-looking phrasing on summary + experience + skills), **Professional consultant review (hiring manager, whole profile)**, **Edit profile sections (manual)** → same navigation to `ProfileEditorScreen` (return **Esc** at section root returns to Refine when launched from here), **Direct edit**. No duplicate “open Jobs” / “stay” rows — use the **sidebar** for navigation.
 
 **Esc while a text field owns stdin:** **Q&A** answer draft and **Direct edit** input handle **Esc** locally (exit to the refine hub / cancel edit) even when `inTextInput` is true, so users are not stuck behind the global “suppress nav while typing” rule.
 
@@ -50,7 +50,7 @@ no refined.json yet:
 
 not-refined (after choosing Q&A from first-refine-menu):
   → generating-questions      (spinner; generateRefinementQuestions)
-  → qa-phase                  (TextInput per question)
+  → qa-phase                  (`SelectList` of all questions + current detail + `TextInput`; **Shift+Tab** toggles focus between list and answer field; **↑↓** move selection when the list is focused; **Enter** on the list focuses the answer field; **Enter** in the field advances / runs apply on the last question; answers persist when changing index)
   → generating-refinements    (spinner; applyRefinements)
   → diff-review               (DiffView; accept / edit proposed summary / discard)
   → saving                    (spinner; saveRefined)
@@ -60,7 +60,8 @@ already-refined:
   → sub-menu (SelectList):
       Run Q&A from source
       Polish sections (AI)     → polish-pick → polish-run → diff-review (keep-session) → saving
-      Professional consultant  → consultant-run → consultant-view → consultant-apply → diff-review or done
+      AI sniff pass            → ai-sniff-run → diff-review (keep-session, reason `ai-sniff`) → saving
+      Professional consultant  → consultant-run → consultant-view → (apply all | choose suggestions) → optional follow-up Q&A per finding → consultant-apply → diff-review or done
       Edit profile sections    → navigate to ProfileEditorScreen (return via Esc at section root)
       Direct edit              → MultilineInput → direct-edit-run → diff-review (keep-session)
 ```
@@ -72,6 +73,10 @@ already-refined:
 **Direct edit sub-flow:** `MultilineInput` → on submit, calls `applyDirectEdit(profile, instructions)` via `callWithToolStreaming` → shows streaming output → transitions to `diff-review` with the resulting changes.
 
 **Polish sub-flow:** `polish-section-select` renders a `CheckboxList` of sections (Experience, Skills, etc.) and optionally a `SelectList` of positions to narrow scope. Only after the user confirms does the screen call `polishProfile(profile, { sections, positionIds })`. This mirrors the existing CLI's interactive section/position prompts — the TUI replaces those prompts with the CheckboxList step.
+
+**AI sniff sub-flow:** One-shot from the already-refined menu: `sniffReduceAiTellsProfile` (`AI_SNIFF_REDUCE_SYSTEM` + same refinements tool as polish) scans summary, all experience bullets, and skills when present. No section picker. Goal: fewer patterns that read as generic or machine-written, without adding facts. Same **diff-review** / **keep-session** path as polish; snapshot **`reason`:** `ai-sniff`.
+
+**Consultant sub-flow:** After **consultant-view**, the user chooses **Apply all suggestions** or **Choose which suggestions to apply** (`CheckboxList`, same interaction as Generate section pick: Space · Enter). The screen then runs the same **follow-up question** step as the CLI (`fetchConsultantFeedbackQuestions` / `mergeConsultantFindingAnswers`): model-posed questions are answered one at a time with `TextInput` (blank allowed); then **`applyConsultantFindingsToProfile`** and **diff-review** as before. **Esc** from pick or follow-ups returns to **consultant-view** without losing the evaluation; **Esc** from **consultant-view** still returns to the refined hub and clears staged consultant state.
 
 **Prepare sub-flow:** Handled on **JobsScreen** (not Refine): saved job → Prepare → curation summary, etc.
 

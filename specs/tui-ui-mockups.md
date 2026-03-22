@@ -79,16 +79,19 @@ ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional c
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ Suited  ·  Jane Smith  ·  refining…                                         │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
-│   2 Import    │  Refine profile                     Question 3 of 12        │
-│ ► 3 Refine    │  ────────────────────────────────────────────────────────    │
-│   4 Generate  │  Did you lead the migration from monolith to services?      │
-│   …           │                                                              │
-│               │  Your answer                                                 │
-│               │  [ Yes, I owned the roadmap and cutover…_________________ ] │
-│               │                                                              │
-│               │  Enter: submit  ·  skip (leave blank + Enter)               │
+│   2 Import    │  Refine — Q&A from source                   12 questions      │
+│ ► 3 Refine    │  Questions (Shift+Tab)                                       │
+│   4 Generate  │    1. …first gap… (answered)                                 │
+│   …           │    2. …second…                                               │
+│               │  › 3. Did you lead the migration from monolith…              │
+│               │    4. …                                                        │
+│               │  Question 3                                                    │
+│               │  Senior Engineer at Acme (2020–2022)                         │
+│               │  Did you lead the migration from monolith to services?       │
+│               │  [ Yes, I owned the roadmap and cutover…_________________ ]  │
+│               │  Shift+Tab: list / answer · Enter: next or apply last        │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
-│ Input mode: q does NOT quit  ·  Esc: blur / skip question                   │
+│ Input mode: q does NOT quit  ·  Esc: exit Q&A to refine menu                │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

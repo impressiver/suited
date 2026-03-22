@@ -88,7 +88,7 @@ function buildTrimPrompt(doc: ResumeDocument, overflowPct: number): string {
   lines.push('## Experience (positions indexed from 0, newest first)');
   doc.positions.forEach((pos, i) => {
     lines.push(
-      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} - ${pos.endDate ?? 'Present'})`,
     );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');

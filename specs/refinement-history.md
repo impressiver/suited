@@ -53,7 +53,7 @@ Implementations SHOULD keep machine-readable snapshots **under the profile direc
 - Each snapshot **MUST** include enough data to restore **one** consistent prior state:
   - **`RefinedData`** as a whole (**`profile` + `session`**) — restore **MUST** write both so `sourceHash`, Q&A metadata, and profile bullets stay internally consistent.
   - **`savedAt`** (ISO 8601).
-  - **`reason`** / **label** (enum or short string: e.g. `qa-save`, `polish`, `consultant`, `direct-edit`, `profile-editor`, `md-sync`, `improve`, `contact-merge`, `generate-md-sync`, `manual-restore`).
+  - **`reason`** / **label** (enum or short string: e.g. `qa-save`, `polish`, `ai-sniff`, `consultant`, `direct-edit`, `profile-editor`, `md-sync`, `improve`, `contact-merge`, `generate-md-sync`, `manual-restore`).
 - Snapshot envelopes **SHOULD** include a **`schemaVersion`** (or reuse the profile JSON version field if one exists) so future migrations can read old snapshots.
 
 **Stable user-facing id:** Each snapshot **MUST** expose an **`id`** that is **stable until pruned**, **unique** within the profile dir’s history store, and **accepted by** `restore` / TUI selection (e.g. monotonic integer, ULID, or filename stem — document in CLI `--help` and TUI copy affordances).

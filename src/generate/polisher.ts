@@ -73,7 +73,7 @@ function buildPolishPrompt(doc: ResumeDocument, jobAnalysis: JobAnalysis): strin
   lines.push('## Experience (positions indexed from 0)');
   doc.positions.forEach((pos, i) => {
     lines.push(
-      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} - ${pos.endDate ?? 'Present'})`,
     );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');
@@ -151,7 +151,7 @@ function buildTweakPrompt(doc: ResumeDocument, instruction: string): string {
   lines.push('## Experience (positions indexed from 0)');
   doc.positions.forEach((pos, i) => {
     lines.push(
-      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} - ${pos.endDate ?? 'Present'})`,
     );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');

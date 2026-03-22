@@ -15,7 +15,7 @@ export function profileToRefineText(profile: Profile): string {
   for (const pos of profile.positions) {
     const end = pos.endDate?.value ?? 'Present';
     lines.push(
-      `\n### ${pos.id}: ${pos.title.value} at ${pos.company.value} (${pos.startDate.value} – ${end})`,
+      `\n### ${pos.id}: ${pos.title.value} at ${pos.company.value} (${pos.startDate.value} - ${end})`,
     );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');
@@ -33,7 +33,7 @@ export function profileToRefineText(profile: Profile): string {
     lines.push('\n## Education');
     for (const edu of profile.education) {
       const deg = [edu.degree?.value, edu.fieldOfStudy?.value].filter(Boolean).join(' in ');
-      lines.push(`  ${edu.institution.value}${deg ? ` — ${deg}` : ''}`);
+      lines.push(`  ${edu.institution.value}${deg ? ` - ${deg}` : ''}`);
     }
   }
 
@@ -41,12 +41,12 @@ export function profileToRefineText(profile: Profile): string {
 }
 
 // ---------------------------------------------------------------------------
-// Shared writing rules — appended to every content-generating prompt
+// Shared writing rules: appended to every content-generating prompt
 // ---------------------------------------------------------------------------
 
 export const WRITING_RULES = `
-Writing rules — follow these without exception:
-- No em dashes (—) or en dashes used as separators. Use a comma, period, or rewrite the sentence.
+Writing rules (follow without exception):
+- No Unicode em dash (U+2014) or en dash (U+2013) used as phrase separators. Use a hyphen-minus (-), comma, period, or rewrite the sentence.
 - No filler openers: do not start bullets with "Successfully", "Effectively", "Proactively", "Leveraged", "Utilized", or "Facilitated".
 - No AI clichés: avoid "leverage" (as a verb), "utilize", "streamline", "robust", "scalable", "cutting-edge", "innovative", "dynamic", "synergy", "paradigm shift", "game-changer", "delve", "harness", "foster", "spearhead".
 - No throat-clearing phrases: "In order to", "It is worth noting that", "It is important to", "As a result of".
@@ -196,6 +196,25 @@ Rules:
 - For skills: clean up LinkedIn-imported skills for resume use. Rename verbose technical terms to clean, recognizable equivalents (e.g. "Amazon Web Services (AWS)" → "AWS", "Node.js" stays "Node.js"). Consolidate overlapping entries. Drop low-value or redundant ones. Use replacedSkills to provide the full updated list.
 - Only include positionRefinements for positions where you actually changed at least one bullet.
 - If a section was not selected for improvement, omit it entirely from the output.
+${WRITING_RULES}`;
+
+// ---------------------------------------------------------------------------
+// AI "sniff test" — reduce patterns that read as machine-generated (refine pass)
+// ---------------------------------------------------------------------------
+
+export const AI_SNIFF_REDUCE_SYSTEM = `You are a resume line editor. Recruiters and automated screening tools often flag text that reads as generic or AI-generated: identical rhythm across bullets, perfectly parallel structure in every line, stock corporate phrasing, vague "impact" without texture, or a tone that is uniformly polished with no natural variation.
+
+Your job: minimally rewrite ONLY the selected sections so the voice sounds more human and less templated, while staying completely truthful.
+
+Rules:
+- Never invent facts, metrics, technologies, products, dates, team sizes, or outcomes. Everything must remain grounded in the original text.
+- Preserve every number and named entity. Do not add new metrics or claims.
+- Vary bullet openings where the original feels mechanically repetitive (do not force variety where bullets are already distinct).
+- Prefer plain, direct wording over buzzwords and abstract nouns. Remove phrases that scan as generic LLM output.
+- If a bullet or the summary already reads natural and specific, leave it exactly unchanged and omit it from the tool output.
+- For skills: use replacedSkills only when cleanup clearly improves the list; if skills are fine, omit replacedSkills entirely.
+- Only include positionRefinements for positions where you changed at least one bullet.
+- If nothing needs changing, return an empty positionRefinements array and omit improvedSummary and replacedSkills.
 ${WRITING_RULES}`;
 
 // ---------------------------------------------------------------------------

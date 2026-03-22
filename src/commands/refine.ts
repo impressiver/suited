@@ -35,12 +35,14 @@ import {
   sourceJsonPath,
 } from '../profile/serializer.ts';
 import {
+  aiSniffSectionsForProfile,
   applyDirectEdit,
   applyRefinements,
   applyRefinementsFromTool,
   generateRefinementQuestions,
   polishProfile,
   type RefinementsOutput,
+  sniffReduceAiTellsProfile,
 } from '../services/refine.ts';
 import { c } from '../utils/colors.ts';
 import { fileExists } from '../utils/fs.ts';
@@ -466,6 +468,36 @@ async function applyExpertPolish(
 }
 
 // ---------------------------------------------------------------------------
+// AI sniff pass — reduce phrasing that scans as generic or AI-generated
+// ---------------------------------------------------------------------------
+
+async function applyAiSniffReduce(
+  profile: Profile,
+  session: RefinementSession,
+  profileDir: string,
+): Promise<void> {
+  if (aiSniffSectionsForProfile(profile).length === 0) {
+    console.log(c.muted('Nothing to scan: add a summary, experience, or skills first.'));
+    return;
+  }
+
+  console.log(c.muted('\nRunning AI sniff pass on summary, experience, and skills...'));
+
+  let proposedProfile: Profile | undefined;
+  for await (const ev of sniffReduceAiTellsProfile(profile)) {
+    if (ev.type === 'done') proposedProfile = ev.result;
+  }
+  if (!proposedProfile) return;
+  const finalProfile = await reviewRefinements(profile, proposedProfile);
+
+  if (finalProfile === profile) return;
+
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'ai-sniff' });
+  console.log(`\n${c.ok} ${c.success('AI sniff pass saved')}`);
+  console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
+}
+
+// ---------------------------------------------------------------------------
 // Hiring consultant profile review
 // ---------------------------------------------------------------------------
 
@@ -736,6 +768,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
           message: 'What would you like to do?',
           choices: [
             { value: 'consultant', name: 'Consultant review — get professional feedback' },
+            { value: 'sniff', name: 'AI sniff pass — reduce AI-looking phrasing' },
             { value: 'polish', name: 'Expert polish — improve writing quality' },
             { value: 'prompt', name: 'Prompt — tell Claude what to change' },
             { value: 'edit', name: 'Edit refined.md manually' },
@@ -754,6 +787,11 @@ export async function runRefine(options: RefineOptions): Promise<void> {
 
       if (action === 'consultant') {
         await runConsultantReview(existing.profile, existing.session, profileDir);
+        return;
+      }
+
+      if (action === 'sniff') {
+        await applyAiSniffReduce(existing.profile, existing.session, profileDir);
         return;
       }
 
@@ -875,6 +913,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       choices: [
         { value: 'done', name: 'Done' },
         { value: 'polish', name: 'Expert polish — have a pro improve the writing' },
+        { value: 'sniff', name: 'AI sniff pass — reduce AI-looking phrasing' },
         { value: 'prompt', name: 'Prompt — make a targeted change' },
         { value: 'consultant', name: 'Consultant review again' },
         { value: 'jobs', name: 'Job refinements — manage per-job curation plans' },
@@ -885,6 +924,9 @@ export async function runRefine(options: RefineOptions): Promise<void> {
   if (followUp === 'polish') {
     const saved = await loadRefined(profileDir);
     await applyExpertPolish(saved.profile, saved.session, profileDir);
+  } else if (followUp === 'sniff') {
+    const saved = await loadRefined(profileDir);
+    await applyAiSniffReduce(saved.profile, saved.session, profileDir);
   } else if (followUp === 'prompt') {
     const saved = await loadRefined(profileDir);
     await applyDirectPrompt(saved.profile, saved.session, profileDir);

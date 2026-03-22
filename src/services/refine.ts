@@ -5,6 +5,7 @@ import {
   type ConsultantFinding,
 } from '../claude/prompts/consultant.ts';
 import {
+  AI_SNIFF_REDUCE_SYSTEM,
   buildQAContext,
   DIRECT_EDIT_SYSTEM,
   EXPERT_POLISH_SYSTEM,
@@ -15,6 +16,7 @@ import {
   refinementsToolSchema,
 } from '../claude/prompts/refine.ts';
 import type { Profile, RefinementQuestion } from '../profile/schema.ts';
+import { sanitizeConsultantFindings } from '../utils/noEmDash.ts';
 
 // ---------------------------------------------------------------------------
 // Tool payloads (same shapes as `commands/refine.ts`)
@@ -299,6 +301,48 @@ export async function* polishProfile(
   yield { type: 'done', result: applyRefinementsFromTool(profile, last) };
 }
 
+/** Sections to scan for AI-like phrasing (summary, experience, skills when present). */
+export function aiSniffSectionsForProfile(profile: Profile): string[] {
+  const sections: string[] = [];
+  if (profile.summary?.value?.trim()) sections.push('summary');
+  if (profile.positions.length > 0) sections.push('experience');
+  if (profile.skills.length > 0) sections.push('skills');
+  return sections;
+}
+
+/**
+ * Refinement pass focused on reducing text that scans as generic or AI-generated.
+ * Reuses the refinements tool; scope is summary + all experience + skills when present.
+ */
+export async function* sniffReduceAiTellsProfile(
+  profile: Profile,
+  signal?: AbortSignal,
+): AsyncGenerator<RefineStreamYield> {
+  const sections = aiSniffSectionsForProfile(profile);
+  if (sections.length === 0) {
+    yield { type: 'done', result: profile };
+    return;
+  }
+  const instruction = buildPolishInstruction(profile, { sections });
+  const gen = callWithToolStreaming<RefinementsOutput>(
+    AI_SNIFF_REDUCE_SYSTEM,
+    instruction,
+    refinementsToolSchema,
+    undefined,
+    signal,
+  );
+  let last: RefinementsOutput | undefined;
+  for await (const ev of gen) {
+    if (ev.type === 'done') {
+      last = ev.result;
+    } else {
+      yield ev;
+    }
+  }
+  if (!last) throw new Error('sniffReduceAiTellsProfile: no result from model');
+  yield { type: 'done', result: applyRefinementsFromTool(profile, last) };
+}
+
 export async function* applyDirectEdit(
   profile: Profile,
   instructions: string,
@@ -336,9 +380,10 @@ export async function applyConsultantFindingsToProfile(
   signal?: AbortSignal,
 ): Promise<Profile> {
   const profileText = profileToRefineText(profile);
+  const cleanFindings = sanitizeConsultantFindings(findings);
   const rawRefinements = await callWithTool<RefinementsOutput>(
     APPLY_PROFILE_FEEDBACK_SYSTEM,
-    buildProfileFeedbackPrompt(profileText, findings),
+    buildProfileFeedbackPrompt(profileText, cleanFindings),
     refinementsToolSchema,
     undefined,
     signal,

@@ -11,13 +11,18 @@ export interface ConsultantFinding {
   suggestion: string; // concrete fix
 }
 
+/** Appended to consultant system prompts so tool output avoids U+2014 (enforced in UI/render too). */
+export const CONSULTANT_NO_EM_DASH_OUTPUT = `
+
+Never use the Unicode em dash (U+2014) or em-dash HTML entities (&mdash;, &#8212;, &#x2014;) in any string you return. Use a hyphen-minus (-), comma, or period instead.`;
+
 // ---------------------------------------------------------------------------
 // Profile evaluation
 // ---------------------------------------------------------------------------
 
 export const PROFILE_CONSULTANT_SYSTEM = `You are a senior hiring consultant with 20 years of experience reviewing resumes for competitive roles at top companies. You have seen thousands of resumes and know exactly what makes candidates stand out or get screened out.
 
-Your job: give honest, specific, actionable feedback. Be direct — flag real problems. Don't inflate scores or give empty praise. Only highlight strengths that are genuinely strong.
+Your job: give honest, specific, actionable feedback. Be direct: flag real problems. Don't inflate scores or give empty praise. Only highlight strengths that are genuinely strong.
 
 Focus areas:
 - Impact and quantification in experience bullets
@@ -26,7 +31,7 @@ Focus areas:
 - Career narrative and progression
 - Overall first impression for a recruiter who spends 10 seconds scanning
 
-Do NOT comment on formatting, fonts, or visual design — only content.`;
+Do NOT comment on formatting, fonts, or visual design; only content.${CONSULTANT_NO_EM_DASH_OUTPUT}`;
 
 export interface ProfileEvaluation {
   overallScore: number;
@@ -51,7 +56,7 @@ export const profileEvalTool: Tool = {
         type: 'array',
         items: { type: 'string' },
         description:
-          'Specific things that are working well. Be concrete — not just "good experience".',
+          'Specific things that are working well. Be concrete, not just "good experience".',
       },
       improvements: {
         type: 'array',
@@ -63,7 +68,7 @@ export const profileEvalTool: Tool = {
               type: 'string',
               description: 'Section or element (e.g. "Summary", "Bullet #3 at Acme Corp")',
             },
-            issue: { type: 'string', description: 'Specific problem — what is weak or missing' },
+            issue: { type: 'string', description: 'Specific problem: what is weak or missing' },
             suggestion: { type: 'string', description: 'Concrete actionable fix' },
           },
         },
@@ -85,7 +90,7 @@ export const JOB_CONSULTANT_SYSTEM = `You are a hiring manager and senior resume
 
 Your job: assess how well the resume is positioned for this specific role. Be specific. Identify real gaps between what the role requires and what the resume shows. Flag missing keywords, weak positioning, or missed opportunities to highlight relevant experience.
 
-Do NOT comment on formatting or visual design — only content alignment with the job.`;
+Do NOT comment on formatting or visual design; only content alignment with the job.${CONSULTANT_NO_EM_DASH_OUTPUT}`;
 
 export interface JobEvaluation {
   alignmentScore: number;
@@ -137,21 +142,21 @@ export const jobEvalTool: Tool = {
 };
 
 // ---------------------------------------------------------------------------
-// Question generation — determine what info is needed before applying feedback
+// Question generation: determine what info is needed before applying feedback
 // ---------------------------------------------------------------------------
 
 export const FEEDBACK_QUESTIONS_SYSTEM = `You are a resume assistant helping a candidate incorporate consultant feedback into their resume.
 
 Your job: given a list of consultant findings the candidate wants to apply, determine which ones require additional factual information from the candidate that isn't already present in the profile.
 
-Only generate a question when implementing the suggestion genuinely requires a specific fact the candidate must supply — such as a metric, outcome, team size, timeframe, technology name, dollar amount, or concrete result.
+Only generate a question when implementing the suggestion genuinely requires a specific fact the candidate must supply, such as a metric, outcome, team size, timeframe, technology name, dollar amount, or concrete result.
 
 Do NOT generate questions for findings that:
 - Can be addressed using only the information already in the profile
 - Are structural or stylistic changes (reordering, rephrasing, removing content)
 - Ask for something the profile already contains
 
-Be precise: ask for the specific fact needed, not a vague "more details."`;
+Be precise: ask for the specific fact needed, not a vague "more details."${CONSULTANT_NO_EM_DASH_OUTPUT}`;
 
 export interface FeedbackQuestion {
   findingIndex: number; // 0-based index into the findings array
@@ -182,7 +187,7 @@ export const feedbackQuestionsTool: Tool = {
             },
             question: {
               type: 'string',
-              description: 'Specific question to ask the candidate — what fact is needed',
+              description: 'Specific question to ask the candidate: what fact is needed',
             },
           },
         },
@@ -216,7 +221,7 @@ export const APPLY_PROFILE_FEEDBACK_SYSTEM = `You are a resume writer applying s
 
 Apply ONLY the changes described in the consultant's findings below. Do not make other changes.
 Do not add any fact, metric, or technology not already present in the original profile.
-Match the candidate's voice — write how a person writes, not a press release.`;
+Match the candidate's voice: write how a person writes, not a press release.${CONSULTANT_NO_EM_DASH_OUTPUT}`;
 
 export function buildProfileFeedbackPrompt(
   profileText: string,
@@ -240,7 +245,7 @@ export const APPLY_JOB_FEEDBACK_SYSTEM = `You are a resume writer applying targe
 
 Apply ONLY the changes described in the consultant's gap findings. Do not make other changes.
 Do not add any fact, technology, or metric not already present in the resume.
-Match the candidate's existing voice and writing style.`;
+Match the candidate's existing voice and writing style.${CONSULTANT_NO_EM_DASH_OUTPUT}`;
 
 export interface JobFeedbackOutput {
   positions: Array<{ index: number; bullets: string[] }>;
@@ -341,7 +346,7 @@ export function resumeDocToConsultantText(doc: ResumeDocument, jobAnalysis: JobA
   if (doc.positions.length > 0) {
     lines.push('\n### Experience');
     for (const pos of doc.positions) {
-      const dates = [pos.startDate, pos.endDate || 'Present'].join(' – ');
+      const dates = [pos.startDate, pos.endDate || 'Present'].join(' - ');
       lines.push(`\n${pos.title} at ${pos.company}  (${dates})`);
       for (const b of pos.bullets) lines.push(`  • ${b}`);
     }
@@ -356,7 +361,7 @@ export function resumeDocToConsultantText(doc: ResumeDocument, jobAnalysis: JobA
     lines.push('\n### Education');
     for (const edu of doc.education) {
       const deg = [edu.degree, edu.fieldOfStudy].filter(Boolean).join(' in ');
-      lines.push(`  ${edu.institution}${deg ? ` — ${deg}` : ''}`);
+      lines.push(`  ${edu.institution}${deg ? ` - ${deg}` : ''}`);
     }
   }
 

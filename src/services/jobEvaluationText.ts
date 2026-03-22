@@ -3,7 +3,7 @@ import type { JobEvaluation, ProfileEvaluation } from '../claude/prompts/consult
 /** Plain lines for Ink `ScrollView` (general profile consultant output). */
 export function formatProfileEvaluationLines(ev: ProfileEvaluation): string[] {
   const lines: string[] = [];
-  lines.push(`Hiring consultant review — overall ${ev.overallScore}/10`);
+  lines.push(`Hiring consultant review (overall ${ev.overallScore}/10)`);
   lines.push('');
 
   if (ev.strengths.length > 0) {
@@ -31,7 +31,7 @@ export function formatProfileEvaluationLines(ev: ProfileEvaluation): string[] {
 /** Plain lines for Ink `ScrollView` (job-fit consultant output). */
 export function formatJobEvaluationLines(ev: JobEvaluation): string[] {
   const lines: string[] = [];
-  lines.push(`Job fit review — alignment ${ev.alignmentScore}/10`);
+  lines.push(`Job fit review (alignment ${ev.alignmentScore}/10)`);
   lines.push('');
 
   if (ev.strengths.length > 0) {

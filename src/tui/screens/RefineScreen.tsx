@@ -1,7 +1,16 @@
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ProfileEvaluation } from '../../claude/prompts/consultant.ts';
-import { evaluateProfile } from '../../generate/consultant.ts';
+import type {
+  ConsultantFinding,
+  FeedbackQuestion,
+  ProfileEvaluation,
+} from '../../claude/prompts/consultant.ts';
+import { profileToRefineText } from '../../claude/prompts/refine.ts';
+import {
+  evaluateProfile,
+  fetchConsultantFeedbackQuestions,
+  mergeConsultantFindingAnswers,
+} from '../../generate/consultant.ts';
 import { markdownToProfile } from '../../profile/markdown.ts';
 import type { RefinementHistoryListEntry } from '../../profile/refinementHistory.ts';
 import type {
@@ -28,6 +37,7 @@ import {
   computeRefinementDiff,
   generateRefinementQuestions,
   polishProfile,
+  sniffReduceAiTellsProfile,
 } from '../../services/refine.ts';
 import {
   listGlobalRefinementHistory,
@@ -35,6 +45,8 @@ import {
 } from '../../services/refinementHistory.ts';
 import { fileExists } from '../../utils/fs.ts';
 import {
+  type CheckboxItem,
+  CheckboxList,
   ConfirmPrompt,
   DiffView,
   MultilineInput,
@@ -65,6 +77,12 @@ function cloneProfile(p: Profile): Profile {
 function userEditSourced(value: string): Sourced<string> {
   const now = new Date().toISOString();
   return { value, source: { kind: 'user-edit', editedAt: now } };
+}
+
+function truncateForPanel(s: string, maxLen: number): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, Math.max(0, maxLen - 1))}…`;
 }
 
 type Phase =
@@ -98,6 +116,7 @@ type Phase =
     }
   | { k: 'polish-pick' }
   | { k: 'polish-run'; sections: string[] }
+  | { k: 'ai-sniff-run' }
   | { k: 'direct-edit-input' }
   | { k: 'direct-edit-run'; instructions: string }
   | { k: 'consultant-run' }
@@ -106,6 +125,14 @@ type Phase =
       evaluation: ProfileEvaluation;
       previewLines: string[];
       scroll: number;
+    }
+  | { k: 'consultant-pick' }
+  | { k: 'consultant-questions-run' }
+  | {
+      k: 'consultant-feedback-qa';
+      findings: ConsultantFinding[];
+      questions: FeedbackQuestion[];
+      index: number;
     }
   | { k: 'consultant-apply' }
   | { k: 'saving' }
@@ -119,6 +146,7 @@ type Phase =
         | 'save'
         | 'sync'
         | 'polish'
+        | 'ai-sniff'
         | 'direct-edit'
         | 'consultant';
     };
@@ -137,6 +165,8 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [questions, setQuestions] = useState<RefinementQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerDraft, setAnswerDraft] = useState('');
+  /** When true, ↑↓ moves the question list; Shift+Tab from answer field toggles this on. */
+  const [qaListFocus, setQaListFocus] = useState(false);
   const [menuIdx, setMenuIdx] = useState(0);
   const [diffSelectIdx, setDiffSelectIdx] = useState(0);
   const [summaryTweakDraft, setSummaryTweakDraft] = useState('');
@@ -156,6 +186,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   const [polishMenuIdx, setPolishMenuIdx] = useState(0);
   const [consultantMenuIdx, setConsultantMenuIdx] = useState(0);
   const consultantWorkRef = useRef<{ base: Profile; evaluation: ProfileEvaluation } | null>(null);
+  const consultantPendingFindingsRef = useRef<ConsultantFinding[] | null>(null);
+  /** Last findings passed into enrich flow (subset or all); used for error retry after fetch fails. */
+  const consultantEnrichFindingsRef = useRef<ConsultantFinding[] | null>(null);
+  const consultantFbAnswersRef = useRef(new Map<number, string>());
+  const [consultantFbDraft, setConsultantFbDraft] = useState('');
+  const [consultantCheckboxItems, setConsultantCheckboxItems] = useState<
+    Array<CheckboxItem<string>>
+  >([]);
+  const [consultantPickFocusIdx, setConsultantPickFocusIdx] = useState(0);
   const [cols, rows] = useTerminalSize();
   const panelW = panelInnerWidth(cols);
   const textW = panelFramedTextWidth(cols);
@@ -181,6 +220,22 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     })();
   }, [profileDir]);
 
+  const restoreConsultantView = useCallback(() => {
+    const w = consultantWorkRef.current;
+    if (!w) {
+      void goBackToRefineHub();
+      return;
+    }
+    setConsultantMenuIdx(0);
+    setConsultantFbDraft('');
+    setPhase({
+      k: 'consultant-view',
+      evaluation: w.evaluation,
+      previewLines: formatProfileEvaluationLines(w.evaluation),
+      scroll: 0,
+    });
+  }, [goBackToRefineHub]);
+
   const openManualSections = useCallback(() => {
     dispatch({ type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: 'refine' });
     navigate('profile');
@@ -192,6 +247,9 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     }
     if (phase.k === 'refinement-history-list') {
       setHistoryMenuIdx(0);
+    }
+    if (phase.k !== 'qa') {
+      setQaListFocus(false);
     }
   }, [phase.k]);
 
@@ -226,9 +284,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       if (inTextInput) {
         return;
       }
+      if (key.escape && phase.k === 'consultant-pick') {
+        restoreConsultantView();
+        return;
+      }
       if (key.escape && (phase.k === 'polish-pick' || phase.k === 'consultant-view')) {
         if (phase.k === 'consultant-view') {
           consultantWorkRef.current = null;
+          consultantPendingFindingsRef.current = null;
+          consultantEnrichFindingsRef.current = null;
         }
         goBackToRefineHub();
       }
@@ -238,7 +302,8 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         active &&
         (phase.k === 'polish-pick' ||
           phase.k === 'direct-edit-input' ||
-          phase.k === 'consultant-view'),
+          phase.k === 'consultant-view' ||
+          phase.k === 'consultant-pick'),
     },
   );
 
@@ -248,9 +313,37 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         return;
       }
       setAnswerDraft('');
+      setQaListFocus(false);
       goBackToRefineHub();
     },
     { isActive: active && phase.k === 'qa' },
+  );
+
+  useInput(
+    (_input, key) => {
+      if (!active || phase.k !== 'qa') {
+        return;
+      }
+      if (key.shift && key.tab) {
+        if (qaListFocus) {
+          setQaListFocus(false);
+        } else {
+          setQaListFocus(true);
+        }
+      }
+    },
+    { isActive: active && phase.k === 'qa' },
+  );
+
+  useInput(
+    (_input, key) => {
+      if (!active || phase.k !== 'consultant-feedback-qa' || !key.escape) {
+        return;
+      }
+      setConsultantFbDraft('');
+      restoreConsultantView();
+    },
+    { isActive: active && phase.k === 'consultant-feedback-qa' },
   );
 
   useInput(
@@ -321,6 +414,8 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
         setApiFailureStreak(0);
         consultantWorkRef.current = null;
+        consultantPendingFindingsRef.current = null;
+        consultantEnrichFindingsRef.current = null;
         setPhase({
           k: 'done',
           note: 'Updated refined.json / refined.md (Q&A session unchanged).',
@@ -423,6 +518,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       }
       setAnswers({});
       setAnswerDraft('');
+      setQaListFocus(false);
       setApiFailureStreak(0);
       setPhase({ k: 'qa', questions: qs, index: 0 });
     } catch (e) {
@@ -465,39 +561,44 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     })();
   }, [profileDir]);
 
-  const runApply = useCallback(async () => {
-    if (!source) {
-      return;
-    }
-    const ac = createController();
-    setPhase({ k: 'apply' });
-    dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
-    try {
-      const proposed = await applyRefinements(source, questions, answers, ac.signal);
-      const blocks = computeRefinementDiff(source, proposed);
-      if (blocks.length === 0) {
-        await persistRefined(proposed, questions, answers);
+  const runApply = useCallback(
+    async (answersSnapshot?: Record<string, string>) => {
+      if (!source) {
         return;
       }
-      setApiFailureStreak(0);
-      setPhase({ k: 'diff', original: source, proposed, diffSaveMode: 'qa' });
-    } catch (e) {
-      if (isUserAbort(e)) {
-        setPhase({ k: 'qa', questions, index: Math.max(0, questions.length - 1) });
-        return;
+      const ans = answersSnapshot ?? answers;
+      const ac = createController();
+      setPhase({ k: 'apply' });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const proposed = await applyRefinements(source, questions, ans, ac.signal);
+        const blocks = computeRefinementDiff(source, proposed);
+        if (blocks.length === 0) {
+          await persistRefined(proposed, questions, ans);
+          return;
+        }
+        setApiFailureStreak(0);
+        setPhase({ k: 'diff', original: source, proposed, diffSaveMode: 'qa' });
+      } catch (e) {
+        if (isUserAbort(e)) {
+          setQaListFocus(false);
+          setPhase({ k: 'qa', questions, index: Math.max(0, questions.length - 1) });
+          return;
+        }
+        setApiFailureStreak((n) => n + 1);
+        setErrMenuIdx(0);
+        setPhase({
+          k: 'err',
+          msg: (e as Error).message,
+          retryKind: 'apply',
+        });
+      } finally {
+        releaseController(ac);
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
-      setApiFailureStreak((n) => n + 1);
-      setErrMenuIdx(0);
-      setPhase({
-        k: 'err',
-        msg: (e as Error).message,
-        retryKind: 'apply',
-      });
-    } finally {
-      releaseController(ac);
-      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
-    }
-  }, [answers, createController, dispatch, persistRefined, questions, releaseController, source]);
+    },
+    [answers, createController, dispatch, persistRefined, questions, releaseController, source],
+  );
 
   const runPolish = useCallback(
     async (sections: string[]) => {
@@ -553,6 +654,57 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       releaseController,
     ],
   );
+
+  const runAiSniff = useCallback(async () => {
+    const ac = createController();
+    setPhase({ k: 'ai-sniff-run' });
+    dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+    try {
+      const existing = await loadRefined(profileDir);
+      const base = cloneProfile(existing.profile);
+      let proposed = base;
+      for await (const ev of sniffReduceAiTellsProfile(base, ac.signal)) {
+        if (ev.type === 'done') {
+          proposed = ev.result;
+        }
+      }
+      const blocks = computeRefinementDiff(base, proposed);
+      setApiFailureStreak(0);
+      if (blocks.length === 0) {
+        await persistRefinedKeepSession(proposed, 'ai-sniff');
+        return;
+      }
+      setPhase({
+        k: 'diff',
+        original: base,
+        proposed,
+        diffSaveMode: 'keep-session',
+        keepSessionReason: 'ai-sniff',
+      });
+    } catch (e) {
+      if (isUserAbort(e)) {
+        goBackToRefineHub();
+        return;
+      }
+      setApiFailureStreak((n) => n + 1);
+      setErrMenuIdx(0);
+      setPhase({
+        k: 'err',
+        msg: (e as Error).message,
+        retryKind: 'ai-sniff',
+      });
+    } finally {
+      releaseController(ac);
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+    }
+  }, [
+    createController,
+    dispatch,
+    goBackToRefineHub,
+    persistRefinedKeepSession,
+    profileDir,
+    releaseController,
+  ]);
 
   const runDirectEdit = useCallback(
     async (instructions: string) => {
@@ -611,6 +763,8 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
 
   const runConsultantReview = useCallback(async () => {
     consultantWorkRef.current = null;
+    consultantPendingFindingsRef.current = null;
+    consultantEnrichFindingsRef.current = null;
     const ac = createController();
     setPhase({ k: 'consultant-run' });
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
@@ -646,60 +800,111 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     }
   }, [createController, dispatch, goBackToRefineHub, profileDir, releaseController]);
 
-  const runConsultantApply = useCallback(async () => {
-    const work = consultantWorkRef.current;
-    if (!work) {
-      return;
-    }
-    const { base, evaluation } = work;
-    if (evaluation.improvements.length === 0) {
-      return;
-    }
-    const ac = createController();
-    setPhase({ k: 'consultant-apply' });
-    dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
-    try {
-      const proposed = await applyConsultantFindingsToProfile(
-        base,
-        evaluation.improvements,
-        ac.signal,
-      );
-      const blocks = computeRefinementDiff(base, proposed);
-      setApiFailureStreak(0);
-      if (blocks.length === 0) {
-        await persistRefinedKeepSession(proposed, 'consultant');
+  const runConsultantApplyWithFindings = useCallback(
+    async (findings: ConsultantFinding[]) => {
+      const work = consultantWorkRef.current;
+      if (!work || findings.length === 0) {
         return;
       }
-      setPhase({
-        k: 'diff',
-        original: base,
-        proposed,
-        diffSaveMode: 'keep-session',
-        keepSessionReason: 'consultant',
-      });
-    } catch (e) {
-      if (isUserAbort(e)) {
-        setConsultantMenuIdx(0);
+      const { base, evaluation } = work;
+      consultantPendingFindingsRef.current = findings;
+      const ac = createController();
+      setPhase({ k: 'consultant-apply' });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const proposed = await applyConsultantFindingsToProfile(base, findings, ac.signal);
+        const blocks = computeRefinementDiff(base, proposed);
+        setApiFailureStreak(0);
+        if (blocks.length === 0) {
+          consultantPendingFindingsRef.current = null;
+          await persistRefinedKeepSession(proposed, 'consultant');
+          return;
+        }
         setPhase({
-          k: 'consultant-view',
-          evaluation,
-          previewLines: formatProfileEvaluationLines(evaluation),
-          scroll: 0,
+          k: 'diff',
+          original: base,
+          proposed,
+          diffSaveMode: 'keep-session',
+          keepSessionReason: 'consultant',
         });
+      } catch (e) {
+        if (isUserAbort(e)) {
+          setConsultantMenuIdx(0);
+          setPhase({
+            k: 'consultant-view',
+            evaluation,
+            previewLines: formatProfileEvaluationLines(evaluation),
+            scroll: 0,
+          });
+          return;
+        }
+        setApiFailureStreak((n) => n + 1);
+        setErrMenuIdx(0);
+        setPhase({
+          k: 'err',
+          msg: (e as Error).message,
+          retryKind: 'consultant',
+        });
+      } finally {
+        releaseController(ac);
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
+    [createController, dispatch, persistRefinedKeepSession, releaseController],
+  );
+
+  const runConsultantEnrichAndApply = useCallback(
+    async (findings: ConsultantFinding[]) => {
+      const work = consultantWorkRef.current;
+      if (!work || findings.length === 0) {
         return;
       }
-      setApiFailureStreak((n) => n + 1);
-      setErrMenuIdx(0);
-      setPhase({
-        k: 'err',
-        msg: (e as Error).message,
-        retryKind: 'consultant',
-      });
-    } finally {
-      releaseController(ac);
-      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
-    }
-  }, [createController, dispatch, persistRefinedKeepSession, releaseController]);
+      consultantEnrichFindingsRef.current = findings;
+      const ac = createController();
+      setPhase({ k: 'consultant-questions-run' });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const profileText = profileToRefineText(work.base);
+        const qs = await fetchConsultantFeedbackQuestions(findings, profileText, ac.signal);
+        if (qs.length === 0) {
+          dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+          releaseController(ac);
+          await runConsultantApplyWithFindings(findings);
+          return;
+        }
+        consultantFbAnswersRef.current = new Map();
+        setConsultantFbDraft('');
+        setPhase({
+          k: 'consultant-feedback-qa',
+          findings,
+          questions: qs,
+          index: 0,
+        });
+      } catch (e) {
+        if (isUserAbort(e)) {
+          restoreConsultantView();
+          return;
+        }
+        setApiFailureStreak((n) => n + 1);
+        setErrMenuIdx(0);
+        setPhase({
+          k: 'err',
+          msg: (e as Error).message,
+          retryKind: 'consultant',
+        });
+      } finally {
+        releaseController(ac);
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
+    [
+      createController,
+      dispatch,
+      releaseController,
+      restoreConsultantView,
+      runConsultantApplyWithFindings,
+    ],
+  );
 
   const refineFooterHint = useMemo(() => {
     const sb = ' · Tab sidebar';
@@ -717,20 +922,28 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       case 'has-refined-menu':
         return phase.syncPrompt
           ? `Refine · Enter confirm md sync · Esc cancel${sb}`
-          : `Refine · ↑↓ Enter · Q&A, polish, consultant, manual edit, direct edit${sb}`;
+          : `Refine · ↑↓ Enter · Q&A, polish, AI sniff, consultant, manual edit, direct edit${sb}`;
       case 'consultant-view':
         return `Refine · PgUp/PgDn scroll text · ↑↓ actions · Enter · Esc menu${sb}`;
+      case 'consultant-pick':
+        return `Refine · Space toggle · Enter confirm · Esc back to review${sb}`;
+      case 'consultant-feedback-qa':
+        return `Refine · Enter submit answer (blank OK) · Esc back to review${sb}`;
       case 'gen-questions':
       case 'apply':
       case 'polish-run':
+      case 'ai-sniff-run':
       case 'direct-edit-run':
       case 'consultant-run':
+      case 'consultant-questions-run':
       case 'consultant-apply':
       case 'syncing-md':
       case 'saving':
         return `Refine · working…${sb}`;
       case 'qa':
-        return `Refine · Enter submit answer (blank OK) · Esc exit Q&A to menu${sb}`;
+        return qaListFocus
+          ? `Refine · ↑↓ questions · Enter answer field · Shift+Tab · Esc menu${sb}`
+          : `Refine · Shift+Tab question list · Enter next/submit · Esc menu${sb}`;
       case 'diff':
         return `Refine · ↑↓ choose action · Enter confirm${sb}`;
       case 'diff-edit-summary':
@@ -746,7 +959,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       default:
         return `Refine${sb}`;
     }
-  }, [phase]);
+  }, [phase, qaListFocus]);
 
   useRegisterPanelFooterHint(refineFooterHint);
 
@@ -846,6 +1059,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     );
   }
 
+  if (phase.k === 'ai-sniff-run') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Refine</Text>
+        <Spinner label="Running AI sniff pass (humanizing phrasing)…" />
+      </Box>
+    );
+  }
+
   if (phase.k === 'direct-edit-input') {
     return (
       <Box flexDirection="column" flexGrow={1}>
@@ -888,11 +1110,110 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     );
   }
 
+  if (phase.k === 'consultant-questions-run') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Refine</Text>
+        <Spinner label="Checking which suggestions need details from you…" />
+      </Box>
+    );
+  }
+
   if (phase.k === 'consultant-apply') {
     return (
       <Box flexDirection="column">
         <Text bold>Refine</Text>
         <Spinner label="Applying consultant suggestions to profile…" />
+      </Box>
+    );
+  }
+
+  if (phase.k === 'consultant-feedback-qa') {
+    const q = phase.questions[phase.index];
+    const finding = q ? phase.findings[q.findingIndex] : undefined;
+    if (!q || !finding) {
+      return (
+        <Box flexDirection="column">
+          <Text bold>Refine</Text>
+          <Spinner label="Applying consultant suggestions…" />
+        </Box>
+      );
+    }
+    return (
+      <Box flexDirection="column">
+        <Text bold>
+          Consultant follow-up {phase.index + 1}/{phase.questions.length}
+        </Text>
+        <Text dimColor>{finding.area}</Text>
+        <Text dimColor>{finding.suggestion}</Text>
+        <Box marginTop={1}>
+          <Text>{q.question}</Text>
+          <TextInput
+            value={consultantFbDraft}
+            onChange={setConsultantFbDraft}
+            focus={active}
+            onSubmit={(v) => {
+              const trimmed = v.trim();
+              if (trimmed) {
+                consultantFbAnswersRef.current.set(q.findingIndex, trimmed);
+              }
+              setConsultantFbDraft('');
+              if (phase.index + 1 >= phase.questions.length) {
+                const merged = mergeConsultantFindingAnswers(
+                  phase.findings,
+                  new Map(consultantFbAnswersRef.current),
+                );
+                void runConsultantApplyWithFindings(merged);
+              } else {
+                setPhase({ ...phase, index: phase.index + 1 });
+              }
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (phase.k === 'consultant-pick') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Professional consultant — choose suggestions</Text>
+        <Text dimColor>
+          Space toggles each item · Enter applies selected (at least one) · Esc back to review
+        </Text>
+        <Box marginTop={1}>
+          {consultantCheckboxItems.length === 0 ? (
+            <Text dimColor>No suggestions — Esc to go back.</Text>
+          ) : (
+            <CheckboxList
+              items={consultantCheckboxItems}
+              focusedIndex={consultantPickFocusIdx}
+              onFocusChange={setConsultantPickFocusIdx}
+              onItemsChange={setConsultantCheckboxItems}
+              isActive={active}
+              onConfirm={() => {
+                const w = consultantWorkRef.current;
+                if (!w) {
+                  return;
+                }
+                const checkedIdx = consultantCheckboxItems
+                  .filter((it) => it.checked)
+                  .map((it) => Number.parseInt(it.value, 10))
+                  .filter(
+                    (i) => !Number.isNaN(i) && i >= 0 && i < w.evaluation.improvements.length,
+                  );
+                if (checkedIdx.length === 0) {
+                  return;
+                }
+                checkedIdx.sort((a, b) => a - b);
+                const selected = checkedIdx
+                  .map((i) => w.evaluation.improvements[i])
+                  .filter((f): f is ConsultantFinding => f != null);
+                void runConsultantEnrichAndApply(selected);
+              }}
+            />
+          )}
+        </Box>
       </Box>
     );
   }
@@ -903,8 +1224,12 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       ...(phase.evaluation.improvements.length > 0
         ? [
             {
-              value: 'apply' as const,
-              label: 'Apply suggestions to refined profile (Claude)',
+              value: 'apply-all' as const,
+              label: 'Apply all suggestions (follow-up questions if needed)',
+            },
+            {
+              value: 'apply-pick' as const,
+              label: 'Choose which suggestions to apply',
             },
           ]
         : []),
@@ -940,11 +1265,26 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
             onChange={(i) => setConsultantMenuIdx(i)}
             isActive={active}
             onSubmit={(item) => {
-              if (item.value === 'apply') {
-                void runConsultantApply();
+              if (item.value === 'apply-all') {
+                void runConsultantEnrichAndApply(phase.evaluation.improvements);
+                return;
+              }
+              if (item.value === 'apply-pick') {
+                const imps = phase.evaluation.improvements;
+                setConsultantCheckboxItems(
+                  imps.map((f, i) => ({
+                    value: String(i),
+                    label: truncateForPanel(`${f.area}: ${f.issue}`, Math.max(24, textW - 8)),
+                    checked: true,
+                  })),
+                );
+                setConsultantPickFocusIdx(0);
+                setPhase({ k: 'consultant-pick' });
                 return;
               }
               consultantWorkRef.current = null;
+              consultantPendingFindingsRef.current = null;
+              consultantEnrichFindingsRef.current = null;
               goBackToRefineHub();
             }}
           />
@@ -957,6 +1297,10 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     const items = [
       { value: 'start', label: 'Run Q&A from source (new refinement pass)' },
       { value: 'polish', label: 'Polish sections (AI)' },
+      {
+        value: 'ai-sniff',
+        label: 'AI sniff pass (reduce AI-looking phrasing)',
+      },
       {
         value: 'consultant',
         label: 'Professional consultant review (hiring manager, whole profile)',
@@ -1012,6 +1356,10 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
               if (item.value === 'polish') {
                 setPolishMenuIdx(0);
                 setPhase({ k: 'polish-pick' });
+                return;
+              }
+              if (item.value === 'ai-sniff') {
+                void runAiSniff();
                 return;
               }
               if (item.value === 'consultant') {
@@ -1154,28 +1502,71 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         </Box>
       );
     }
+    const labelW = Math.max(16, textW - 16);
+    const qaItems = phase.questions.map((qq, i) => ({
+      value: String(i),
+      label: `${i + 1}. ${truncateForPanel(qq.question, labelW)}${
+        answers[qq.id]?.trim() ? ' (answered)' : ''
+      }`,
+    }));
     return (
       <Box flexDirection="column">
-        <Text bold>
-          Question {phase.index + 1}/{phase.questions.length}
+        <Text bold>Refine — Q&A from source</Text>
+        <Text dimColor>
+          {phase.questions.length} question{phase.questions.length === 1 ? '' : 's'} · Shift+Tab
+          switches question list / answer field · In the list, ↑↓ move · Enter opens the answer
+          field
         </Text>
-        <Text dimColor>{q.context}</Text>
-        <Text>{q.question}</Text>
-        <TextInput
-          value={answerDraft}
-          onChange={setAnswerDraft}
-          focus={active}
-          onSubmit={(v) => {
-            const next = { ...answers, [q.id]: v.trim() };
-            setAnswers(next);
-            setAnswerDraft('');
-            if (phase.index + 1 >= phase.questions.length) {
-              void runApply();
-            } else {
-              setPhase({ ...phase, index: phase.index + 1 });
-            }
-          }}
-        />
+        <Box marginTop={1} flexDirection="column">
+          <Text bold={qaListFocus} dimColor={!qaListFocus}>
+            Questions {qaListFocus ? '(focused)' : '(Shift+Tab)'}
+          </Text>
+          <SelectList
+            items={qaItems}
+            selectedIndex={phase.index}
+            onChange={(i) => {
+              if (phase.k !== 'qa') {
+                return;
+              }
+              const oldQ = phase.questions[phase.index];
+              const merged = { ...answers };
+              if (oldQ) {
+                merged[oldQ.id] = answerDraft.trim();
+              }
+              const newQ = phase.questions[i];
+              setAnswers(merged);
+              setAnswerDraft(newQ ? (merged[newQ.id] ?? '') : '');
+              setPhase({ ...phase, index: i });
+            }}
+            isActive={active && qaListFocus}
+            onSubmit={() => {
+              setQaListFocus(false);
+            }}
+          />
+        </Box>
+        <Box marginTop={1} flexDirection="column">
+          <Text bold>Question {phase.index + 1}</Text>
+          <Text dimColor>{q.context}</Text>
+          <Text>{q.question}</Text>
+          <TextInput
+            value={answerDraft}
+            onChange={setAnswerDraft}
+            focus={active && !qaListFocus}
+            onSubmit={(v) => {
+              const next = { ...answers, [q.id]: v.trim() };
+              setAnswers(next);
+              if (phase.index + 1 >= phase.questions.length) {
+                setAnswerDraft('');
+                void runApply(next);
+              } else {
+                const ni = phase.index + 1;
+                const nq = phase.questions[ni];
+                setPhase({ ...phase, index: ni });
+                setAnswerDraft(nq ? (next[nq.id] ?? '') : '');
+              }
+            }}
+          />
+        </Box>
       </Box>
     );
   }
@@ -1329,6 +1720,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
               if (item.value === 'back') {
                 setApiFailureStreak(0);
                 if (phase.retryKind === 'apply') {
+                  setQaListFocus(false);
                   setPhase({ k: 'qa', questions, index: Math.max(0, questions.length - 1) });
                   return;
                 }
@@ -1368,9 +1760,18 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                   void syncRefinedFromMarkdown();
                 } else if (phase.retryKind === 'polish') {
                   void runPolish(lastPolishSectionsRef.current);
+                } else if (phase.retryKind === 'ai-sniff') {
+                  void runAiSniff();
                 } else if (phase.retryKind === 'consultant') {
-                  if (consultantWorkRef.current) {
-                    void runConsultantApply();
+                  const w = consultantWorkRef.current;
+                  const pending = consultantPendingFindingsRef.current;
+                  const enrichStash = consultantEnrichFindingsRef.current;
+                  if (w && pending && pending.length > 0) {
+                    void runConsultantApplyWithFindings(pending);
+                  } else if (w && enrichStash && enrichStash.length > 0) {
+                    void runConsultantEnrichAndApply(enrichStash);
+                  } else if (w && w.evaluation.improvements.length > 0) {
+                    void runConsultantEnrichAndApply(w.evaluation.improvements);
                   } else {
                     void runConsultantReview();
                   }

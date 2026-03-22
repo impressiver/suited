@@ -16,6 +16,7 @@ export const DEFAULT_REFINEMENT_HISTORY_MAX = 50;
 export type RefinementSaveReason =
   | 'qa-save'
   | 'polish'
+  | 'ai-sniff'
   | 'consultant'
   | 'direct-edit'
   | 'profile-editor'

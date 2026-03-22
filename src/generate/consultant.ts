@@ -1,3 +1,4 @@
+import { APIUserAbortError } from '@anthropic-ai/sdk';
 import chalk from 'chalk';
 import { callWithTool } from '../claude/client.ts';
 import {
@@ -7,6 +8,7 @@ import {
   buildJobFeedbackPrompt,
   type ConsultantFinding,
   FEEDBACK_QUESTIONS_SYSTEM,
+  type FeedbackQuestion,
   type FeedbackQuestionsOutput,
   feedbackQuestionsTool,
   JOB_CONSULTANT_SYSTEM,
@@ -21,16 +23,24 @@ import {
 import { profileToRefineText } from '../claude/prompts/refine.ts';
 import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.ts';
 import { c } from '../utils/colors.ts';
+import {
+  replaceEmDashes,
+  sanitizeConsultantFindings,
+  sanitizeJobEvaluation,
+  sanitizeProfileEvaluation,
+  sanitizeResumeDocument,
+} from '../utils/noEmDash.ts';
 
 type InquirerCLI = typeof import('inquirer').default;
 
 /** Run the hiring consultant evaluation on a general (non-tailored) profile. */
 export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluation> {
-  return callWithTool<ProfileEvaluation>(
+  const ev = await callWithTool<ProfileEvaluation>(
     PROFILE_CONSULTANT_SYSTEM,
     `Please evaluate this candidate's resume profile:\n\n${profileToRefineText(profile)}`,
     profileEvalTool,
   );
+  return sanitizeProfileEvaluation(ev);
 }
 
 /** Run the hiring consultant evaluation on a resume tailored for a specific job. */
@@ -38,16 +48,58 @@ export async function evaluateForJob(
   doc: ResumeDocument,
   jobAnalysis: JobAnalysis,
 ): Promise<JobEvaluation> {
-  return callWithTool<JobEvaluation>(
+  const ev = await callWithTool<JobEvaluation>(
     JOB_CONSULTANT_SYSTEM,
     `Please evaluate how well this resume is tailored for the role:\n\n${resumeDocToConsultantText(doc, jobAnalysis)}`,
     jobEvalTool,
   );
+  return sanitizeJobEvaluation(ev);
 }
 
 // ---------------------------------------------------------------------------
 // User enrichment — ask Claude what questions are needed, then prompt the user
 // ---------------------------------------------------------------------------
+
+/** Append factual answers to findings (same shape the apply prompt expects). */
+export function mergeConsultantFindingAnswers(
+  findings: ConsultantFinding[],
+  answersByFindingIndex: Map<number, string>,
+): ConsultantFinding[] {
+  return findings.map((f, i) => {
+    const answer = answersByFindingIndex.get(i);
+    return answer ? { ...f, suggestion: `${f.suggestion}\n  Candidate's details: ${answer}` } : f;
+  });
+}
+
+/**
+ * Asks the model which findings need extra facts from the candidate before apply.
+ * On failure, returns an empty list (caller proceeds without follow-up questions).
+ */
+export async function fetchConsultantFeedbackQuestions(
+  findings: ConsultantFinding[],
+  profileContext: string,
+  signal?: AbortSignal,
+): Promise<FeedbackQuestion[]> {
+  try {
+    const out = await callWithTool<FeedbackQuestionsOutput>(
+      FEEDBACK_QUESTIONS_SYSTEM,
+      buildFeedbackQuestionsPrompt(findings, profileContext),
+      feedbackQuestionsTool,
+      undefined,
+      signal,
+    );
+    const qs = out.questions ?? [];
+    return qs.map((q) => ({
+      findingIndex: q.findingIndex,
+      question: replaceEmDashes(q.question),
+    }));
+  } catch (err) {
+    if (err instanceof APIUserAbortError || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
+    return [];
+  }
+}
 
 /**
  * Uses Claude to determine which selected findings require additional factual
@@ -60,20 +112,8 @@ export async function enrichFindingsWithUserInput(
   inquirer: InquirerCLI,
   profileContext: string,
 ): Promise<ConsultantFinding[]> {
-  let questionsOutput: FeedbackQuestionsOutput;
-  try {
-    questionsOutput = await callWithTool<FeedbackQuestionsOutput>(
-      FEEDBACK_QUESTIONS_SYSTEM,
-      buildFeedbackQuestionsPrompt(findings, profileContext),
-      feedbackQuestionsTool,
-    );
-  } catch {
-    // If the question-generation call fails, proceed without enrichment
-    return findings;
-  }
-
-  const { questions } = questionsOutput;
-  if (questions.length === 0) return findings;
+  const questions = await fetchConsultantFeedbackQuestions(findings, profileContext);
+  if (questions.length === 0) return sanitizeConsultantFindings(findings);
 
   console.log(c.muted('\n  A few questions to fill in the details:'));
 
@@ -96,10 +136,8 @@ export async function enrichFindingsWithUserInput(
     if (answer.trim()) answers.set(q.findingIndex, answer.trim());
   }
 
-  return findings.map((f, i) => {
-    const answer = answers.get(i);
-    return answer ? { ...f, suggestion: `${f.suggestion}\n  Candidate's details: ${answer}` } : f;
-  });
+  const merged = mergeConsultantFindingAnswers(findings, answers);
+  return sanitizeConsultantFindings(merged);
 }
 
 /** Serialise a ResumeDocument into plain text for use as profile context. */
@@ -140,7 +178,7 @@ export async function applyJobFeedback(
   if (output.summary?.trim()) updated.summary = output.summary.trim();
   if (output.skills && output.skills.length > 0) updated.skills = output.skills;
 
-  return updated;
+  return sanitizeResumeDocument(updated);
 }
 
 // ---------------------------------------------------------------------------

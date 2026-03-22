@@ -124,6 +124,8 @@ Use `vi.useFakeTimers()` to control async advancement. Assert that:
 
 **Rationale:** Keep template source ASCII-friendly and avoid typographic dashes in shipped Eta/CSS that are easy to break when editing or diffing.
 
+**Generated resume HTML/PDF:** `renderResumeHtml()` runs `sanitizeResumeDocument()` so resolved `ResumeDocument` strings passed into Eta cannot contain U+2014/U+2013 (or common em-dash entities) even if profile or model output slipped them in. Consultant tool output is normalized the same way for evaluations and follow-up questions (`src/utils/noEmDash.ts`).
+
 ## CI
 
 One `pnpm test` covers everything. TUI tests run headless — the testing library does not require a real TTY. If `@inkjs/testing-library` requires a specific env flag, document it in `package.json` `scripts.test` or a `.env.test` file.

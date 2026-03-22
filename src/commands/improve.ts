@@ -1,4 +1,4 @@
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.ts';
+import { markdownToProfile } from '../profile/markdown.ts';
 import type { Profile } from '../profile/schema.ts';
 import {
   loadRefined,
@@ -89,7 +89,9 @@ export async function runImprove(options: ImproveOptions): Promise<void> {
         const currentlyRefined = await fileExists(refinedJsonPath(profileDir));
         if (currentlyRefined) {
           const refined = await loadRefined(profileDir);
-          await saveRefined({ ...refined, profile: updatedProfile }, profileDir);
+          await saveRefined({ ...refined, profile: updatedProfile }, profileDir, {
+            reason: 'improve',
+          });
         } else {
           await saveSource(updatedProfile, profileDir);
         }
@@ -107,8 +109,9 @@ export async function runImprove(options: ImproveOptions): Promise<void> {
       await openInEditor(mdPath);
       const refined = await loadRefined(profileDir);
       const updatedProfile = await markdownToProfile(mdPath, refined.profile);
-      await saveRefined({ profile: updatedProfile, session: refined.session }, profileDir);
-      await profileToMarkdown(updatedProfile, mdPath);
+      await saveRefined({ profile: updatedProfile, session: refined.session }, profileDir, {
+        reason: 'improve',
+      });
       profile = updatedProfile;
       console.log('Refined data reloaded.');
     }

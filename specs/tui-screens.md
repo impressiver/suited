@@ -77,7 +77,7 @@ already-refined:
 
 **Components:** `SelectList`, `TextInput`, `MultilineInput`, `DiffView`, `InlineEditor`, `Spinner`, `ScrollView`, `ConfirmPrompt`.
 
-**Planned — refinement history / revert:** Normative behavior (disk layout, when to snapshot, restore semantics, TUI entry from this hub, optional CLI) lives in [`refinement-history.md`](./refinement-history.md). Not implemented today.
+**Refinement history / revert:** [`refinement-history.md`](./refinement-history.md). **Refine** hub includes **View / restore refinement history** (list + confirm restore). CLI: `suited refine history list` / `restore <id>`.
 
 **Backlog — side-by-side suggestion diffs:** Replace or augment unified `DiffView` with a **before | after** (side-by-side) layout for all AI-suggestion review steps above. Tracked as a post–Phase C task in [`tui-definition-of-done.md`](./tui-definition-of-done.md) (**Suggestion diffs (side-by-side)**).
 

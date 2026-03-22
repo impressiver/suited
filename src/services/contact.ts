@@ -4,7 +4,6 @@ import {
   loadActiveProfile,
   loadRefined,
   refinedJsonPath,
-  refinedMdPath,
   saveContactMeta,
   saveRefined,
   saveSource,
@@ -68,8 +67,7 @@ export async function mergeContactMeta(fields: ContactFields, profileDir: string
 
   if (await fileExists(refinedJsonPath(profileDir))) {
     const refined = await loadRefined(profileDir);
-    await saveRefined({ ...refined, profile }, profileDir);
-    await profileToMarkdown(profile, refinedMdPath(profileDir));
+    await saveRefined({ ...refined, profile }, profileDir, { reason: 'contact-merge' });
   } else {
     await saveSource(profile, profileDir);
     await profileToMarkdown(profile, sourceMdPath(profileDir));

@@ -12,7 +12,7 @@ import {
   printProfileEvaluation,
 } from '../generate/consultant.ts';
 import { type CuratorResult, curateForJob } from '../generate/curator.ts';
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.ts';
+import { markdownToProfile } from '../profile/markdown.ts';
 import type {
   JobRefinement,
   Profile,
@@ -345,8 +345,7 @@ async function applyDirectPrompt(
   if (!proposedProfile) return;
   const finalProfile = await reviewRefinements(profile, proposedProfile);
 
-  await saveRefined({ profile: finalProfile, session }, profileDir);
-  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'direct-edit' });
 
   console.log(`\n${c.ok} ${c.success('Refined data saved')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
@@ -461,8 +460,7 @@ async function applyExpertPolish(
 
   if (finalProfile === profile) return; // nothing accepted
 
-  await saveRefined({ profile: finalProfile, session }, profileDir);
-  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'polish' });
   console.log(`\n${c.ok} ${c.success('Polished profile saved')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
 }
@@ -546,8 +544,7 @@ async function runConsultantReview(
   const finalProfile = await reviewRefinements(profile, proposedProfile);
 
   if (finalProfile !== profile) {
-    await saveRefined({ profile: finalProfile, session }, profileDir);
-    await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+    await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'consultant' });
     console.log(`\n${c.ok} ${c.success('Profile updated with consultant feedback.')}`);
   }
 
@@ -712,7 +709,9 @@ export async function runRefine(options: RefineOptions): Promise<void> {
     if (sync) {
       const existing = await loadRefined(profileDir);
       const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
-      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+        reason: 'md-sync',
+      });
       console.log(`${c.ok} ${c.success('refined.json updated from refined.md.')}`);
     }
   }
@@ -772,7 +771,9 @@ export async function runRefine(options: RefineOptions): Promise<void> {
         await openInEditor(refinedMdPath(profileDir));
         const originalProfile = await loadSource(profileDir);
         const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), originalProfile);
-        await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+        await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+          reason: 'md-sync',
+        });
         console.log(`\n${c.ok} ${c.success('refined.json updated from edited markdown.')}`);
         return;
       }
@@ -821,8 +822,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       questions: [],
       answers: {},
     };
-    await saveRefined({ profile: source, session }, profileDir);
-    await profileToMarkdown(source, refinedMdPath(profileDir));
+    await saveRefined({ profile: source, session }, profileDir, { reason: 'qa-save' });
     console.log(`\n${c.ok} ${c.success('Refined data saved')} ${c.muted('(no changes)')}`);
     console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
     return;
@@ -841,8 +841,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       questions,
       answers: {},
     };
-    await saveRefined({ profile: source, session }, profileDir);
-    await profileToMarkdown(source, refinedMdPath(profileDir));
+    await saveRefined({ profile: source, session }, profileDir, { reason: 'qa-save' });
     return;
   }
 
@@ -858,8 +857,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
     questions,
     answers,
   };
-  await saveRefined({ profile: finalProfile, session }, profileDir);
-  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'qa-save' });
 
   console.log(`\n${c.ok} ${c.success('Refined data saved:')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);

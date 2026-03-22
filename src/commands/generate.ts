@@ -131,7 +131,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     if (sync) {
       const existing = await loadRefined(profileDir);
       const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
-      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+        reason: 'generate-md-sync',
+      });
       console.log(`${c.ok} ${c.success('refined.json updated from refined.md.')}`);
     }
   }
@@ -1558,7 +1560,8 @@ async function editRefinedProfile(profileDir: string): Promise<void> {
   await openInEditor(refinedMd);
   const existing = await loadRefined(profileDir);
   const updatedProfile = await markdownToProfile(refinedMd, existing.profile);
-  await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
-  await profileToMarkdown(updatedProfile, refinedMd);
+  await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+    reason: 'generate-md-sync',
+  });
   console.log('Refined data reloaded from markdown.');
 }

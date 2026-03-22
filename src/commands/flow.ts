@@ -4,6 +4,7 @@
  */
 
 import type { FlowOptions } from '../tui/flowOptions.ts';
+import { withNoHistorySnapshotFlag } from '../utils/refinementHistoryEnv.ts';
 
 export type { FlowOptions };
 
@@ -12,14 +13,16 @@ function isInteractiveTty(): boolean {
 }
 
 export async function runFlow(options: FlowOptions): Promise<void> {
-  if (isInteractiveTty()) {
-    const { runTui } = await import('../tui/runTui.tsx');
-    await runTui(options);
-    return;
-  }
+  await withNoHistorySnapshotFlag(options.noHistorySnapshot, async () => {
+    if (isInteractiveTty()) {
+      const { runTui } = await import('../tui/runTui.tsx');
+      await runTui(options);
+      return;
+    }
 
-  console.error(
-    'suited: open an interactive terminal to use the TUI, or run e.g. suited --help, suited refine',
-  );
-  process.exitCode = 0;
+    console.error(
+      'suited: open an interactive terminal to use the TUI, or run e.g. suited --help, suited refine',
+    );
+    process.exitCode = 0;
+  });
 }

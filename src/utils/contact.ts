@@ -83,7 +83,7 @@ export async function ensureContactDetails(
   // Persist to whichever profile is active
   if (await fileExists(refinedJsonPath(profileDir))) {
     const refined = await loadRefined(profileDir);
-    await saveRefined({ ...refined, profile: updated }, profileDir);
+    await saveRefined({ ...refined, profile: updated }, profileDir, { reason: 'contact-merge' });
   } else {
     await saveSource(updated, profileDir);
   }

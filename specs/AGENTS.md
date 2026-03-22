@@ -67,7 +67,7 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 | Activity | Read |
 |----------|------|
 | **Curate screen (planned)** | [`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned), [`tui-definition-of-done.md` — post–Phase C](./tui-definition-of-done.md#whats-left-postphase-c-polish) |
-| **Refinement history / revert (planned)** | [`refinement-history.md`](./refinement-history.md), [`project.md` §7](./project.md#7-profile-directory-layout-conceptual) |
+| **Refinement history / revert** | [`refinement-history.md`](./refinement-history.md), [`project.md` §7](./project.md#7-profile-directory-layout-conceptual) |
 | Decide Phase A vs B scope | [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) |
 | Layout / keyboard / streaming UI | [`tui-architecture.md`](./tui-architecture.md) |
 | Holistic UX, header/footer, blocking confirms | [`tui-ux.md` — Holistic design principles](./tui-ux.md#holistic-design-principles), [`tui-architecture.md`](./tui-architecture.md) (Footer composition, Header pipeline, Blocking UI) |
@@ -194,3 +194,7 @@ Phase A checklist in [`tui-definition-of-done.md`](./tui-definition-of-done.md) 
 ### Post–Phase C polish
 
 - **Optional follow-ups:** first section of [`tui-definition-of-done.md`](./tui-definition-of-done.md) (*What’s left (post–Phase C polish)*) — streaming UI, Generate JD checkpoints, deep profile forms, etc.
+
+### Refinement history (global refined)
+
+- **Shipped:** [`refinement-history.md`](./refinement-history.md) — `saveRefined` snapshots previous **`RefinedData`** under **`refined-history/`** (cap 50), atomic temp+rename, identity no-op (ignores `profile.updatedAt` only), restore clears **`pinnedRender`** on all job refinements; TUI **Refine** menu + CLI **`suited refine history`**.

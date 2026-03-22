@@ -2,13 +2,15 @@ import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ProfileEvaluation } from '../../claude/prompts/consultant.ts';
 import { evaluateProfile } from '../../generate/consultant.ts';
-import { markdownToProfile, profileToMarkdown } from '../../profile/markdown.ts';
+import { markdownToProfile } from '../../profile/markdown.ts';
+import type { RefinementHistoryListEntry } from '../../profile/refinementHistory.ts';
 import type {
   Profile,
   RefinementQuestion,
   RefinementSession,
   Sourced,
 } from '../../profile/schema.ts';
+import type { RefinementSaveReason } from '../../profile/serializer.ts';
 import {
   hashSource,
   isMdNewerThanJson,
@@ -27,6 +29,10 @@ import {
   generateRefinementQuestions,
   polishProfile,
 } from '../../services/refine.ts';
+import {
+  listGlobalRefinementHistory,
+  restoreGlobalRefinedSnapshot,
+} from '../../services/refinementHistory.ts';
 import { fileExists } from '../../utils/fs.ts';
 import {
   ConfirmPrompt,
@@ -70,12 +76,25 @@ type Phase =
   | { k: 'gen-questions' }
   | { k: 'qa'; questions: RefinementQuestion[]; index: number }
   | { k: 'apply' }
-  | { k: 'diff'; original: Profile; proposed: Profile; diffSaveMode?: 'qa' | 'keep-session' }
+  | {
+      k: 'diff';
+      original: Profile;
+      proposed: Profile;
+      diffSaveMode?: 'qa' | 'keep-session';
+      keepSessionReason?: RefinementSaveReason;
+    }
   | {
       k: 'diff-edit-summary';
       original: Profile;
       proposed: Profile;
       diffSaveMode?: 'qa' | 'keep-session';
+      keepSessionReason?: RefinementSaveReason;
+    }
+  | { k: 'refinement-history-list'; warnings: string[]; entries: RefinementHistoryListEntry[] }
+  | {
+      k: 'refinement-history-confirm';
+      entry: RefinementHistoryListEntry;
+      list: { entries: RefinementHistoryListEntry[]; warnings: string[] };
     }
   | { k: 'polish-pick' }
   | { k: 'polish-run'; sections: string[] }
@@ -129,9 +148,11 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     ans: Record<string, string>;
   } | null>(null);
   const persistKeepRef = useRef<Profile | null>(null);
+  const persistKeepReasonRef = useRef<RefinementSaveReason>('unspecified');
   const lastPolishSectionsRef = useRef<string[]>([]);
   const lastDirectInstructionsRef = useRef('');
   const [directEditDraft, setDirectEditDraft] = useState('');
+  const [historyMenuIdx, setHistoryMenuIdx] = useState(0);
   const [polishMenuIdx, setPolishMenuIdx] = useState(0);
   const [consultantMenuIdx, setConsultantMenuIdx] = useState(0);
   const consultantWorkRef = useRef<{ base: Profile; evaluation: ProfileEvaluation } | null>(null);
@@ -143,7 +164,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
 
   const active = activeScreen === 'refine' && focusTarget === 'content';
 
-  useRegisterBlockingUi(active && phase.k === 'err');
+  useRegisterBlockingUi(active && (phase.k === 'err' || phase.k === 'refinement-history-confirm'));
 
   const goBackToRefineHub = useCallback(() => {
     void (async () => {
@@ -169,6 +190,9 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     if (phase.k === 'diff') {
       setDiffSelectIdx(0);
     }
+    if (phase.k === 'refinement-history-list') {
+      setHistoryMenuIdx(0);
+    }
   }, [phase.k]);
 
   useInput(
@@ -182,6 +206,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           original: phase.original,
           proposed: phase.proposed,
           diffSaveMode: phase.diffSaveMode,
+          keepSessionReason: phase.keepSessionReason,
         });
       }
     },
@@ -265,8 +290,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           questions: qs,
           answers: ans,
         };
-        await saveRefined({ profile, session }, profileDir);
-        await profileToMarkdown(profile, refinedMdPath(profileDir));
+        await saveRefined({ profile, session }, profileDir, { reason: 'qa-save' });
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
         setApiFailureStreak(0);
         setPhase({ k: 'done', note: 'Refinements saved to refined.json / refined.md' });
@@ -285,15 +309,15 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
   );
 
   const persistRefinedKeepSession = useCallback(
-    async (profile: Profile) => {
+    async (profile: Profile, reason: RefinementSaveReason) => {
       persistKeepRef.current = profile;
+      persistKeepReasonRef.current = reason;
       persistCtxRef.current = null;
       setPhase({ k: 'saving' });
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
       try {
         const existing = await loadRefined(profileDir);
-        await saveRefined({ profile, session: existing.session }, profileDir);
-        await profileToMarkdown(profile, refinedMdPath(profileDir));
+        await saveRefined({ profile, session: existing.session }, profileDir, { reason });
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
         setApiFailureStreak(0);
         consultantWorkRef.current = null;
@@ -321,7 +345,9 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
     try {
       const existing = await loadRefined(profileDir);
       const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
-      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+        reason: 'md-sync',
+      });
       setPhase({ k: 'has-refined-menu', syncPrompt: false });
     } catch (e) {
       setErrMenuIdx(0);
@@ -334,6 +360,42 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
   }, [dispatch, profileDir]);
+
+  const openRefinementHistory = useCallback(async () => {
+    try {
+      const { entries, warnings } = await listGlobalRefinementHistory(profileDir);
+      setPhase({ k: 'refinement-history-list', entries, warnings });
+    } catch (e) {
+      setErrMenuIdx(0);
+      setPhase({
+        k: 'err',
+        msg: (e as Error).message,
+        retryKind: 'save',
+      });
+    }
+  }, [profileDir]);
+
+  const runRestoreFromHistory = useCallback(
+    async (entry: RefinementHistoryListEntry) => {
+      setPhase({ k: 'saving' });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        await restoreGlobalRefinedSnapshot(profileDir, entry.id);
+        dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
+        setPhase({ k: 'done', note: `Restored refinement snapshot ${entry.id}.` });
+      } catch (e) {
+        setErrMenuIdx(0);
+        setPhase({
+          k: 'err',
+          msg: (e as Error).message,
+          retryKind: 'save',
+        });
+      } finally {
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
+    [dispatch, profileDir],
+  );
 
   const beginQaFlow = useCallback(async () => {
     if (!source) {
@@ -353,8 +415,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           questions: [],
           answers: {},
         };
-        await saveRefined({ profile: source, session }, profileDir);
-        await profileToMarkdown(source, refinedMdPath(profileDir));
+        await saveRefined({ profile: source, session }, profileDir, { reason: 'qa-save' });
         dispatch({ type: 'SET_HAS_REFINED', hasRefined: true });
         setApiFailureStreak(0);
         setPhase({ k: 'done', note: 'No gaps found — saved source as refined (no edits).' });
@@ -456,7 +517,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         const blocks = computeRefinementDiff(base, proposed);
         setApiFailureStreak(0);
         if (blocks.length === 0) {
-          await persistRefinedKeepSession(proposed);
+          await persistRefinedKeepSession(proposed, 'polish');
           return;
         }
         setPhase({
@@ -464,6 +525,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           original: base,
           proposed,
           diffSaveMode: 'keep-session',
+          keepSessionReason: 'polish',
         });
       } catch (e) {
         if (isUserAbort(e)) {
@@ -510,7 +572,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         const blocks = computeRefinementDiff(base, proposed);
         setApiFailureStreak(0);
         if (blocks.length === 0) {
-          await persistRefinedKeepSession(proposed);
+          await persistRefinedKeepSession(proposed, 'direct-edit');
           return;
         }
         setPhase({
@@ -518,6 +580,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
           original: base,
           proposed,
           diffSaveMode: 'keep-session',
+          keepSessionReason: 'direct-edit',
         });
       } catch (e) {
         if (isUserAbort(e)) {
@@ -604,7 +667,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       const blocks = computeRefinementDiff(base, proposed);
       setApiFailureStreak(0);
       if (blocks.length === 0) {
-        await persistRefinedKeepSession(proposed);
+        await persistRefinedKeepSession(proposed, 'consultant');
         return;
       }
       setPhase({
@@ -612,6 +675,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         original: base,
         proposed,
         diffSaveMode: 'keep-session',
+        keepSessionReason: 'consultant',
       });
     } catch (e) {
       if (isUserAbort(e)) {
@@ -675,6 +739,10 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
         return `Refine · done · Tab sidebar${sb}`;
       case 'err':
         return `Refine · ↑↓ Enter · retry / settings / back${sb}`;
+      case 'refinement-history-list':
+        return `Refine · ↑↓ Enter · pick snapshot or back${sb}`;
+      case 'refinement-history-confirm':
+        return `Refine · y/n · confirm restore${sb}`;
       default:
         return `Refine${sb}`;
     }
@@ -895,6 +963,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
       },
       { value: 'edit', label: 'Edit profile sections (manual)' },
       { value: 'direct', label: 'Direct edit (instructions to Claude)' },
+      { value: 'history', label: 'View / restore refinement history' },
     ];
     const syncPrompt = phase.syncPrompt;
     return (
@@ -958,6 +1027,99 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                 setPhase({ k: 'direct-edit-input' });
                 return;
               }
+              if (item.value === 'history') {
+                void openRefinementHistory();
+              }
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (phase.k === 'refinement-history-list') {
+    const listItems = [
+      ...phase.entries.map((e) => ({
+        value: `snap:${e.id}`,
+        label: `${e.id} · ${e.savedAt} · ${e.reason}`,
+      })),
+      { value: 'back', label: '← Back to refined menu' },
+    ];
+    return (
+      <Box flexDirection="column">
+        <Text bold>Refinement history</Text>
+        <Text dimColor>
+          Snapshots are saved automatically when refined.json changes. Restore replaces current
+          refined.json and refined.md; job PDF squeeze hints may reset.
+        </Text>
+        {phase.warnings.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            {phase.warnings.map((w) => (
+              <Text key={w} color="yellow">
+                {w}
+              </Text>
+            ))}
+          </Box>
+        )}
+        {phase.entries.length === 0 && (
+          <Box marginTop={1}>
+            <Text dimColor>No snapshots yet (appears after the second save of refined data).</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <SelectList
+            items={listItems}
+            selectedIndex={historyMenuIdx}
+            onChange={(i) => setHistoryMenuIdx(i)}
+            isActive={active}
+            onSubmit={(item) => {
+              if (item.value === 'back') {
+                void goBackToRefineHub();
+                return;
+              }
+              const id = item.value.replace(/^snap:/, '');
+              const entry = phase.entries.find((e) => e.id === id);
+              if (!entry) {
+                return;
+              }
+              setPhase({
+                k: 'refinement-history-confirm',
+                entry,
+                list: { entries: phase.entries, warnings: phase.warnings },
+              });
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (phase.k === 'refinement-history-confirm') {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Restore snapshot?</Text>
+        <Text>
+          id {phase.entry.id} · {phase.entry.savedAt} · {phase.entry.reason}
+        </Text>
+        <Box marginTop={1}>
+          <Text dimColor>
+            Your current refined profile will be snapshotted first. You can undo by restoring a
+            newer entry.
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <ConfirmPrompt
+            message="Restore this snapshot?"
+            active={active}
+            onConfirm={() => {
+              void runRestoreFromHistory(phase.entry);
+            }}
+            onCancel={() => {
+              setPhase({
+                k: 'refinement-history-list',
+                entries: phase.list.entries,
+                warnings: phase.list.warnings,
+              });
             }}
           />
         </Box>
@@ -1047,7 +1209,10 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
             onSubmit={(item) => {
               if (item.value === 'accept') {
                 if (phase.diffSaveMode === 'keep-session') {
-                  void persistRefinedKeepSession(phase.proposed);
+                  void persistRefinedKeepSession(
+                    phase.proposed,
+                    phase.keepSessionReason ?? 'unspecified',
+                  );
                 } else {
                   void persistRefined(phase.proposed, questions, answers);
                 }
@@ -1060,6 +1225,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                   original: phase.original,
                   proposed: phase.proposed,
                   diffSaveMode: phase.diffSaveMode,
+                  keepSessionReason: phase.keepSessionReason,
                 });
               }
             }}
@@ -1091,6 +1257,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                 original: phase.original,
                 proposed: next,
                 diffSaveMode: phase.diffSaveMode ?? 'qa',
+                keepSessionReason: phase.keepSessionReason,
               });
             }}
           />
@@ -1190,7 +1357,7 @@ export function RefineScreen({ profileDir }: RefineScreenProps) {
                 } else if (phase.retryKind === 'save') {
                   const kp = persistKeepRef.current;
                   if (kp) {
-                    void persistRefinedKeepSession(kp);
+                    void persistRefinedKeepSession(kp, persistKeepReasonRef.current);
                   } else {
                     const ctx = persistCtxRef.current;
                     if (ctx) {

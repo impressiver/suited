@@ -1,8 +1,15 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileExists } from '../utils/fs.ts';
+import { isNoHistorySnapshotEnv } from '../utils/refinementHistoryEnv.ts';
 import { getGlobalContactMetaPath, getGlobalLogoCachePath } from '../utils/suitedDirs.ts';
+import { profileMarkdownContent } from './markdown.ts';
+import {
+  commitRefinementSnapshot,
+  type RefinementSaveReason,
+  refinedDataIdentityCanon,
+} from './refinementHistory.ts';
 import {
   type ContactMeta,
   type GenerationConfig,
@@ -12,6 +19,8 @@ import {
   type RefinedData,
   type SavedJob,
 } from './schema.ts';
+
+export type { RefinementSaveReason } from './refinementHistory.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -95,21 +104,77 @@ export function refinedMdPath(profileDir: string): string {
   return join(profileDir, 'refined.md');
 }
 
-export async function saveRefined(data: RefinedData, profileDir: string): Promise<void> {
-  data.profile.updatedAt = new Date().toISOString();
-  await writeJson(refinedJsonPath(profileDir), data);
+export interface SaveRefinedOptions {
+  /** Why the refined profile is being written (refinement history §3.2). */
+  reason?: RefinementSaveReason;
+  /** When reason is manual-restore, the snapshot id being restored from (§5). */
+  restoreSourceId?: string;
+  maxHistorySnapshots?: number;
+  /**
+   * When true, do not append a `refined-history/` snapshot before overwriting (§4 exception).
+   * Also set via CLI `--no-history-snapshot` or env `SUITED_NO_HISTORY_SNAPSHOT=1`.
+   */
+  skipHistorySnapshot?: boolean;
 }
 
-export async function loadRefined(profileDir: string): Promise<RefinedData> {
-  const path = refinedJsonPath(profileDir);
-  if (!(await fileExists(path))) {
-    throw new Error(`refined.json not found in ${profileDir}. Run 'resume refine' first.`);
+export async function saveRefined(
+  data: RefinedData,
+  profileDir: string,
+  options?: SaveRefinedOptions,
+): Promise<void> {
+  const jsonPath = refinedJsonPath(profileDir);
+  const mdPath = refinedMdPath(profileDir);
+  const existing = await loadRefinedIfExists(profileDir);
+
+  const nextUpdatedAt = new Date().toISOString();
+  const pending: RefinedData = {
+    profile: { ...data.profile, updatedAt: nextUpdatedAt },
+    session: data.session,
+  };
+  const skipSnapshot = options?.skipHistorySnapshot === true || isNoHistorySnapshotEnv();
+
+  if (existing) {
+    if (refinedDataIdentityCanon(pending) === refinedDataIdentityCanon(existing)) {
+      return;
+    }
+    if (!skipSnapshot) {
+      await commitRefinementSnapshot(profileDir, existing, options?.reason ?? 'unspecified', {
+        restoreSourceId: options?.restoreSourceId,
+        maxSnapshots: options?.maxHistorySnapshots,
+      });
+    }
   }
+
+  data.profile.updatedAt = nextUpdatedAt;
+
+  await mkdir(dirname(jsonPath), { recursive: true });
+  const jsonTmp = join(dirname(jsonPath), `.refined.json.tmp.${randomBytes(8).toString('hex')}`);
+  await writeFile(jsonTmp, JSON.stringify(pending, null, 2), 'utf-8');
+  await rename(jsonTmp, jsonPath);
+
+  await mkdir(dirname(mdPath), { recursive: true });
+  const mdTmp = join(dirname(mdPath), `.refined.md.tmp.${randomBytes(8).toString('hex')}`);
+  await writeFile(mdTmp, profileMarkdownContent(pending.profile), 'utf-8');
+  await rename(mdTmp, mdPath);
+}
+
+/** Load refined data when `refined.json` exists; otherwise `null` (no throw). */
+export async function loadRefinedIfExists(profileDir: string): Promise<RefinedData | null> {
+  const path = refinedJsonPath(profileDir);
+  if (!(await fileExists(path))) return null;
   const raw = await readJson<{ profile: unknown; session: unknown }>(path);
   return {
     profile: parseProfile(raw.profile),
     session: raw.session as RefinedData['session'],
   };
+}
+
+export async function loadRefined(profileDir: string): Promise<RefinedData> {
+  const data = await loadRefinedIfExists(profileDir);
+  if (!data) {
+    throw new Error(`refined.json not found in ${profileDir}. Run 'resume refine' first.`);
+  }
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +363,16 @@ export async function deleteJobRefinement(jobId: string, profileDir: string): Pr
   await unlink(jobRefinementPath(profileDir, jobId)).catch(() => {
     /* already absent */
   });
+}
+
+/** After a global refined restore, drop layout squeeze hints that may no longer match content (§5.1 refinement-history). */
+export async function clearPinnedRenderForAllJobs(profileDir: string): Promise<void> {
+  const jobs = await loadJobs(profileDir);
+  for (const job of jobs) {
+    const refinement = await loadJobRefinement(profileDir, job.id);
+    if (!refinement?.pinnedRender) continue;
+    await saveJobRefinement({ ...refinement, pinnedRender: undefined }, profileDir);
+  }
 }
 
 // ---------------------------------------------------------------------------

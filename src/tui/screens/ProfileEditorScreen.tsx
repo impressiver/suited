@@ -15,7 +15,6 @@ import {
   loadRefined,
   loadSource,
   refinedJsonPath,
-  refinedMdPath,
   saveRefined,
   saveSource,
   sourceJsonPath,
@@ -51,8 +50,7 @@ async function persistProfile(
   session: RefinementSession | null,
 ): Promise<void> {
   if (session) {
-    await saveRefined({ profile, session }, profileDir);
-    await profileToMarkdown(profile, refinedMdPath(profileDir));
+    await saveRefined({ profile, session }, profileDir, { reason: 'profile-editor' });
   } else {
     await saveSource(profile, profileDir);
     await profileToMarkdown(profile, sourceMdPath(profileDir));

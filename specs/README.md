@@ -22,7 +22,7 @@ User guide and module layout: [`README.md`](../README.md), [`docs/ARCHITECTURE.m
 
 | File | Role |
 |------|------|
-| [`refinement-history.md`](./refinement-history.md) | **Planned:** durable snapshots + revert for global **`refined.json`** / **`refined.md`** |
+| [`refinement-history.md`](./refinement-history.md) | Durable snapshots + revert for global **`refined.json`** / **`refined.md`** |
 
 ---
 

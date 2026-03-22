@@ -1,6 +1,6 @@
-# Refinement history and revert (planned)
+# Refinement history and revert
 
-**Status:** **Not implemented** — normative product/behavior spec for a future change. Today, persisting refined data overwrites **`refined.json`** / **`refined.md`** (see [`project.md` §7](./project.md#7-profile-directory-layout-conceptual)); users rely on **version control**, copies of the profile directory, or backups to recover older refined states.
+**Status:** **Implemented** in-repo (serializer + **`refined-history/`** + TUI + CLI). Directory name: **`refined-history/`** (see [`src/profile/refinementHistory.ts`](../src/profile/refinementHistory.ts) `REFINED_HISTORY_DIR_NAME`). Default retention: **50** snapshots (`DEFAULT_REFINEMENT_HISTORY_MAX`); pruning removes **oldest** first and prints a **one-time** stderr warning per process when pruning runs.
 
 **Normative terms** follow [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
 
@@ -96,7 +96,8 @@ Single-process **crash safety** for the “replace refined” operation **MUST**
 
 - **Restore** writes snapshot **id**’s **`RefinedData`** to **`refined.json`** and refreshes **`refined.md`** per §3.3. Loaders see the new state after **`loadRefined`**.
 - Restore **MUST NOT** delete newer snapshots by default. Persisting a restore **MUST** go through the same save path, producing a new snapshot labeled e.g. **`manual-restore`** (with optional metadata pointing at the source **id**), so a mistaken restore can be undone.
-- Optional **“replace head only”** (no new snapshot on restore) **MAY** exist as an advanced CLI flag; default remains append-only.
+- Optional **“replace head only”** (no new snapshot on restore) is implemented as **`suited refine history restore <id> --replace-head-only`**; default remains append-only (current refined is snapshotted before restore).
+- **Skipping snapshots on ordinary saves:** **`--no-history-snapshot`** on **`suited`** (default TUI entry), **`suited refine`**, **`suited generate`**, **`suited improve`**, and **`suited contact`** sets process env for that command so **`saveRefined`** does not append **`refined-history/`** entries. Equivalent: **`SUITED_NO_HISTORY_SNAPSHOT=1`** for the process. **`saveRefined(..., { skipHistorySnapshot: true })`** is the programmatic escape hatch.
 
 ### 5.1 Job metadata after global restore
 
@@ -124,7 +125,7 @@ Single-process **crash safety** for the “replace refined” operation **MUST**
 
 ### 7.2 CLI
 
-- **SHOULD** expose non-interactive commands or flags, e.g. `suited refine history list` / `restore <id>`, where **`<id>`** is exactly the **id** column from **`list`**. Exact naming lives in [`README.md`](../README.md) once implemented.
+- **CLI:** `suited refine history list` / `suited refine history restore <id>` (optional **`--replace-head-only`**); **`<id>`** is exactly the **id** column from **`list`**. See [`README.md`](../README.md).
 
 ---
 

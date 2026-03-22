@@ -142,6 +142,7 @@ suited import https://www.linkedin.com/in/your-username --headed
 | `suited` | Run the full pipeline interactively |
 | `suited import` | Import your LinkedIn profile |
 | `suited refine` | Q&A and edits: **source → refined** profile (skips if already refined) |
+| `suited refine history list` / `restore <id>` | List or restore **refined-history/** snapshots; **`restore`** accepts **`--replace-head-only`** |
 | `suited generate` | Build a PDF from refined data + job description |
 | `suited improve` | Interactive hub: refine again, bullets, summary, contact |
 | `suited jobs` | Add, list, delete saved job descriptions |
@@ -190,6 +191,8 @@ If any check fails, the pipeline halts.
 
 After refining, suited creates `output/refined.md` — a plain-text file you can edit directly. On the next run, suited detects that the file has changed and asks whether to reload it before continuing. This is the easiest way to rewrite bullets, fix dates, or add anything LinkedIn didn't capture.
 
+**Refinement history:** Each time `refined.json` is about to change (and a prior refined file already exists), suited stores the previous **`RefinedData`** under **`refined-history/`** as JSON snapshots (default cap: last 50; oldest pruned first). List or restore from the CLI: `suited refine history list` and `suited refine history restore <id>`, or from the TUI **Refine** hub (**View / restore refinement history**). **`suited refine history restore <id> --replace-head-only`** restores without snapshotting the current refined state first (you cannot undo that pre-restore version via history). To skip **all** history appends for a single CLI invocation or TUI session, pass **`--no-history-snapshot`** on **`suited`**, **`refine`**, **`generate`**, **`improve`**, or **`contact`**, or set **`SUITED_NO_HISTORY_SNAPSHOT=1`**. Restoring rewrites both `refined.json` and `refined.md` and clears per-job PDF squeeze hints (`pinnedRender`) that may no longer match. Snapshots duplicate the same PII as `refined.json`; if you sync or commit **`--profile-dir`** to the cloud or Git, treat **`refined-history/`** as sensitive too.
+
 ### Job-specific profiles
 
 When you generate a resume for a specific job, suited saves a curated version of your profile to `output/jobs/{job-slug}/refined.md`. This file contains only the positions, bullets, and skills that were selected and polished for that job.
@@ -201,6 +204,7 @@ output/                               # default --profile-dir (all paths relativ
   source.json / source.md
   refined.md                          # your full profile (editable)
   refined.json
+  refined-history/                    # prior refined.json snapshots (auto, capped)
   jobs.json
   generation.json
   jobs/

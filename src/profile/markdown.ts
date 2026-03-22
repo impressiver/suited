@@ -52,7 +52,7 @@ function upgradeIfChanged<T>(parsed: T, original: Sourced<T> | undefined, now: s
 // Profile → Markdown
 // ---------------------------------------------------------------------------
 
-export async function profileToMarkdown(profile: Profile, filePath: string): Promise<void> {
+export function profileMarkdownContent(profile: Profile): string {
   const lines: string[] = [];
 
   lines.push('# Resume Profile\n\n');
@@ -177,7 +177,11 @@ export async function profileToMarkdown(profile: Profile, filePath: string): Pro
     }
   }
 
-  await writeFile(filePath, lines.filter(Boolean).join(''), 'utf-8');
+  return lines.filter(Boolean).join('');
+}
+
+export async function profileToMarkdown(profile: Profile, filePath: string): Promise<void> {
+  await writeFile(filePath, profileMarkdownContent(profile), 'utf-8');
 }
 
 // ---------------------------------------------------------------------------

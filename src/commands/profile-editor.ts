@@ -11,7 +11,6 @@ import {
   loadActiveProfile,
   loadRefined,
   refinedJsonPath,
-  refinedMdPath,
   saveRefined,
   saveSource,
   sourceMdPath,
@@ -31,8 +30,7 @@ export interface ProfileEditorOptions {
 async function persistProfile(profile: Profile, profileDir: string): Promise<void> {
   if (await fileExists(refinedJsonPath(profileDir))) {
     const refined = await loadRefined(profileDir);
-    await saveRefined({ ...refined, profile }, profileDir);
-    await profileToMarkdown(profile, refinedMdPath(profileDir));
+    await saveRefined({ ...refined, profile }, profileDir, { reason: 'profile-editor' });
   } else {
     await saveSource(profile, profileDir);
     await profileToMarkdown(profile, sourceMdPath(profileDir));

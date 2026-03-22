@@ -96,7 +96,7 @@ applyDirectEdit(
 
 **`computeRefinementDiff` note:** This function does not exist in the codebase today. It requires refactoring the inline diff-generation logic from `reviewRefinements()` in `commands/refine.ts` into a pure function that takes two Profile objects and returns `DiffBlock[]`. This is new design work, not a simple extraction.
 
-**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and persists plain-string contact fields to **global** config (`contact.json` under the suited XDG config directory). Does **not** call inquirer.
+**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and persists plain-string contact fields to **global** config (`contact.json` under the suited XDG config directory). Global keys **merge** with the existing file: properties not present on the `fields` argument are left unchanged; for each global key that **is** present, a non-empty trimmed value updates that key and an empty string removes it (so a partial CLI edit does not wipe other saved fields). Does **not** call inquirer.
 
 Commands **refactor** to delegate to services; CLI behavior stays the same at the user-visible level.
 

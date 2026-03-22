@@ -2,6 +2,7 @@ import { profileToMarkdown } from '../profile/markdown.ts';
 import type { ContactMeta, Profile, Sourced } from '../profile/schema.ts';
 import {
   loadActiveProfile,
+  loadContactMeta,
   loadRefined,
   refinedJsonPath,
   saveContactMeta,
@@ -58,8 +59,22 @@ function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profil
   return { ...profile, contact };
 }
 
+const GLOBAL_CONTACT_KEYS: (keyof ContactMeta)[] = [
+  'headline',
+  'email',
+  'phone',
+  'location',
+  'linkedin',
+  'website',
+  'github',
+];
+
 /**
  * Writes contact fields into the active profile file (refined preferred over source) and global contact config.
+ *
+ * Global `contact.json` is merged: keys not present on `fields` keep their previous values. For each global key
+ * that *is* present on `fields`, a non-empty trimmed string updates that key; an empty string removes it. This
+ * avoids wiping saved email/phone/etc. when the active profile temporarily lacks those fields.
  */
 export async function mergeContactMeta(fields: ContactFields, profileDir: string): Promise<void> {
   let profile = await loadActiveProfile(profileDir);
@@ -73,14 +88,16 @@ export async function mergeContactMeta(fields: ContactFields, profileDir: string
     await profileToMarkdown(profile, sourceMdPath(profileDir));
   }
 
-  const meta: ContactMeta = {
-    headline: profile.contact.headline?.value,
-    email: profile.contact.email?.value,
-    phone: profile.contact.phone?.value,
-    location: profile.contact.location?.value,
-    linkedin: profile.contact.linkedin?.value,
-    website: profile.contact.website?.value,
-    github: profile.contact.github?.value,
-  };
-  await saveContactMeta(meta, profileDir);
+  const existing = await loadContactMeta(profileDir);
+  const next: ContactMeta = { ...existing };
+  for (const k of GLOBAL_CONTACT_KEYS) {
+    if (!Object.hasOwn(fields, k)) continue;
+    const raw = fields[k];
+    if (typeof raw === 'string' && raw.trim()) {
+      next[k] = raw.trim();
+    } else {
+      delete next[k];
+    }
+  }
+  await saveContactMeta(next, profileDir);
 }

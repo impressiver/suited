@@ -62,6 +62,7 @@ export function profileMarkdownContent(profile: Profile): string {
   // Contact
   lines.push('## Contact\n\n');
   lines.push(sf('Name', profile.contact.name));
+  lines.push(sf('Headline', profile.contact.headline));
   lines.push(sf('Email', profile.contact.email));
   lines.push(sf('Phone', profile.contact.phone));
   lines.push(sf('Location', profile.contact.location));
@@ -353,6 +354,11 @@ export async function markdownToProfile(
       switch (f.label) {
         case 'Name':
           contact.name = up(f.value, contact.name);
+          break;
+        case 'Headline':
+          contact.headline = contact.headline
+            ? up(f.value, contact.headline)
+            : { value: f.value, source: f.source };
           break;
         case 'Email':
           contact.email = contact.email

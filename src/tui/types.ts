@@ -19,10 +19,17 @@ export const SCREEN_ORDER: ScreenId[] = [
   'settings',
 ];
 
+/** Palette / letter / number nav pushes these as overlays; `activeScreen` stays the underlay. */
+export const OVERLAY_NAV_SCREEN_IDS: ScreenId[] = ['import', 'contact', 'settings', 'generate'];
+
+export function isOverlayNavScreen(id: ScreenId): boolean {
+  return OVERLAY_NAV_SCREEN_IDS.includes(id);
+}
+
 export type FocusTarget = 'sidebar' | 'content';
 
 export const NAV_LABELS: Record<ScreenId, string> = {
-  dashboard: 'Dashboard',
+  dashboard: 'Resume',
   import: 'Import',
   refine: 'Refine',
   generate: 'Generate',

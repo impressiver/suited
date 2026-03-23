@@ -9,7 +9,7 @@ Use this file to **route work**, avoid duplicate effort, and pick the **smallest
 ## 1. Start here (3 steps)
 
 1. Read **[`project.md`](./project.md)** — invariants (accuracy, profile dir, no duplicate pipelines).
-2. If your work touches the **default `suited` UI** or `src/tui/**`, read **[`tui-phased-delivery.md`](./tui-phased-delivery.md)** (Phase A vs B vs C) and the **global rules** in [`tui-README.md`](./tui-README.md) (non-TTY, key precedence, forbidden imports).
+2. If your work touches the **default `suited` UI** or `src/tui/**`, read **[`tui-document-shell.md`](./tui-document-shell.md)** (target shell) plus **[`tui-phased-delivery.md`](./tui-phased-delivery.md)** and the **global rules** in [`tui-README.md`](./tui-README.md) (non-TTY, key precedence, forbidden imports).
 3. Open **[§2 Workstreams](#2-workstreams)** below, pick **one** stream, then only open the **Primary specs** for that row.
 
 ---
@@ -24,7 +24,8 @@ Each row is a **parallelizable lane** when dependencies are satisfied. Prefer **
 | **S1** | **Service extraction** | Callable modules from commands; no new UI | [`tui-goals-and-constraints.md`](./tui-goals-and-constraints.md), [`tui-phased-delivery.md`](./tui-phased-delivery.md) (Phase B), [`tui-implementation-order.md`](./tui-implementation-order.md) step 1 | `src/services/` (new/refactors), `src/commands/*` | P0 for contracts |
 | **T0** | **TUI bootstrap** | Ink app, store, layout, TTY gate, build | [`tui-stack-and-structure.md`](./tui-stack-and-structure.md), [`tui-build.md`](./tui-build.md), [`tui-terminal.md`](./tui-terminal.md), [`tui-README.md`](./tui-README.md) (non-TTY SSOT) | `src/tui/**`, `src/commands/flow.ts`, `tsconfig` | — |
 | **T1** | **Shared TUI components** | Reusable inputs, lists, spinners, diff, scroll | [`tui-architecture.md`](./tui-architecture.md), [`tui-ui-mockups.md`](./tui-ui-mockups.md) | `src/tui/components/**` | T0 |
-| **T2** | **Screens** | One screen per assignment; wire to **`src/services/`** (no `commands/` imports) | [`tui-screens.md`](./tui-screens.md), [`tui-ux.md`](./tui-ux.md), [`tui-state-machines.md`](./tui-state-machines.md) as needed | `src/tui/screens/**` | T0+T1; **S1** for service-backed data |
+| **TD** | **Document shell** | `DocumentShell`, TopBar, StatusBar, active session, palette, overlays; migrate off sidebar | [`tui-document-shell.md`](./tui-document-shell.md), [`tui-architecture.md`](./tui-architecture.md), [`tui-ui-mockups.md`](./tui-ui-mockups.md) | `src/tui/**` (shell, `store`, `App`) | T0+T1; **S1** |
+| **T2** | **Screens** | Overlay flows; wire to **`src/services/`** (no `commands/` imports) | [`tui-document-shell.md`](./tui-document-shell.md), [`tui-screens.md`](./tui-screens.md), [`tui-ux.md`](./tui-ux.md), [`tui-state-machines.md`](./tui-state-machines.md) as needed | `src/tui/screens/**` | T0+T1+TD; **S1** for service-backed data |
 | **L1** | **LLM streaming** | `callWithToolStreaming`, tool events, AbortSignal | [`tui-architecture.md`](./tui-architecture.md), [`tui-testing.md`](./tui-testing.md) | `src/claude/**`, TUI consumers | P0; coordinate with T2 on Refine/Generate |
 | **Q1** | **QA / CI** | Tests, forbidden-import gates, footers | [`tui-testing.md`](./tui-testing.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) | `src/**/*.test.*`, CI scripts | After `src/tui/**` exists |
 
@@ -44,18 +45,23 @@ flowchart TB
   S1[Stream S1 Services]
   T0[Stream T0 TUI bootstrap]
   T1[Stream T1 TUI components]
+  TD[Stream TD Document shell]
   T2[Stream T2 Screens]
   L1[Stream L1 LLM streaming]
   Q1[Stream Q1 QA CI]
   P0 --> S1
   T0 --> T1
+  T0 --> TD
+  T1 --> TD
   T1 --> T2
+  TD --> T2
   S1 -.->|Phase B data| T2
   T0 --> T2
   P0 --> L1
   T2 --> L1
   T0 --> Q1
   T2 --> Q1
+  TD --> Q1
 ```
 
 Sequential **order within TUI** when alone on the team: follow [`tui-implementation-order.md`](./tui-implementation-order.md). The graph above shows **what can run in parallel** across people.
@@ -66,12 +72,12 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 
 | Activity | Read |
 |----------|------|
-| **Curate screen (planned)** | [`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned), [`tui-definition-of-done.md` — post–Phase C](./tui-definition-of-done.md#whats-left-postphase-c-polish) |
+| **Job-targeted editing (ex-Curate)** | [`tui-document-shell.md`](./tui-document-shell.md) §4–6 (job context on document); legacy Curate section in [`tui-screens.md`](./tui-screens.md#curatescreen-planned) |
 | **Refinement history / revert** | [`refinement-history.md`](./refinement-history.md), [`project.md` §7](./project.md#7-profile-directory-layout-conceptual) |
 | Decide Phase A vs B scope | [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) |
 | Layout / keyboard / streaming UI | [`tui-architecture.md`](./tui-architecture.md) |
-| Holistic UX, header/footer, blocking confirms | [`tui-ux.md` — Holistic design principles](./tui-ux.md#holistic-design-principles), [`tui-architecture.md`](./tui-architecture.md) (Footer composition, Header pipeline, Blocking UI) |
-| Per-screen behavior | [`tui-screens.md`](./tui-screens.md) |
+| Holistic UX, chrome, blocking confirms | [`tui-document-shell.md`](./tui-document-shell.md), [`tui-ux.md` — Holistic design principles](./tui-ux.md#holistic-design-principles), [`tui-architecture.md`](./tui-architecture.md) (Blocking UI; legacy Header/Footer notes) |
+| Per-screen / overlay behavior | [`tui-document-shell.md`](./tui-document-shell.md), [`tui-screens.md`](./tui-screens.md) |
 | Errors, Esc vs Ctrl+C | [`tui-failure.md`](./tui-failure.md) |
 | Open decisions | [`tui-open-questions.md`](./tui-open-questions.md) |
 | Size / LOC | [`tui-scope.md`](./tui-scope.md) |
@@ -111,6 +117,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 | **7** | **Generate screen (T2)** — build/render pipeline, section `CheckboxList`, JD sources, template + flair, `pendingJobId` | **Done** (2026-03-19) |
 | **8** | **Refine + Profile MVP** — Refine: Q&A, `applyRefinements`, `DiffView`, `saveRefined`; Profile: stack + summary/bullets, persist like CLI `profile-editor` | **Done** (2026-03-19) |
 | **9+** | Phase C + post-C polish | **Phase C** checklist: [`tui-definition-of-done.md` § Phase C](./tui-definition-of-done.md#phase-c--full-vision-north-star). Optional follow-ups: [`post–Phase C`](./tui-definition-of-done.md#whats-left-postphase-c-polish). |
+| **D** | **Document shell** | **Done (in-repo)** — normative spec [`tui-document-shell.md`](./tui-document-shell.md); checklist [`tui-definition-of-done.md` § Phase D](./tui-definition-of-done.md#phase-d--document-shell-target-tui). Includes **`DocumentShell`**, refined **Resume** editor (**`FreeCursorMultilineInput`**, **`mdExternalRevision`**), outline / **`refineResumeIntent`** with optional **`positionId`**, polish diff on dashboard. Residual optional items called out in DoD (e.g. side-by-side outline column). |
 
 ### Phase 1 — completed work
 
@@ -144,7 +151,7 @@ See [`README.md`](./README.md) in this folder for a grouped list of all spec fil
 
 - **`src/tui/dashboardVariant.ts`** (+ test) — maps snapshot + `hasApiKey()` to the five dashboard states.
 - **`src/tui/settings/`** — `probeProvider.ts` (Anthropic / OpenRouter key probes), `upsertEnvFile.ts` (+ test) for `.env` merges.
-- **`src/tui/screens/DashboardScreen.tsx`** — `StatusBadge` + variant; health (`computeHealthScore`) when refined; **validation** (`validateProfile` reference count) when source exists; `ScrollView` pipeline/activity (navigation is the sidebar only).
+- **`src/tui/screens/DashboardScreen.tsx`** — under **`DocumentShell`**: `StatusBadge` + variant; health / validation when applicable; **read-only** `TextViewport` without refined, **`FreeCursorMultilineInput`** + section strip + polish diff when refined; global nav is palette / number keys (no legacy sidebar).
 - **`src/tui/screens/SettingsScreen.tsx`** — provider list + masked `TextInput`, **`s`** save (probe + write `.env`), shortcuts **`a`/`A`**, **`o`/`O`**, **`e`**, **`l`**.
 - **`src/tui/App.tsx`** — number-key screen jumps / letter jumps **no-op** when already on that screen (so **Settings** can use **`s`** for save). **↑↓** screen-cycle on Dashboard **content** focus (no in-panel list).
 

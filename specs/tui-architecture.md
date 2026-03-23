@@ -1,8 +1,24 @@
 # Architecture
 
-## Global state (`store.ts`)
+> **Target UI:** **[`tui-document-shell.md`](./tui-document-shell.md)** defines the **document-first** shell (TopBar, StatusBar, **active document session**, palette, overlays, section context). This file remains authoritative for **`useInput`** discipline, **blocking UI**, **streaming**, and **shared components**. **Shipped (Phase D in progress):** `DocumentShell` replaces **Header + Sidebar + Footer**; **`Sidebar.tsx` removed** — navigation is **TopBar** + **`:`** palette (+ legacy **1–n** / letter jumps until fully retired). Remaining sections that still mention **sidebar** / **Header pipeline** as the live chrome may lag — treat **document shell** + this file’s **target store** list as normative going forward.
 
-`useReducer` + Context. Tracks active screen, loaded profile, focus target, `operationInProgress` (suppresses sidebar/screen-jump during async; content may still scroll), optional `lastError`.
+## Target additions to global state (document shell)
+
+**In store today:** **`persistenceTarget`**, **`paletteOpen`**, **`overlayStack`** + **`getEffectiveScreen`** (see `src/tui/store.tsx`). **TopBar / main panel** use the **effective** screen (top overlay if any, else **`activeScreen`**). **Still illustrative / not wired:**
+
+- **`shellScreen`:** `'resume' | 'import' | …` — could collapse **`activeScreen`** + **`overlayStack`** later.
+- **`focusedSectionId`:** optional `ResumeSectionId` — scroll highlight + scope for scoped actions.
+- **`helpOpen`:** still local to `App.tsx` (not store); Ctrl-? overlay per document shell.
+
+**Invariant:** all mutations to the active resume body flow through the **session profile** and **one save dispatch** per `persistenceTarget` (see document shell §7).
+
+Legacy fields (`activeScreen`, `focusTarget`, `SCREEN_ORDER` jumps) **MAY** remain until overlay routing and palette fully replace screen stacking; default **`focusTarget`** is **`content`** (sidebar removed from layout).
+
+---
+
+## Global state (`store.ts`) — current shipped shape
+
+`useReducer` + Context. Tracks active screen, loaded profile, focus target, `operationInProgress` (suppresses screen-jump during async; content may still scroll), optional `lastError`, **document session** target, palette.
 
 ```typescript
 interface AppState {
@@ -10,25 +26,29 @@ interface AppState {
   profile: Profile | null;
   hasRefined: boolean;
   activeScreen: Screen;
-  focusTarget: string; // 'sidebar' | 'content' | screen-specific sub-region
-  inTextInput: boolean; // true when any TextInput/MultilineInput has focus — gates global shortcuts
+  focusTarget: string; // legacy; default 'content' without sidebar
+  inTextInput: boolean;
   operationInProgress: boolean;
   lastError: string | null;
-  pendingJobId: string | null; // set by JobsScreen 'g' action; consumed + cleared by GenerateScreen on mount
-  blockingUiDepth: number; // confirms + error menus; App suppresses global q/jumps when > 0
+  pendingJobId: string | null;
+  blockingUiDepth: number;
+  persistenceTarget: PersistenceTarget; // global-refined | job
+  paletteOpen: boolean;
+  overlayStack: ScreenId[];
 }
 
 type Action =
   | { type: 'SET_SCREEN'; screen: Screen }
-  | { type: 'SET_PROFILE'; profile: Profile; hasRefined: boolean }
-  | { type: 'SET_FOCUS'; target: string }
-  | { type: 'SET_IN_TEXT_INPUT'; value: boolean }
-  | { type: 'SET_OPERATION_IN_PROGRESS'; value: boolean }
-  | { type: 'SET_ERROR'; error: string | null }
-  | { type: 'SET_PENDING_JOB'; jobId: string | null }
-  | { type: 'INCREMENT_BLOCKING_UI' }
-  | { type: 'DECREMENT_BLOCKING_UI' };
+  | { type: 'SET_PALETTE_OPEN'; open: boolean }
+  | { type: 'PUSH_OVERLAY'; screen: Screen }
+  | { type: 'POP_OVERLAY' }
+  | { type: 'CLEAR_OVERLAYS' }
+  | { type: 'SET_PERSISTENCE_TARGET'; target: PersistenceTarget }
+  // … SET_PROFILE, SET_FOCUS, SET_IN_TEXT_INPUT, SET_OPERATION_IN_PROGRESS,
+  // SET_ERROR, SET_PENDING_JOB, CANCEL_OPERATION, profile editor flags, blocking UI, …
 ```
+
+See **`src/tui/store.tsx`** for the full discriminated union.
 
 `pendingJobId` solves the Jobs → Generate navigation: `JobsScreen` dispatches `SET_SCREEN + SET_PENDING_JOB`, then `GenerateScreen` reads and clears it on mount.
 
@@ -42,12 +62,12 @@ Start simple. Cross-screen state growth is an implementation detail.
 
 | Key | Behavior |
 |-----|----------|
-| `Tab` | Advance focus to next region in active screen's Tab order |
+| `Tab` | Advance focus to next region in active screen's Tab order. **Exception:** on **Resume** with refined markdown, **Tab** refocuses the body editor after **Esc** left **navigation mode** (see [`tui-document-shell.md`](./tui-document-shell.md) §8). |
 | `Shift+Tab` | Previous focus region. In Ink, detect via raw escape sequence `\x1b[Z` inside `useInput`; terminal support varies — treat as best-effort. |
 | `↑↓` | Move selection in focused list or diff block |
 | `Enter` | Confirm / activate; submit single-line input |
-| `Esc` | Pop one level: blur input → cancel sub-state → go back → (only then) quit prompt |
-| `1–n` | Direct screen jump for sidebar `SCREEN_ORDER` (`n` = row count; suppressed when `operationInProgress` or `inTextInput`) |
+| `Esc` | **Generate** / **Jobs** handle inner back first; else **`POP_OVERLAY`** when **`overlayStack`** non-empty; else go to **Resume** (`dashboard`) from other full screens. On **Resume** refined editor, **Esc** first blurs the markdown body (clears **`inTextInput`**) so **:** / **1–n** / letter jumps work; a second **Esc** from an already-unfocused **dashboard** is a no-op for navigation. |
+| `1–n` | Direct jump via `SCREEN_ORDER` (`n` = row count; **↑↓** screen-cycle suppressed while an overlay is open; suppressed when `operationInProgress` or `inTextInput`) |
 | Letter shortcuts | Screen jump per implementation map (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred). **Planned:** **`u` → Curate** when that sidebar row ships ([resolved list](./tui-open-questions.md#resolved)). |
 | `:` or `/` | Open command palette |
 | `q` | Quit (suppressed during any text input) |
@@ -271,14 +291,14 @@ Across the shell, **at most one** list-style **caret** (`›`, bright / `white` 
 
 | Area | Caret | Dimming |
 |------|-------|---------|
-| **`Sidebar`** | **`focusTarget === 'sidebar'`** and row is `activeScreen`: show `›` on that row only. | When focus is **`content`**, **all** sidebar rows dim; **no** caret on any row (current screen is still implied by the header / active route). |
+| **Sidebar (removed)** | *N/A — component deleted;* was caret on active row when `focusTarget === 'sidebar'`. | **`DocumentShell`** + palette / TopBar replace sidebar wayfinding. |
 | **`SelectList`** | Caret on the selected row **only when `isActive` is true** (this list owns arrow keys). | When **`isActive` is false**, **no** caret on any row; **all** rows dim. Selection index may still update programmatically for when the list becomes active again. |
 | **Contact (field list)** | Caret on the focused field label **only when** the panel has content focus **and** phase is **browse** (not while a `TextInput` is focused — avoid two cursors). | When sidebar has focus, or for non-selected fields, dim labels and values accordingly. |
 | **Dashboard (main panel)** | No `SelectList` in the panel; no list caret. Use sidebar / number / letter keys. | N/A |
 
 **Not a caret:** Breadcrumb separators (e.g. `Summary › Experience` in Profile) use `›` as typography in **dim** text; they **MUST NOT** be styled as the white list caret.
 
-**Implementation reference:** `Sidebar.tsx` (takes `focusTarget`), `SelectList.tsx`, `ContactScreen.tsx`; split layouts (e.g. Jobs list + detail) rely on **`isActive={false}`** on the non-focused column.
+**Implementation reference:** `DocumentShell.tsx`, `SelectList.tsx`, `ContactScreen.tsx`; split layouts (e.g. Jobs list + detail) rely on **`isActive={false}`** on the non-focused column.
 
 ---
 
@@ -286,22 +306,16 @@ Across the shell, **at most one** list-style **caret** (`›`, bright / `white` 
 
 ```
 <App>
-  <Layout>
-    <Header />           ← "Suited · Jane Smith · 12 positions · refined ✓"
-    <Box flexDirection="row">
-      <Sidebar />        ← nav items; white › on active row only when sidebar has focus; all dim, no › when content focused
-      <ContentArea>      ← flex:1
-        <DashboardScreen />      (screen === 'dashboard')
-        <ImportScreen />         (screen === 'import')
-        <RefineScreen />         (screen === 'refine')
-        <GenerateScreen />       (screen === 'generate')
-        <JobsScreen />           (screen === 'jobs')
-        <ProfileEditorScreen />  (screen === 'profile')
-        <ContactScreen />        (screen === 'contact')
-        <SettingsScreen />       (screen === 'settings')
-      </ContentArea>
-    </Box>
-    <Footer />           ← context-sensitive copy; see Keyboard/Footer table
+  {paletteOpen && <CommandPalette … />}
+  <Layout>               ← wraps DocumentShell (TopBar + main + StatusBar)
+    <DashboardScreen />      (screen === 'dashboard')
+    <ImportScreen />         (screen === 'import')
+    <RefineScreen />         (screen === 'refine')
+    <GenerateScreen />       (screen === 'generate')
+    <JobsScreen />           (screen === 'jobs')
+    <ProfileEditorScreen />  (screen === 'profile')
+    <ContactScreen />        (screen === 'contact')
+    <SettingsScreen />       (screen === 'settings')
   </Layout>
 </App>
 ```

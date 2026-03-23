@@ -11,11 +11,17 @@ import {
   loadActiveProfile,
   loadJobRefinement,
   loadJobs,
+  makeJobSlug,
   saveJob,
 } from '../../profile/serializer.ts';
 import { formatCurationPreviewLines } from '../../services/curationPreview.ts';
 import { formatJobEvaluationLines } from '../../services/jobEvaluationText.ts';
 import { runJobRefinementPipeline } from '../../services/jobRefinement.ts';
+import {
+  globalRefinedTarget,
+  jobRefinedTarget,
+  persistenceTargetsEqual,
+} from '../activeDocumentSession.ts';
 import {
   ConfirmPrompt,
   MultilineInput,
@@ -70,6 +76,23 @@ type Mode =
   | { m: 'feedbackDone'; note: string }
   | { m: 'err'; msg: string; canRetryPrepare?: boolean };
 
+function jobFromMode(mode: Mode): SavedJob | null {
+  switch (mode.m) {
+    case 'detail':
+    case 'viewJd':
+    case 'deleteAsk':
+    case 'prepareRun':
+    case 'prepareOk':
+    case 'viewPrep':
+    case 'feedbackRun':
+    case 'feedbackView':
+    case 'feedbackApply':
+      return mode.job;
+    default:
+      return null;
+  }
+}
+
 export interface JobsScreenProps {
   profileDir: string;
 }
@@ -77,7 +100,8 @@ export interface JobsScreenProps {
 export function JobsScreen({ profileDir }: JobsScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { activeScreen, focusTarget, inTextInput, operationInProgress } = useAppState();
+  const { activeScreen, focusTarget, inTextInput, operationInProgress, persistenceTarget } =
+    useAppState();
   const [cols, rows] = useTerminalSize();
   const panelW = panelInnerWidth(cols);
   const textW = panelFramedTextWidth(cols);
@@ -123,6 +147,24 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (activeScreen !== 'jobs') {
+      return;
+    }
+    const job = jobFromMode(mode);
+    let next = globalRefinedTarget();
+    if (job) {
+      const id = job.id.trim();
+      const slug = makeJobSlug(job.company, job.title);
+      if (id && slug) {
+        next = jobRefinedTarget(id, slug);
+      }
+    }
+    if (!persistenceTargetsEqual(next, persistenceTarget)) {
+      dispatch({ type: 'SET_PERSISTENCE_TARGET', target: next });
+    }
+  }, [activeScreen, dispatch, mode, persistenceTarget]);
+
   const detailJobId = mode.m === 'detail' ? mode.job.id : null;
 
   useEffect(() => {
@@ -162,7 +204,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   useRegisterBlockingUi(active && mode.m === 'err');
 
   const jobsFooterHint = useMemo(() => {
-    const sb = ' · Tab sidebar';
+    const sb = ' · : palette';
     switch (mode.m) {
       case 'list':
         return `Jobs · ↑↓ · Enter open · a add · d delete · p prepare · g generate · preview below list${sb}`;
@@ -430,7 +472,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         return;
       }
       if (mode.m === 'list') {
-        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
+        navigate('dashboard');
       }
     },
     { isActive: active },

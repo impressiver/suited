@@ -4,7 +4,7 @@
 
 **Product contract (whole repo):** [`project.md`](./project.md)
 
-**TUI (default interactive `suited`):** bookmark [`tui.md`](./tui.md) → index [`tui-README.md`](./tui-README.md) — **Phase C** complete per [`tui-definition-of-done.md`](./tui-definition-of-done.md); optional polish listed there as *post–Phase C*.
+**TUI (default interactive `suited`):** bookmark [`tui.md`](./tui.md) → index [`tui-README.md`](./tui-README.md). **Target shell:** [`tui-document-shell.md`](./tui-document-shell.md). **Phase C** complete per [`tui-definition-of-done.md`](./tui-definition-of-done.md); **Phase D** = document shell; optional polish listed as *post–Phase C*.
 
 User guide and module layout: [`README.md`](../README.md), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
@@ -44,6 +44,7 @@ Grouped for **planning → design → build → verify**. Order within build fol
 
 | File | Role |
 |------|------|
+| [`tui-document-shell.md`](./tui-document-shell.md) | **Target** content-first shell: session, TopBar, StatusBar, overlays, section context |
 | [`tui-architecture.md`](./tui-architecture.md) | State, keyboard, footer modes, streaming, focus, selection caret rules |
 | [`tui-state-machines.md`](./tui-state-machines.md) | Refine / Generate diagrams |
 | [`tui-ui-mockups.md`](./tui-ui-mockups.md) | ASCII wireframes |
@@ -64,7 +65,7 @@ Grouped for **planning → design → build → verify**. Order within build fol
 | File | Role |
 |------|------|
 | [`tui-testing.md`](./tui-testing.md) | Vitest, ink-testing-library, forbidden imports |
-| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phases A–C checklists + post–C polish |
+| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phases A–C + Phase D document shell + post–C polish |
 
 ### Index (global TUI rules)
 

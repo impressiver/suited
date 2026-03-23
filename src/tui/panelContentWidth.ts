@@ -1,9 +1,9 @@
 /**
  * Approximate inner width of the main panel for wrapping multiline text.
- * Matches `Layout` padding (1+1) + `Sidebar` (22) + `marginRight` (2).
+ * Matches `DocumentShell` horizontal padding (1 char each side on the outer `Layout` box).
  */
 export function panelInnerWidth(terminalCols: number): number {
-  return Math.max(20, terminalCols - 26);
+  return Math.max(20, terminalCols - 2);
 }
 
 /**

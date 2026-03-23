@@ -1,6 +1,11 @@
 export { type CheckboxItem, CheckboxList, type CheckboxListProps } from './CheckboxList.tsx';
 export { ConfirmPrompt, type ConfirmPromptProps } from './ConfirmPrompt.tsx';
 export { DiffView, type DiffViewProps, formatDiffBlockLines } from './DiffView.tsx';
+export {
+  FreeCursorMultilineInput,
+  type FreeCursorMultilineInputProps,
+  type JumpToCharRequest,
+} from './FreeCursorMultilineInput.tsx';
 export { InlineEditor, type InlineEditorProps } from './InlineEditor.tsx';
 export { MultilineInput, type MultilineInputProps } from './MultilineInput.tsx';
 export { ProgressSteps, type ProgressStepsProps } from './ProgressSteps.tsx';

@@ -1,16 +1,16 @@
 # UX & workflow
 
-The CLI mental model is **Import → Refine → (optional per-job Curate) → Generate**. The TUI exposes **`SCREEN_ORDER.length` sidebar destinations** plus **manual section editing** opened from **Refine** or *(planned)* **Curate**, with **Dashboard** for suggested next step.
+**Target shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** — one **Resume** markdown viewport, **TopBar** (screen + **Job:**), **StatusBar** (glyphs + pipeline), **`:`** palette, **Ctrl-?** help. **Job-targeted** editing uses the **same** UX as base refined; only **persistence** changes (`jobs/{slug}/refined.*`). Planned **Curate** as a separate sidebar row is **superseded** by **job selection on the document** (see document shell §4–6).
 
-**Curate (planned):** A future **main sidebar** row for **job-targeted** iteration on refined content — job list → per-job hub (polish, consultant, edit sections, direct edit, clear & restart from global refined + plan). See [CurateScreen](./tui-screens.md#curatescreen-planned).
+The CLI mental model remains **Import → Refine → (optional per-job iteration) → Generate**. The **shipped** TUI used a **sidebar** (`SCREEN_ORDER`, Dashboard, etc.); migration moves actions into **palette + overlays** while preserving services.
 
-- **Pipeline status** — Derived from profile data (source, `refined.json`, jobs, last PDF). Compact indicators in the **Header** on every screen (when implemented).
-- **Suggested next step** — Dashboard highlights one primary action from state; secondary actions via sidebar.
-- **First-run / blocked** — No API key → banner + path to Settings. No source → suggest Import. Avoid dead-end dashboards.
+- **Pipeline status** — **Target:** compact **graphical** segments on **StatusBar right** (and optional **Dashboard** palette dialog). **Not** on TopBar. Legacy: Header pipeline strip until removed.
+- **Suggested next step** — **Target:** palette **Dashboard** / health / validate; empty state on Resume when no source.
+- **First-run / blocked** — No API key → StatusBar / modal path to Settings; no source → Import CTA. Non-LLM actions MUST work without a key.
 
-**Discoverability:** `1–n` screen jumps (`n` = sidebar row count) + letter shortcuts for sidebar targets (exact map lives with `SCREEN_ORDER` in `App.tsx`). Today: **`d i c j r g s`**. **`p` is not a global jump** (reserved for **Jobs** → prepare when that screen defers shortcuts). **Planned Curate row:** add **`u` → Curate** (see [`tui-open-questions.md`](./tui-open-questions.md)). **Manual profile sections:** Refine → *Edit profile sections* (global refined); *(planned)* Curate → *Edit profile sections* (job-scoped store). **Command palette** (`:` / `/`) is specified in architecture but **not implemented** yet; when added, it **MUST** take key precedence while open.
+**Discoverability (target):** **`:`** palette + **Ctrl-?** (fallbacks `?`, `h`, Help item) + outline/jump; **MUST NOT** rely only on Tab through every section. Legacy **`1–n`** sidebar jumps **removed** when migration completes. **Manual profile sections:** scoped **Edit** from section context; save respects **active session** target.
 
-**Contextual footer:** The bottom hint line reflects the **focused panel**’s current screen and step (lists, scroll panes, confirms, etc.). Inline “nav” dim lines under menus were removed so shortcuts are not duplicated in the body.
+**Contextual chrome (target):** **Single-line StatusBar** — left = alerts/ops, right = pipeline/health; **no** two-line footer cheat sheet. Deep overlay footers MAY add one line for that flow only.
 
 ```mermaid
 flowchart LR
@@ -29,9 +29,9 @@ flowchart LR
   Gen --> Out[PDFs / artifacts]
 ```
 
-**Curate** (dotted edges) is **optional**: users may go **Refine → Generate** or **Jobs → Generate** without it. When used, **Curate** is the hub for **per-job curated** profile iteration before or between generates.
+**Per-job iteration** (dotted edges) is **optional**: users may go **Refine → Generate** or **Jobs → Generate** without editing a job copy. When used, **job target + same document UX** replaces the old **Curate** sidebar concept.
 
-Users may jump to any screen anytime; Dashboard ties intent back to the pipeline.
+Users may open palette / overlays anytime; **Resume** is the default home for the manuscript.
 
 **Generate — template vs flair:** **Template** picks the **baseline layout**; **flair** (level) is a **separate** control on how much **creative freedom** the layout/design agent may use when rendering that baseline (more flair → more **variety** and **artistic license** in the visual result). Defaults in Settings apply only to the initial flair level, not to template choice.
 
@@ -51,11 +51,11 @@ This section records a **joint UX / engineering review** of the shell: what “g
 
 ### Wayfinding
 
-- **Screen + profile context:** The user **SHOULD** always see **which screen** they are on, **which profile directory** is active (or an honest “no profile” state), and **whether refined output exists** — without opening Dashboard. Today the **header** carries name / counts / coarse status; **pipeline dots** in mockups ([`tui-ui-mockups.md`](./tui-ui-mockups.md)) are the **target** for full parity on every screen (not only Dashboard body copy).
-- **Breadcrumbs inside deep editors:** Profile section stacks stay **inside** the editor panel ([resolved](./tui-open-questions.md#resolved)); the shell header does not duplicate them.
-- **Suggested next step:** Dashboard remains the **primary** place for narrative “what to do next”; other screens **SHOULD** use short titles + footers, not duplicate long coaching text, unless the user is blocked (no API key, no source).
+- **Screen + job context:** **TopBar** shows **screen** + **Job:** line only. **StatusBar right** carries pipeline/health glyphs. Profile directory **MAY** appear in palette “About / status” or Settings — not required on TopBar.
+- **Breadcrumbs inside deep editors:** Unchanged — stay inside overlay ([resolved](./tui-open-questions.md#resolved)).
+- **Suggested next step:** **Palette** Dashboard entry + empty states; avoid duplicating long coaching on StatusBar.
 
-**Implementation alignment:** **`Header`** (or equivalent) **SHOULD** consume the **same snapshot signals** as `getDashboardVariant` / pipeline badges so the strip does not drift from Dashboard logic. Adding a new pipeline milestone **MUST** update header + dashboard rules together (single source of derived state where feasible).
+**Implementation alignment:** StatusBar / palette **SHOULD** consume the **same derived signals** as `getDashboardVariant` / snapshot loaders so pipeline dots do not drift.
 
 ### Trust and predictability
 

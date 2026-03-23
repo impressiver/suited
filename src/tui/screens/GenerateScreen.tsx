@@ -18,7 +18,7 @@ import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
-import { useAppDispatch, useAppState } from '../store.tsx';
+import { getEffectiveScreen, useAppDispatch, useAppState } from '../store.tsx';
 
 type PickFlairSnapshot = {
   jd?: string;
@@ -97,7 +97,9 @@ export interface GenerateScreenProps {
 export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { pendingJobId, activeScreen, focusTarget, inTextInput } = useAppState();
+  const appState = useAppState();
+  const { pendingJobId, focusTarget, inTextInput, overlayStack } = appState;
+  const effectiveScreen = getEffectiveScreen(appState);
   const { createController, releaseController } = useOperationAbort();
   const [phase, setPhase] = useState<Phase>({ p: 'pick-source' });
   const [sourceIdx, setSourceIdx] = useState(0);
@@ -118,12 +120,20 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   >([]);
   const [sectionFocusIdx, setSectionFocusIdx] = useState(0);
 
-  const active = activeScreen === 'generate' && focusTarget === 'content';
+  const active = effectiveScreen === 'generate' && focusTarget === 'content';
+
+  const leaveGenerateSurface = useCallback(() => {
+    if (overlayStack.length > 0) {
+      dispatch({ type: 'POP_OVERLAY' });
+    } else {
+      navigate('dashboard');
+    }
+  }, [dispatch, navigate, overlayStack.length]);
 
   useRegisterBlockingUi(active && phase.p === 'err');
 
   const generateFooterHint = useMemo(() => {
-    const sb = ' · Tab sidebar';
+    const sb = ' · : palette';
     switch (phase.p) {
       case 'pick-source':
         return `Generate · ↑↓ · Enter · saved job or full resume${sb}`;
@@ -136,7 +146,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
       case 'pick-sections':
         return `Generate · Space toggle · Enter PDF · Esc back${sb}`;
       case 'done':
-        return `Generate · ↑↓ Enter next step · letter keys / sidebar still work${sb}`;
+        return `Generate · ↑↓ Enter next step · letter keys / palette${sb}`;
       case 'err':
         return phase.kind === 'preflight'
           ? `Generate · Enter back to source${sb}`
@@ -159,7 +169,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         return;
       }
       if (phase.p === 'pick-source') {
-        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
+        leaveGenerateSurface();
         return;
       }
       if (phase.p === 'pick-saved') {
@@ -184,7 +194,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         return;
       }
       if (phase.p === 'done') {
-        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
+        leaveGenerateSurface();
         return;
       }
       if (phase.p === 'err' && phase.kind === 'preflight') {

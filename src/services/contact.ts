@@ -3,13 +3,16 @@ import type { ContactMeta, Profile, Sourced } from '../profile/schema.ts';
 import {
   loadActiveProfile,
   loadContactMeta,
+  loadJobRefinedProfile,
   loadRefined,
   refinedJsonPath,
   saveContactMeta,
+  saveJobRefinedProfile,
   saveRefined,
   saveSource,
   sourceMdPath,
 } from '../profile/serializer.ts';
+import type { PersistenceTarget } from '../tui/activeDocumentSession.ts';
 import { fileExists } from '../utils/fs.ts';
 
 /** Editable contact fields (subset of `ContactInfo`). */
@@ -69,18 +72,45 @@ const GLOBAL_CONTACT_KEYS: (keyof ContactMeta)[] = [
   'github',
 ];
 
+export type MergeContactMetaOptions = {
+  /** When omitted or `global-refined`, behavior matches legacy CLI (global refined.json / source). */
+  persistenceTarget?: PersistenceTarget;
+};
+
 /**
- * Writes contact fields into the active profile file (refined preferred over source) and global contact config.
+ * Writes contact fields into the active profile file and global contact config.
+ *
+ * **Global target (default):** Base profile is `loadActiveProfile` (global `refined.json` if present, else
+ * `source.json`). Persists via `saveRefined` when refined exists, else `saveSource` + source markdown.
+ *
+ * **Job target:** Base profile is `loadJobRefinedProfile(profileDir, slug)` when that file exists; otherwise
+ * `loadActiveProfile` (same as the effective document the user sees when no job overlay exists yet). Persists
+ * only via `saveJobRefinedProfile` — never `saveRefined` / global refined.
  *
  * Global `contact.json` is merged: keys not present on `fields` keep their previous values. For each global key
  * that *is* present on `fields`, a non-empty trimmed string updates that key; an empty string removes it. This
  * avoids wiping saved email/phone/etc. when the active profile temporarily lacks those fields.
  */
-export async function mergeContactMeta(fields: ContactFields, profileDir: string): Promise<void> {
-  let profile = await loadActiveProfile(profileDir);
+export async function mergeContactMeta(
+  fields: ContactFields,
+  profileDir: string,
+  options?: MergeContactMetaOptions,
+): Promise<void> {
+  const target = options?.persistenceTarget ?? { kind: 'global-refined' as const };
+
+  let profile: Profile;
+  if (target.kind === 'job') {
+    const jobProfile = await loadJobRefinedProfile(profileDir, target.slug);
+    profile = jobProfile ?? (await loadActiveProfile(profileDir));
+  } else {
+    profile = await loadActiveProfile(profileDir);
+  }
+
   profile = mergeFieldsIntoProfile(profile, fields);
 
-  if (await fileExists(refinedJsonPath(profileDir))) {
+  if (target.kind === 'job') {
+    await saveJobRefinedProfile(profile, profileDir, target.slug);
+  } else if (await fileExists(refinedJsonPath(profileDir))) {
     const refined = await loadRefined(profileDir);
     await saveRefined({ ...refined, profile }, profileDir, { reason: 'contact-merge' });
   } else {

@@ -1,4 +1,8 @@
-# Phased delivery & current implementation
+# Phased delivery
+
+**Phase D (document shell):** Target UI is specified in [`tui-document-shell.md`](./tui-document-shell.md) and checklisted in [`tui-definition-of-done.md`](./tui-definition-of-done.md) (Phase D). It **supersedes** the sidebar-first layout as the north star; shipped code may lag until the strangler completes.
+
+---
 
 ## North star (Phase C — full coverage)
 
@@ -24,13 +28,13 @@ The baseline requirements — zero breakout, single full-screen Ink interface, n
 
 **Required:**
 
-- Ink **Layout**, **Sidebar**, and all primary screens rendered as Ink components — no subprocess delegation, no `DelegateScreen` placeholders.
+- Ink **Layout** (**DocumentShell** chrome), and all primary screens rendered as Ink components — no subprocess delegation, no `DelegateScreen` placeholders.
 - Screens that are not yet fully functional **MUST** render an inline "not yet implemented" message rather than spawning a subprocess or breaking out to CLI.
 - The `runTui` loop / `exitBag` / `cliArgs.ts` subprocess-delegation pattern is **not allowed** at any phase.
 
 **Current repo status (track in PRs; update this line when it changes):**
 
-- **Branch / main:** Phase **C** shipped: Dashboard (health + validation), Settings, Import, Contact, **Jobs** (prepare + **curation preview** + **job-fit feedback** + generate hand-off), **Generate** (progress + done menu), **Refine** (Q&A, polish, consultant, **manual section edit** → ProfileEditorScreen, direct edit, md sync). **ProfileEditorScreen** is not a sidebar row; **NavigateProvider** + **`profileEditorReturnTo`** for guarded navigation. **Planned:** **Curate** sidebar screen for per-job curated profile workflows ([`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned)). Residual polish: see **first section** of [`tui-definition-of-done.md`](./tui-definition-of-done.md). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
+- **Branch / main:** Phase **C** flows preserved; **Phase D (document shell):** **`DocumentShell`** chrome (**TopBar** + **StatusBar**), **`:`** command palette, **Resume** = read-only **markdown viewport** when no refined body, else **editable** refined markdown (**`FreeCursorMultilineInput`**, **`parseMarkdownStringToProfile`**, polish/consultant from caret, **`mdExternalRevision`**); overlays + **`persistenceTarget`** / **`paletteOpen`** / **`overlayStack`**; legacy **`Sidebar.tsx` removed**. See [`tui-definition-of-done.md`](./tui-definition-of-done.md) for DoD ticks and residual polish. **Curate** sidebar row superseded by document shell + job context ([`tui-document-shell.md`](./tui-document-shell.md)). No `DelegateScreen`, `exitBag`, or `cliArgs.ts`.
 
 ---
 

@@ -24,4 +24,16 @@ describe('formatProfileEvaluationLines', () => {
     expect(lines.some((l) => l.includes('Summary'))).toBe(true);
     expect(lines.some((l) => l.includes('Solid base'))).toBe(true);
   });
+
+  it('prefixes section scope when provided', () => {
+    const ev: ProfileEvaluation = {
+      overallScore: 6,
+      strengths: [],
+      improvements: [],
+      verdict: 'OK.',
+    };
+    const lines = formatProfileEvaluationLines(ev, { sectionScope: 'Summary' });
+    expect(lines[0]).toBe('Section focus: Summary');
+    expect(lines[1]).toBe('');
+  });
 });

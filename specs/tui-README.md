@@ -2,7 +2,9 @@
 
 These documents are the **product + engineering contract** for the full-screen **Ink** TUI — the **default** when users run `suited` with no subcommand in a real TTY (`runFlow` → `runTui`). They are split so **vision**, **phasing**, and **checklists** stay navigable. **Phase C** is marked complete in [`tui-definition-of-done.md`](./tui-definition-of-done.md); residual items are *post–Phase C polish*.
 
-**Implementers:** **[`AGENTS.md`](./AGENTS.md)** assigns **parallel workstreams** (P0, S1, T0–T2, L1, Q1), dependencies, and PR discipline — read that before splitting work across people.
+**Target UI (document-first redesign):** **[`tui-document-shell.md`](./tui-document-shell.md)** is the **normative contract** for the new shell — one markdown viewport, minimal TopBar + StatusBar, palette + Ctrl-? help, active document session (base vs job), section context for scoped AI. Older docs describe the **sidebar-first** shipped UI until migration finishes; where they conflict on **target** behavior, **document shell wins**.
+
+**Implementers:** **[`AGENTS.md`](./AGENTS.md)** assigns **parallel workstreams** (P0, S1, T0–T2, TD, L1, Q1), dependencies, and PR discipline — read that before splitting work across people.
 
 **Bookmark:** [`specs/tui.md`](./tui.md) remains a one-line pointer to this README.
 
@@ -16,6 +18,7 @@ The same files are **grouped by phase** in [`specs/README.md`](./README.md). Use
 
 | Doc | Purpose |
 |-----|---------|
+| [**Document shell (target)**](./tui-document-shell.md) | **Normative** content-first UI: TopBar, StatusBar, session, overlays, section context, data paths |
 | [Phased delivery & current implementation](./tui-phased-delivery.md) | Phase A/B/C status, what shipped vs optional follow-ups |
 | [Goals & constraints](./tui-goals-and-constraints.md) | Goals, non-goals, breakout rule, service extraction, rollback |
 | [UX & workflow](./tui-ux.md) | Pipeline, holistic principles (wayfinding, trust, help), discoverability, single caret / dim inactive menus, mermaid pipeline diagram |
@@ -61,10 +64,11 @@ When `stdin` or `stdout` is **not** a TTY and the user runs `suited` with **no s
 When multiple handlers could apply, order is:
 
 1. **Blocking UI** — any **modal / confirm** or overlay that **MUST** capture keys before global quit (see [`tui-architecture.md` — Blocking UI](./tui-architecture.md#blocking-ui-and-global-input); includes **`pendingNav`** for Profile navigate-away and **`blockingUiDepth > 0`** for **`ConfirmPrompt`** + error **`SelectList`** menus)
-2. **Text / multiline input** (suppress global `q`, screen-jump number keys, letter jumps)
-3. **Async / streaming** (Esc → cancel if `AbortSignal` wired; navigation locked if `operationInProgress`)
-4. **Global navigation** (sidebar, screen jumps, `q`)
-5. **Command palette** (`:` / `/`) when implemented — **MUST** sit ahead of global navigation while open (see [Open questions — resolved](./tui-open-questions.md))
+2. **Command palette** (`:` / `/`) when open — **MUST** capture before global navigation and **before** single-key quit (see [`tui-document-shell.md`](./tui-document-shell.md) §10)
+3. **Text / multiline input** (suppress global `q`, legacy screen-jump number keys, letter jumps)
+4. **Help overlay** — **Ctrl-?** (fallbacks: `?`, `h`, palette **Help**) when not in raw multiline capture
+5. **Async / streaming** (Esc → cancel if `AbortSignal` wired; navigation locked if `operationInProgress`)
+6. **Global navigation** — **Target:** `Resume` document shell + overlays + palette (sidebar **`1–n`** jumps **removed** when migration completes); **`q`** quit when allowed
 
 Per-screen shortcuts (e.g. `a`/`d` on Jobs) **MUST** be documented per screen and **SHOULD NOT** fire when a text field has focus. Conflict resolutions: [Open questions — resolved](./tui-open-questions.md).
 

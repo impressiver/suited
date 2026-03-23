@@ -5,6 +5,10 @@
 - **Streaming/tool errors:** Distinguish user-cancelled vs API error vs parse error. Each gets different copy ("Cancelled", "API key invalid — go to Settings", "Unexpected response — retry?").
 - **Ctrl+C vs Esc:** Ctrl+C exits the process (documented). Esc aborts in-flight work (request cancel via AbortSignal) without exiting. Second Esc after abort navigates back.
 
+## Save vs disk (document shell)
+
+If the on-disk profile JSON (or job scoped JSON) was **modified externally** after the session loaded it, **save** **SHOULD** detect **mtime** (or equivalent) mismatch and offer **Reload** / **Overwrite** / **Cancel** via a blocking confirm — see [`tui-document-shell.md`](./tui-document-shell.md) §12. **MUST NOT** silently discard newer disk content without user consent.
+
 ---
 
 ## Recovery vocabulary (normative)

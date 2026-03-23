@@ -236,15 +236,25 @@ function parseMetaComment(line: string, key: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Parse resume markdown from a string (same rules as on-disk `refined.md`).
+ * Use when the TUI holds markdown in memory instead of reading a temp file.
+ */
+export function parseMarkdownStringToProfile(md: string, originalProfile: Profile): Profile {
+  return parseMarkdownBodyToProfile(md.split('\n'), originalProfile);
+}
+
 export async function markdownToProfile(
   mdPath: string,
   originalProfile: Profile,
 ): Promise<Profile> {
   const md = await readFile(mdPath, 'utf-8');
+  return parseMarkdownBodyToProfile(md.split('\n'), originalProfile);
+}
+
+function parseMarkdownBodyToProfile(lines: string[], originalProfile: Profile): Profile {
   const now = new Date().toISOString();
   const up = (v: string, orig: Sourced<string> | undefined) => upgradeIfChanged(v, orig, now);
-
-  const lines = md.split('\n');
 
   // Working state
   let section: Section = '';

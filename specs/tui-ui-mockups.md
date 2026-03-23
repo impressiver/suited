@@ -2,6 +2,39 @@
 
 ASCII wireframes at ~80 columns. Real Ink output may use bold/dim and optional color; semantics must match. Narrow-terminal variants noted where layout changes.
 
+**Normative target:** **[`tui-document-shell.md`](./tui-document-shell.md)**. **Color notes:** pipeline dots, focus bar, job/base pill, error red — see [`tui-terminal.md`](./tui-terminal.md) indicator matrix.
+
+### Document shell (target) — wide ~80 cols
+
+```
+ Resume                                          Job: —
+────────────────────────────────────────────────────────────────────────────────────────
+ OUTLINE   │ ## Summary                                              * focused section
+ >Summary  │  …one continuous markdown document…
+  Exp      │
+   Acme    │ ## Experience
+  …        │  …
+────────────────────────────────────────────────────────────────────────────────────────
+ ! md newer — : sync                              ●●●○  ·  h82
+```
+
+`*` = tinted / left rule in Ink. **Ctrl-?** opens help (not shown on StatusBar). **Refined Resume:** the center pane is an **editable** markdown surface (**`FreeCursorMultilineInput`**) with **Ctrl+S** save, **Ctrl+P** / **Ctrl+E** polish / section consultant when the API is configured — not a static preview; **Esc** leaves body focus for **:** / screen jumps; **Tab** edits again; without refined, it stays **read-only** wrapped text. **Narrow:** drop outline column; truncate `Job:`; StatusBar may be left-op + short right crumbs only.
+
+### Section action menu (Enter on heading)
+
+```
+ ── Summary ─────────────────────────────
+   p  Polish (AI)
+   r  Professional review (this section)
+   e  Edit (structured)
+   i  Prompt for changes…
+   Esc  Cancel
+```
+
+---
+
+## Legacy: sidebar shell layout (pre–document-shell)
+
 ### Shell layout
 
 ```

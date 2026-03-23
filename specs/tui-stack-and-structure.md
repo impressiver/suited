@@ -37,7 +37,7 @@ src/
       layout/
         Header.tsx
         Footer.tsx
-        Sidebar.tsx
+        DocumentShell.tsx
         ContentArea.tsx
         Layout.tsx
       shared/                 ← barrel `index.ts`; Spinner, SelectList, TextInput, …

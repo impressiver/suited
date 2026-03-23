@@ -7,7 +7,24 @@ import {
   useReducer,
 } from 'react';
 import type { Profile } from '../profile/schema.ts';
+import type { PersistenceTarget } from './activeDocumentSession.ts';
+import { globalRefinedTarget } from './activeDocumentSession.ts';
 import type { FocusTarget, ScreenId } from './types.ts';
+
+/** One-shot intent consumed by RefineScreen (e.g. dashboard Polish / Section consultant jumps). */
+export type RefineResumeIntent =
+  | {
+      kind: 'polishSection';
+      sectionId: 'all' | 'summary' | 'experience' | 'skills';
+      /** When set with `experience`, `polishProfile` is limited to this `Position.id`. */
+      positionId?: string;
+    }
+  | {
+      kind: 'consultantSection';
+      sectionId: 'summary' | 'experience' | 'skills';
+      /** When set with `experience`, consultant pass is scoped to this role block. */
+      positionId?: string;
+    };
 
 export interface AppState {
   profileDir: string;
@@ -28,13 +45,24 @@ export interface AppState {
   deferLetterShortcutsFor: ScreenId | null;
   /** True while Profile editor has unsaved local edits (Phase C navigate-away guard). */
   profileEditorDirty: boolean;
-  /** When set, ProfileEditorScreen root Esc (no dirty) navigates here instead of focusing sidebar. */
+  /** When set, ProfileEditorScreen root Esc (no dirty) navigates here instead of staying on Profile. */
   profileEditorReturnTo: ScreenId | null;
   /**
    * Nested count of blocking confirms / error menus that must capture keys before global quit.
    * `App.tsx` suppresses q / screen jumps when `> 0` (see specs/tui-architecture.md).
    */
   blockingUiDepth: number;
+  /** Which refined profile file edits apply to (see specs/tui-document-shell.md). */
+  persistenceTarget: PersistenceTarget;
+  /** Command palette (`:`) open; captures keys ahead of global nav when true. */
+  paletteOpen: boolean;
+  /** Cleared by RefineScreen after apply or discard (no refined yet). */
+  refineResumeIntent: RefineResumeIntent | null;
+  /**
+   * Full-viewport overlays (Import / Contact / Settings / Generate). Top entry is the visible panel;
+   * `activeScreen` is the underlay (often `dashboard` / Resume). See `getEffectiveScreen`.
+   */
+  overlayStack: ScreenId[];
 }
 
 export type AppAction =
@@ -53,7 +81,13 @@ export type AppAction =
   | { type: 'SET_PROFILE_EDITOR_DIRTY'; value: boolean }
   | { type: 'SET_PROFILE_EDITOR_RETURN_TO'; screen: ScreenId | null }
   | { type: 'INCREMENT_BLOCKING_UI' }
-  | { type: 'DECREMENT_BLOCKING_UI' };
+  | { type: 'DECREMENT_BLOCKING_UI' }
+  | { type: 'SET_PERSISTENCE_TARGET'; target: PersistenceTarget }
+  | { type: 'SET_PALETTE_OPEN'; open: boolean }
+  | { type: 'PUSH_OVERLAY'; screen: ScreenId }
+  | { type: 'POP_OVERLAY' }
+  | { type: 'CLEAR_OVERLAYS' }
+  | { type: 'SET_REFINE_RESUME_INTENT'; intent: RefineResumeIntent | null };
 
 export function createInitialAppState(profileDir: string): AppState {
   return {
@@ -61,7 +95,7 @@ export function createInitialAppState(profileDir: string): AppState {
     profile: null,
     hasRefined: false,
     activeScreen: 'dashboard',
-    focusTarget: 'sidebar',
+    focusTarget: 'content',
     inTextInput: false,
     operationInProgress: false,
     operationCancelSeq: 0,
@@ -71,17 +105,41 @@ export function createInitialAppState(profileDir: string): AppState {
     profileEditorDirty: false,
     profileEditorReturnTo: null,
     blockingUiDepth: 0,
+    persistenceTarget: globalRefinedTarget(),
+    paletteOpen: false,
+    overlayStack: [],
+    refineResumeIntent: null,
   };
+}
+
+/** Screen rendered in the main panel: top overlay if any, else `activeScreen`. */
+export function getEffectiveScreen(state: AppState): ScreenId {
+  const n = state.overlayStack.length;
+  if (n > 0) {
+    const top = state.overlayStack[n - 1];
+    if (top !== undefined) {
+      return top;
+    }
+  }
+  return state.activeScreen;
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case 'SET_SCREEN':
+    case 'SET_SCREEN': {
+      const persistenceTarget =
+        action.screen === 'dashboard' && state.persistenceTarget.kind === 'job'
+          ? globalRefinedTarget()
+          : state.persistenceTarget;
       return {
         ...state,
         activeScreen: action.screen,
+        overlayStack: [],
+        paletteOpen: false,
         profileEditorReturnTo: action.screen === 'profile' ? state.profileEditorReturnTo : null,
+        persistenceTarget,
       };
+    }
     case 'SET_PROFILE':
       return { ...state, profile: action.profile, hasRefined: action.hasRefined };
     case 'SET_HAS_REFINED':
@@ -115,6 +173,33 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         blockingUiDepth: Math.max(0, state.blockingUiDepth - 1),
       };
+    case 'SET_PERSISTENCE_TARGET':
+      return { ...state, persistenceTarget: action.target };
+    case 'SET_PALETTE_OPEN':
+      return { ...state, paletteOpen: action.open };
+    case 'PUSH_OVERLAY': {
+      const top = state.overlayStack[state.overlayStack.length - 1];
+      if (top === action.screen) {
+        return { ...state, paletteOpen: false };
+      }
+      return {
+        ...state,
+        overlayStack: [...state.overlayStack, action.screen],
+        paletteOpen: false,
+      };
+    }
+    case 'POP_OVERLAY':
+      if (state.overlayStack.length === 0) {
+        return state;
+      }
+      return {
+        ...state,
+        overlayStack: state.overlayStack.slice(0, -1),
+      };
+    case 'CLEAR_OVERLAYS':
+      return state.overlayStack.length === 0 ? state : { ...state, overlayStack: [] };
+    case 'SET_REFINE_RESUME_INTENT':
+      return { ...state, refineResumeIntent: action.intent };
   }
 }
 

@@ -374,6 +374,11 @@ export async function* applyDirectEdit(
 }
 
 /** Apply hiring-consultant findings to a profile (same tool path as CLI `refine` consultant). */
+export {
+  buildSectionScopedProfileEvaluationUserMessage,
+  evaluateProfileSection,
+} from '../generate/consultant.ts';
+
 export async function applyConsultantFindingsToProfile(
   profile: Profile,
   findings: ConsultantFinding[],

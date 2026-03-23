@@ -50,7 +50,7 @@ Logic buried in command files **SHOULD** move to pure functions under `src/servi
 | `src/services/refine.ts` | `commands/refine.ts` | See below |
 | `src/services/improve.ts` | `commands/improve.ts` | `computeHealthScore(profile: Profile): HealthScore` |
 | `src/services/validate.ts` | `commands/validate.ts` | `validateProfile(profile: Profile): ValidationResult` |
-| `src/services/contact.ts` | `commands/contact.ts`, `utils/contact.ts` | `mergeContactMeta(fields: ContactFields, profileDir: string): Promise<void>` |
+| `src/services/contact.ts` | `commands/contact.ts`, `utils/contact.ts` | `mergeContactMeta(fields, profileDir, options?: { persistenceTarget?: PersistenceTarget }): Promise<void>` |
 
 **`src/services/refine.ts` key signatures:**
 
@@ -96,7 +96,7 @@ applyDirectEdit(
 
 **`computeRefinementDiff` note:** This function does not exist in the codebase today. It requires refactoring the inline diff-generation logic from `reviewRefinements()` in `commands/refine.ts` into a pure function that takes two Profile objects and returns `DiffBlock[]`. This is new design work, not a simple extraction.
 
-**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and persists plain-string contact fields to **global** config (`contact.json` under the suited XDG config directory). Global keys **merge** with the existing file: properties not present on the `fields` argument are left unchanged; for each global key that **is** present, a non-empty trimmed value updates that key and an empty string removes it (so a partial CLI edit does not wipe other saved fields). Does **not** call inquirer.
+**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir` + optional `persistenceTarget` (omitted = legacy global behavior). Writes contact into the profile file determined by the target: **global** uses `loadActiveProfile` and `saveRefined` / `saveSource` as today; **job** uses `loadJobRefinedProfile` when present else `loadActiveProfile`, and persists with `saveJobRefinedProfile` only (no global `saveRefined`). Always persists plain-string contact fields to **global** config (`contact.json` under the suited XDG config directory). Global keys **merge** with the existing file: properties not present on the `fields` argument are left unchanged; for each global key that **is** present, a non-empty trimmed value updates that key and an empty string removes it (so a partial CLI edit does not wipe other saved fields). Does **not** call inquirer.
 
 Commands **refactor** to delegate to services; CLI behavior stays the same at the user-visible level.
 

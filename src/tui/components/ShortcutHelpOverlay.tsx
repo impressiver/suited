@@ -20,20 +20,23 @@ export function ShortcutHelpOverlay({ width, height, onClose }: ShortcutHelpOver
     out.push('Shortcuts (Esc or ? to close)');
     out.push('');
     out.push('Global');
-    out.push('  Tab — sidebar ↔ main panel');
-    out.push('  Esc — back one level (screen-specific when lists/flows own it)');
-    out.push('  ↑↓ — change screen, or move in lists when panel owns arrows');
+    out.push('  : — command palette (Esc or : to close)');
+    out.push('  Esc — back to Resume, or one level in wizards (see per-screen)');
+    out.push('  ↑↓ — change screen, or move in lists / scroll when the panel owns arrows');
     const n = SCREEN_ORDER.length;
-    out.push(`  1–${n} — jump to screen (sidebar order)`);
+    out.push(`  1–${n} — jump to screen (legacy order; same as palette)`);
     out.push(
-      '  d / i / c / j / r / g / s — Dashboard, Import, Contact, Jobs, Refine, Generate, Settings',
+      '  d / i / c / j / r / g / s — Resume, Import, Contact, Jobs, Refine, Generate, Settings',
+    );
+    out.push(
+      '  Resume (refined markdown): Esc — leave editor focus for jumps & palette; Tab — focus editor again',
     );
     out.push('  p — Jobs: prepare (when that screen has focus; not a global jump)');
-    out.push('  ? — this help');
+    out.push('  ? / Ctrl+? — this help');
     out.push('  q — quit');
     out.push('  Ctrl+C — force exit the process');
     out.push('');
-    out.push('Sidebar order');
+    out.push('Screen order (palette)');
     for (let i = 0; i < SCREEN_ORDER.length; i++) {
       const id = SCREEN_ORDER[i];
       out.push(`  ${i + 1}. ${NAV_LABELS[id]}`);
@@ -51,7 +54,7 @@ export function ShortcutHelpOverlay({ width, height, onClose }: ShortcutHelpOver
 
   useInput(
     (input, key) => {
-      if (key.escape || input === '?') {
+      if (key.escape || input === '?' || (key.ctrl && (input === '?' || input === '/'))) {
         onClose();
         return;
       }

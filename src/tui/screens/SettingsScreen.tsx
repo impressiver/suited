@@ -9,7 +9,7 @@ import { maskApiKeyForDisplay } from '../settings/maskApiKey.ts';
 import type { ProviderId } from '../settings/probeProvider.ts';
 import { probeApiKey } from '../settings/probeProvider.ts';
 import { upsertEnvFileContents } from '../settings/upsertEnvFile.ts';
-import { useAppDispatch, useAppState } from '../store.tsx';
+import { getEffectiveScreen, useAppDispatch, useAppState } from '../store.tsx';
 
 const PROVIDER_ITEMS: Array<{ value: ProviderId; label: string }> = [
   { value: 'anthropic', label: 'Anthropic (Claude)' },
@@ -22,8 +22,11 @@ export interface SettingsScreenProps {
 
 export function SettingsScreen({ profileDir }: SettingsScreenProps) {
   const dispatch = useAppDispatch();
-  const { activeScreen, focusTarget, inTextInput } = useAppState();
-  const shortcutsActive = activeScreen === 'settings' && focusTarget === 'content' && !inTextInput;
+  const appState = useAppState();
+  const { focusTarget, inTextInput } = appState;
+  const effectiveScreen = getEffectiveScreen(appState);
+  const shortcutsActive =
+    effectiveScreen === 'settings' && focusTarget === 'content' && !inTextInput;
 
   const [provider, setProvider] = useState<ProviderId>(() =>
     process.env.OPENROUTER_API_KEY?.trim() && !process.env.ANTHROPIC_API_KEY?.trim()
@@ -99,7 +102,7 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
 
   useInput(
     (_input, key) => {
-      if (activeScreen !== 'settings' || focusTarget !== 'content' || !key.escape) {
+      if (effectiveScreen !== 'settings' || focusTarget !== 'content' || !key.escape) {
         return;
       }
       if (!inTextInput) {
@@ -107,7 +110,7 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
       }
       setFieldFocus('provider');
     },
-    { isActive: activeScreen === 'settings' && focusTarget === 'content' && inTextInput },
+    { isActive: effectiveScreen === 'settings' && focusTarget === 'content' && inTextInput },
   );
 
   useInput(
@@ -155,7 +158,7 @@ export function SettingsScreen({ profileDir }: SettingsScreenProps) {
   );
 
   const settingsFooterHint = useMemo(() => {
-    const sb = ' · Tab sidebar';
+    const sb = ' · : palette';
     const base =
       'Settings · a/A Anthropic · o/O OpenRouter · e key field · l provider list · s save (probe + .env) · restart suited after save';
     if (fieldFocus === 'provider') {

@@ -1,10 +1,28 @@
 # Screen details
 
-Every screen documents: what loads on mount, the full state machine (every state the screen can be in), and which shared components handle each state. **No state may delegate to CLI or Inquirer** (Phase C). See [Phased delivery](./tui-phased-delivery.md).
+**Target shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** is normative for the **document-first** UI: **Resume** = markdown viewport + optional outline; **Import / Settings / Contact / Generate** = **full-viewport overlays**; **Jobs** actions via **palette** or dialog; **Refine hub** via **palette**. **TopBar** = screen + **Job:** only; **StatusBar** = notifications + pipeline/health.
 
-### DashboardScreen
+The sections below document the **sidebar-era** implementation (per-screen mount, state machines, components) and remain a **reference** until each flow is mounted under `DocumentShell` overlays. **No state may delegate to CLI or Inquirer** (Phase C). See [Phased delivery](./tui-phased-delivery.md).
 
-**Loads on mount:** `loadSource()`, `loadRefined()`, `loadGenerationConfig()`. Detects API key presence from `process.env`.
+### DocumentShell (target) — summary
+
+| Overlay / mode | Loads | Notes |
+|----------------|-------|--------|
+| **Resume** | `Profile` for active `persistenceTarget`; **read-only** wrapped viewport without refined, **`FreeCursorMultilineInput`** + section strip when **`hasRefined`** (see [`tui-document-shell.md`](./tui-document-shell.md) §8) | `isMdNewerThanJson` global or `jobRefinedMdPath`+json job pair → sync banner |
+| **Import** | Same as ImportScreen today | Returns to Resume on success / Esc |
+| **Settings / Contact** | Same as today | TopBar label matches mode |
+| **Generate** | `pendingJobId` + TopBar job precedence per document shell | Full wizard as overlay |
+| **Jobs** | `loadJobs()` | Picker sets session job slug + TopBar `Job:` |
+| **Refine hub** | Palette: Q&A, polish, sniff, consultant (whole + section-scoped), direct edit, history | Modals reuse RefineScreen state machines |
+| **Profile editor** | From scoped **Edit** | Save via session dispatch only |
+
+---
+
+## Appendix: legacy sidebar-era screens
+
+### DashboardScreen (Resume)
+
+**Loads on mount:** snapshot via `fetchProfileSnapshot`; when `hasSource`, `loadActiveProfile` for markdown preview (`profileMarkdownContent`), health (`computeHealthScore` when refined), and validation. When **`hasRefined`**, additionally **`loadRefinedTuiState`** for the editable body + session target. Detects API key presence from `process.env`.
 
 **First-run / missing directory:** If `profileDir` does not exist or `loadSource()` returns `null` (file not found — serializer **MUST** return `null`, not throw, for missing files), show `no-source` state. Do not throw or crash. The TUI is responsible for creating `profileDir` before the first write (mkdir -p semantics, delegated to whichever service performs the first write).
 
@@ -15,14 +33,14 @@ Every screen documents: what loads on mount, the full state machine (every state
 - `refined` — suggest Generate or manage jobs; show health score from `computeHealthScore()`
 - `ready` — has jobs + refined; suggest Generate; show last PDF details
 
-**Components:** `StatusBadge` (pipeline), `ScrollView` (pipeline + activity). Navigation matches the left sidebar (`1–n` for `SCREEN_ORDER` length and letter keys; manual profile edit is under **Refine**; planned **Curate** adds another sidebar row — see [CurateScreen](#curatescreen-planned)).
+**Components:** Without refined: **`TextViewport`** + **`ScrollView`** for **read-only** wrapped markdown. With refined: **`FreeCursorMultilineInput`** (debounced `onChange`, **`mdExternalRevision`** for external replaces only), section context strip (**`resumeSectionIdAtMarkdownOffset`** + experience **`pos-id`** label), inline polish **diff** + **`DiffView`**, **`StatusBadge`**, health/validation, suggested next. Pipeline strip on shell **StatusBar**. Navigation: **Esc** leaves editor focus for **`:`** palette, **`1–n`**, letter keys; **Tab** refocuses the editor; **`o`** / **Ctrl+O** outline; **Ctrl+S** save; **Ctrl+P** / **Ctrl+E** when API + body focused (see document shell §1, §8). Manual structured profile edit still under **Refine** / **Profile editor**.
 
 ### ImportScreen
 
 **Loads on mount:** optional `clearSession` clears LinkedIn cookies file. **Layout:** import control (**URL/file** or **paste**) is **above** the on-disk preview so the primary field is obvious. **On disk:** reads `source.json` when present and shows name/headline, counts, up to five roles, and **full summary** (wrapped) in a `TextViewport` + `ScrollView` sized to `panelInnerWidth` / `panelFramedTextWidth`; **↑↓ PgUp/PgDn** scroll the preview when not in a text field. After a successful import, reloads preview and calls **`onSourceChanged`**.
 
 **States (current implementation):**
-- `idle` / `done` / `error` — single-line or paste input (labeled section + hints); **h** headed Chrome; **p** paste mode; **Esc** sidebar (Import `useInput` handles Esc while fields are focused)
+- `idle` / `done` / `error` — single-line or paste input (labeled section + hints); **h** headed Chrome; **p** paste mode; **Esc** → **Resume** when Import’s outer `useInput` owns Esc (not in a text field)
 - `running` — `Spinner`; `importProfileFromInput({ signal })` drives detect → scrape (URL, cooperative **`AbortSignal`** between nav steps) / ZIP+CSV / dir / Claude paste parse; **Esc** aborts via global `operationCancelSeq` + `useOperationAbort`
 - `error` — message + **`SelectList`**: Retry (same input), optional **Check Settings** after 3 consecutive failures, Dismiss (return to idle)
 
@@ -36,7 +54,7 @@ Every screen documents: what loads on mount, the full state machine (every state
 
 **Current TUI — `first-refine-menu`:** **Run Q&A from source (first refinement pass)** | **Edit profile sections (manual — source.json)** → sets `SET_PROFILE_EDITOR_RETURN_TO('refine')` and navigates to `ProfileEditorScreen`.
 
-**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **AI sniff pass** (reduce AI-looking phrasing on summary + experience + skills), **Professional consultant review (hiring manager, whole profile)**, **Edit profile sections (manual)** → same navigation to `ProfileEditorScreen` (return **Esc** at section root returns to Refine when launched from here), **Direct edit**. No duplicate “open Jobs” / “stay” rows — use the **sidebar** for navigation.
+**Current TUI — already-refined menu:** `SelectList` with **Run Q&A from source**, **Polish sections (AI)**, **AI sniff pass** (reduce AI-looking phrasing on summary + experience + skills), **Professional consultant review (hiring manager, whole profile)**, **Section consultant review (summary, experience, or skills)** — same section labels as polish; **`evaluateProfileSection`** then shared **consultant-view** / apply / diff / keep-session, **Edit profile sections (manual)** → same navigation to `ProfileEditorScreen` (return **Esc** at section root returns to Refine when launched from here), **Direct edit**. No duplicate “open Jobs” / “stay” rows — use **:** / letter keys for navigation.
 
 **Esc while a text field owns stdin:** **Q&A** answer draft and **Direct edit** input handle **Esc** locally (exit to the refine hub / cancel edit) even when `inTextInput` is true, so users are not stuck behind the global “suppress nav while typing” rule.
 
@@ -72,11 +90,13 @@ already-refined:
 
 **Direct edit sub-flow:** `MultilineInput` → on submit, calls `applyDirectEdit(profile, instructions)` via `callWithToolStreaming` → shows streaming output → transitions to `diff-review` with the resulting changes.
 
-**Polish sub-flow:** `polish-section-select` renders a `CheckboxList` of sections (Experience, Skills, etc.) and optionally a `SelectList` of positions to narrow scope. Only after the user confirms does the screen call `polishProfile(profile, { sections, positionIds })`. This mirrors the existing CLI's interactive section/position prompts — the TUI replaces those prompts with the CheckboxList step.
+**Polish sub-flow:** `polish-section-select` renders a `CheckboxList` of sections (Experience, Skills, etc.) and optionally a `SelectList` of positions to narrow scope. Only after the user confirms does the screen call `polishProfile(profile, { sections, positionIds })`. This mirrors the existing CLI's interactive section/position prompts — the TUI replaces those prompts with the CheckboxList step. **`runPolish`** also accepts optional **`positionIds`** from **`refineResumeIntent`** (dashboard / Resume editor handoff for a single experience role); polish **retry** preserves **`lastPolishPositionIdsRef`**.
 
 **AI sniff sub-flow:** One-shot from the already-refined menu: `sniffReduceAiTellsProfile` (`AI_SNIFF_REDUCE_SYSTEM` + same refinements tool as polish) scans summary, all experience bullets, and skills when present. No section picker. Goal: fewer patterns that read as generic or machine-written, without adding facts. Same **diff-review** / **keep-session** path as polish; snapshot **`reason`:** `ai-sniff`.
 
 **Consultant sub-flow:** After **consultant-view**, the user chooses **Apply all suggestions** or **Choose which suggestions to apply** (`CheckboxList`, same interaction as Generate section pick: Space · Enter). The screen then runs the same **follow-up question** step as the CLI (`fetchConsultantFeedbackQuestions` / `mergeConsultantFindingAnswers`): model-posed questions are answered one at a time with `TextInput` (blank allowed); then **`applyConsultantFindingsToProfile`** and **diff-review** as before. **Esc** from pick or follow-ups returns to **consultant-view** without losing the evaluation; **Esc** from **consultant-view** still returns to the refined hub and clears staged consultant state.
+
+**Section consultant sub-flow:** From the already-refined menu → **consultant-section-pick** (`SelectList`: Summary / Experience / Skills, same scope as polish) → **consultant-section-run** (spinner; **`evaluateProfileSection`** with label optionally expanded for one experience role via **`buildExperiencePositionConsultantLabel`**, abort via **`useOperationAbort`**) → **consultant-view** (header copy notes section scope; preview lines include a **Section focus** line). **`runConsultantSectionReview(sectionLabel, { experiencePositionId? })`** is used from **`refineResumeIntent`** when **`positionId`** is set for experience. Apply / pick / follow-up / diff / keep-session match the whole-profile consultant path. **Esc** from the section picker returns to the refined hub.
 
 **Prepare sub-flow:** Handled on **JobsScreen** (not Refine): saved job → Prepare → curation summary, etc.
 
@@ -243,11 +263,11 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 **States:**
 - `form` — 7 `TextInput` fields (Name, Email, Phone, Location, LinkedIn, Website, GitHub); Tab advances
-- `saving` — spinner; calls `mergeContactMeta(fields, profileDir)` which updates the active profile file and writes **global** contact config (`contact.json` under the suited XDG config directory)
+- `saving` — spinner; calls `mergeContactMeta(fields, profileDir, { persistenceTarget })` so profile writes follow the document target; always merges **global** contact config (`contact.json` under the suited XDG config directory)
 - `saved` — "Last saved: …" badge; back to `form`
 - `error` — inline error; retry / back
 
-**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir`, determines which profile file is active (refined > source), writes the contact fields into that profile, and persists the same plain-string fields to **global** contact metadata (XDG config path, not under `profileDir`). Does **not** call inquirer. Lives in `src/services/contact.ts`.
+**`mergeContactMeta` contract:** Takes the edited contact field values + `profileDir` + optional `{ persistenceTarget }` (default = global-refined / legacy CLI). **Global:** base profile `loadActiveProfile`; persist `saveRefined` if global `refined.json` exists, else `saveSource` + source markdown. **Job:** base `loadJobRefinedProfile(profileDir, slug)` if present, else `loadActiveProfile`; persist **only** `saveJobRefinedProfile` (never global `saveRefined`). Always merges the same plain-string fields into **global** contact metadata (XDG config path, not under `profileDir`). Does **not** call inquirer. Lives in `src/services/contact.ts`.
 
 **Save:** `s` saves all fields at once (browse mode). **`App`** defers global **`s`→Settings** on Contact content focus so **`s`** is not stolen. Enter on a field saves that field and advances focus. Do not rely on blur.
 

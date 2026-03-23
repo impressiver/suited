@@ -1,46 +1,41 @@
-import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
-import type { FocusTarget, ScreenId } from '../types.ts';
+import type { ScreenId } from '../types.ts';
 import { NAV_LABELS } from '../types.ts';
-import { Footer } from './Footer.tsx';
-import { Header, type HeaderProps } from './Header.tsx';
-import { Sidebar } from './Sidebar.tsx';
+import { DocumentShell } from './DocumentShell.tsx';
 
-export interface LayoutProps extends HeaderProps {
+export interface LayoutProps {
   activeScreen: ScreenId;
-  focusTarget: FocusTarget;
-  footerHint: string;
-  /** One line when the right panel has keyboard focus (Enter/Esc context). */
-  panelFocusBanner?: string | null;
+  /** Second TopBar line (`Job: …`). */
+  jobLine: string;
+  statusLeft: string | null;
+  statusLeftWarn?: boolean;
+  statusRight: string;
+  baselineHint: string;
+  contextualHint: string;
   children: ReactNode;
 }
 
 export function Layout({
   activeScreen,
-  focusTarget,
-  footerHint,
-  panelFocusBanner,
+  jobLine,
+  statusLeft,
+  statusLeftWarn,
+  statusRight,
+  baselineHint,
+  contextualHint,
   children,
-  ...headerProps
 }: LayoutProps) {
   return (
-    <Box flexDirection="column" padding={1} flexGrow={1} height="100%">
-      <Header {...headerProps} />
-      <Box marginTop={1} flexDirection="row" flexGrow={1}>
-        <Sidebar activeScreen={activeScreen} focusTarget={focusTarget} />
-        <Box flexGrow={1} flexDirection="column" minHeight={0}>
-          {panelFocusBanner != null && panelFocusBanner !== '' && (
-            <Box marginBottom={1} flexDirection="column">
-              <Text bold color="cyan">
-                {NAV_LABELS[activeScreen]}
-              </Text>
-              <Text dimColor>{panelFocusBanner}</Text>
-            </Box>
-          )}
-          {children}
-        </Box>
-      </Box>
-      <Footer focusTarget={focusTarget} hint={footerHint} />
-    </Box>
+    <DocumentShell
+      screenTitle={NAV_LABELS[activeScreen]}
+      jobLine={jobLine}
+      statusLeft={statusLeft}
+      statusLeftWarn={statusLeftWarn}
+      statusRight={statusRight}
+      baselineHint={baselineHint}
+      contextualHint={contextualHint}
+    >
+      {children}
+    </DocumentShell>
   );
 }

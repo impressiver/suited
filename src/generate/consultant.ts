@@ -31,7 +31,58 @@ import {
   sanitizeResumeDocument,
 } from '../utils/noEmDash.ts';
 
+/** User message label for section consultant when scoped to one experience role (`<!-- pos-id -->`). */
+export function buildExperiencePositionConsultantLabel(
+  profile: Profile,
+  positionId: string,
+): string {
+  const pos = profile.positions.find((p) => p.id === positionId);
+  if (pos == null) {
+    return `Experience (position id: ${positionId}). Evaluate only this role block; ignore other jobs.`;
+  }
+  return [
+    `Experience — ${pos.title.value} at ${pos.company.value} (position id: ${positionId}).`,
+    "Evaluate ONLY this role's bullets, title line, company, dates, and location.",
+    'Do not give feedback on other positions.',
+  ].join(' ');
+}
+
 type InquirerCLI = typeof import('inquirer').default;
+
+/**
+ * User message for a section-scoped hiring-consultant pass (document shell).
+ * The model still receives full profile text for context but instructions restrict feedback.
+ */
+export function buildSectionScopedProfileEvaluationUserMessage(
+  sectionLabel: string,
+  profile: Profile,
+): string {
+  const body = profileToRefineText(profile);
+  return [
+    `Evaluate ONLY the resume section described as: "${sectionLabel}".`,
+    'Give findings whose `area` field refers to that section (or a specific bullet within it).',
+    'Do NOT produce improvements for other sections — if you have no feedback for this section, return an empty improvements array and a short verdict.',
+    'You may use the rest of the profile only for context.',
+    '',
+    body,
+  ].join('\n');
+}
+
+/** Hiring consultant evaluation scoped to one section (TUI document shell / palette). */
+export async function evaluateProfileSection(
+  profile: Profile,
+  sectionLabel: string,
+  signal?: AbortSignal,
+): Promise<ProfileEvaluation> {
+  const ev = await callWithTool<ProfileEvaluation>(
+    PROFILE_CONSULTANT_SYSTEM,
+    buildSectionScopedProfileEvaluationUserMessage(sectionLabel, profile),
+    profileEvalTool,
+    undefined,
+    signal,
+  );
+  return sanitizeProfileEvaluation(ev);
+}
 
 /** Run the hiring consultant evaluation on a general (non-tailored) profile. */
 export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluation> {

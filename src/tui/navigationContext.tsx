@@ -13,7 +13,7 @@ export function NavigateProvider({
   return <NavigateContext.Provider value={value}>{children}</NavigateContext.Provider>;
 }
 
-/** Navigate between TUI screens (respects Profile unsaved guard in App). */
+/** Navigate between TUI screens (respects Profile unsaved guard; overlay vs full switch per App). */
 export function useNavigateToScreen(): (screen: ScreenId) => void {
   return useContext(NavigateContext);
 }

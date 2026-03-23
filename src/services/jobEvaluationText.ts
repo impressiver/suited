@@ -1,8 +1,20 @@
 import type { JobEvaluation, ProfileEvaluation } from '../claude/prompts/consultant.ts';
 
+export interface FormatProfileEvaluationOptions {
+  /** When set, output is scoped to one resume section (TUI section consultant pass). */
+  sectionScope?: string;
+}
+
 /** Plain lines for Ink `ScrollView` (general profile consultant output). */
-export function formatProfileEvaluationLines(ev: ProfileEvaluation): string[] {
+export function formatProfileEvaluationLines(
+  ev: ProfileEvaluation,
+  opts?: FormatProfileEvaluationOptions,
+): string[] {
   const lines: string[] = [];
+  if (opts?.sectionScope) {
+    lines.push(`Section focus: ${opts.sectionScope}`);
+    lines.push('');
+  }
   lines.push(`Hiring consultant review (overall ${ev.overallScore}/10)`);
   lines.push('');
 

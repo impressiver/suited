@@ -21,7 +21,7 @@ import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import { panelFramedTextWidth, panelInnerWidth } from '../panelContentWidth.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
-import { useAppDispatch, useAppState } from '../store.tsx';
+import { getEffectiveScreen, useAppDispatch, useAppState } from '../store.tsx';
 import { linesToWrappedRows } from '../utils/wrapTextRows.ts';
 
 export interface ImportScreenProps {
@@ -79,7 +79,9 @@ export function ImportScreen({
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
   const [termCols, termRows] = useTerminalSize();
-  const { focusTarget, activeScreen, inTextInput } = useAppState();
+  const appState = useAppState();
+  const { focusTarget, inTextInput } = appState;
+  const effectiveScreen = getEffectiveScreen(appState);
   const panelW = panelInnerWidth(termCols);
   const textW = panelFramedTextWidth(termCols);
   const { pasteEditorH, sourcePreviewH } = useMemo(() => {
@@ -138,22 +140,22 @@ export function ImportScreen({
     }
   }, [clearSession]);
 
-  const active = activeScreen === 'import' && focusTarget === 'content';
+  const active = effectiveScreen === 'import' && focusTarget === 'content';
 
   useRegisterBlockingUi(active && phase === 'error' && err != null);
 
   const importFooterHint = useMemo(() => {
-    const sb = ' · Tab sidebar';
+    const sb = ' · : palette';
     if (phase === 'running') {
       return `Import · importing…${sb}`;
     }
     if (phase === 'error') {
-      return `Import · ↑↓ Enter · Esc sidebar · retry / settings / dismiss${sb}`;
+      return `Import · ↑↓ Enter · Esc → Resume · retry / settings / dismiss${sb}`;
     }
     const modeHint =
       mode === 'line'
-        ? 'Enter submit · Esc sidebar · h headed browser toggle · p paste mode'
-        : 'Ctrl+D or Ctrl+S submit · PgUp/PgDn · ↑↓ scroll · Esc sidebar · h headed · p line mode';
+        ? 'Enter submit · Esc → Resume · h headed browser toggle · p paste mode'
+        : 'Ctrl+D or Ctrl+S submit · PgUp/PgDn · ↑↓ scroll · Esc → Resume · h headed · p line mode';
     const previewScroll =
       sourcePreview.status === 'ok' && !inTextInput ? ' · ↑↓ PgUp/PgDn scroll on-disk preview' : '';
     return `Import · ${modeHint}${previewScroll}${sb}`;
@@ -218,18 +220,6 @@ export function ImportScreen({
       releaseController,
       reloadSourcePreview,
     ],
-  );
-
-  useInput(
-    (_input, key) => {
-      if (!active || phase === 'running') {
-        return;
-      }
-      if (key.escape) {
-        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
-      }
-    },
-    { isActive: active && phase !== 'running' },
   );
 
   useInput(
@@ -327,8 +317,8 @@ export function ImportScreen({
         <Text bold>{mode === 'line' ? 'Import from URL or file' : 'Import from pasted text'}</Text>
         <Text dimColor>
           {mode === 'line'
-            ? 'Enter runs import · p switch to paste · h headed browser · Esc sidebar'
-            : 'Ctrl+D or Ctrl+S runs import · p line mode · h headed · Esc sidebar'}
+            ? 'Enter runs import · p switch to paste · h headed browser · Esc → Resume'
+            : 'Ctrl+D or Ctrl+S runs import · p line mode · h headed · Esc → Resume'}
         </Text>
         <Box marginTop={1} flexDirection="column">
           {mode === 'line' ? (
@@ -415,8 +405,8 @@ export function ImportScreen({
           {doneContactGap != null && (
             <Box marginTop={1}>
               <Text color="yellow">
-                Missing contact: {doneContactGap}. Open Contact (c from Dashboard, or sidebar) to
-                add these — same fields the CLI prompts after import.
+                Missing contact: {doneContactGap}. Open Contact (c or : palette) to add these — same
+                fields the CLI prompts after import.
               </Text>
             </Box>
           )}

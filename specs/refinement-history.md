@@ -1,5 +1,7 @@
 # Refinement history and revert
 
+**Document shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** assumes **global `refined`** history remains the **default**; **per-job** `jobs/{slug}/` history is still **optional** (§2.2 below). Implementing job-scoped snapshots **MAY** follow the same cap/prune pattern under `jobs/{slug}/refined-history/` if product requires it.
+
 **Status:** **Implemented** in-repo (serializer + **`refined-history/`** + TUI + CLI). Directory name: **`refined-history/`** (see [`src/profile/refinementHistory.ts`](../src/profile/refinementHistory.ts) `REFINED_HISTORY_DIR_NAME`). Default retention: **50** snapshots (`DEFAULT_REFINEMENT_HISTORY_MAX`); pruning removes **oldest** first and prints a **one-time** stderr warning per process when pruning runs.
 
 **Normative terms** follow [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).

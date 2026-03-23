@@ -73,7 +73,7 @@ If validation fails, the pipeline MUST NOT emit a PDF for that run until the inc
 The tool MUST support `--profile-dir` so multiple profiles can coexist. Within a profile, artifacts include (non-exhaustive):
 
 - Global refined profile (`refined.md` / `refined.json`) — editable by the user. **Refinement history:** durable snapshots under **`refined-history/`** (not under `refinements/`) and **restore** via TUI or CLI — see [`refinement-history.md`](./refinement-history.md).
-- Per-job curated copies under `jobs/{job-slug}/` — editable; subsequent runs SHOULD detect changes and offer reload vs re-curation as implemented in commands.
+- Per-job curated copies under `jobs/{job-slug}/` — editable; subsequent runs SHOULD detect changes and offer reload vs re-curation as implemented in commands. **Slug drift:** when the user changes company/title on a **SavedJob**, implementation MUST follow **one** rule (document in serializer + PR): **migrate** `jobs/{oldSlug}/` → `jobs/{newSlug}/`, **or** use a stable directory keyed by **`jobId`** with slug as display-only — pick one approach for the whole product.
 - Per-job refinement JSON under `refinements/{jobId}.json` — stores the curation plan plus optional **`pinnedRender`**: the last successful **layout squeeze** tier (and resolved template / flair metadata) so the next generate for the same job, with the same flair and template override, can reuse the same CSS fit-override path for repeatable PDF layout. Re-prepare / re-curate SHOULD preserve `pinnedRender` until a successful export overwrites it. When the user **clears job-scoped curated content** (e.g. Curate **Clear and start over**), implementation SHOULD **clear or invalidate `pinnedRender`** for that `jobId` so the next export does not reuse a squeeze tier tied to discarded layout length; the next successful PDF export may write a fresh `pinnedRender`.
 
 Exact filenames and migration rules live in code and user docs; **behavioral** expectation: **no silent overwrite** of user-edited files without confirmation where the CLI already implements that pattern.
@@ -87,7 +87,7 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 ## 8. Interactive UI
 
 - **Default entry (`suited` with no subcommand):** In an **interactive TTY** (stdin + stdout TTY), the process runs the **full-screen Ink TUI** (`runFlow` → `runTui`). In a **non-TTY** environment, it **MUST NOT** block on input — it prints a **one-line** hint to stderr and exits (canonical behavior in [`tui-README.md`](./tui-README.md)). **Subcommands** (`suited generate`, `suited refine`, …) use their own interactive or non-interactive paths (some still use **inquirer** where documented); they MUST call **`src/services/`** for shared behavior, not duplicate pipeline logic in UI-only code.
-- **TUI contract:** [`tui-README.md`](./tui-README.md) and `tui-*.md`. A planned **Curate** sidebar row covers **per-job** polish/consultant/edit flows ([CurateScreen](./tui-screens.md#curatescreen-planned)). Core business logic MUST remain in **`generate/`**, **`profile/`**, **`claude/`**, **`ingestion/`**, and shared services — not inside `src/tui/**` except as wiring (see TUI spec for forbidden imports).
+- **TUI contract:** [`tui-README.md`](./tui-README.md), **[`tui-document-shell.md`](./tui-document-shell.md)** (target shell), and other `tui-*.md`. **Per-job** polish/consultant/edit use **job target on the document** (same UX as global refined; isolated saves) — legacy **Curate** sidebar spec: [CurateScreen](./tui-screens.md#curatescreen-planned). Core business logic MUST remain in **`generate/`**, **`profile/`**, **`claude/`**, **`ingestion/`**, and shared services — not inside `src/tui/**` except as wiring (see TUI spec for forbidden imports).
 
 ---
 
@@ -109,7 +109,8 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 | [`SECURITY.md`](../SECURITY.md) | Reporting, dependency policy |
 | [`AGENTS.md`](./AGENTS.md) | Agent/human routing: streams, deps, PR discipline |
 | [`tui-README.md`](./tui-README.md) | TUI index (screens, testing, non-TTY, phasing) |
-| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phase A/B/C + post–C polish |
+| [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phase A/B/C + Phase D document shell + post–C polish |
+| [`tui-document-shell.md`](./tui-document-shell.md) | Target content-first TUI contract |
 | [`refinement-history.md`](./refinement-history.md) | Snapshots + restore for global refined profile |
 
 ---

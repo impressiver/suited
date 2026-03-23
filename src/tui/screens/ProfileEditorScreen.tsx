@@ -15,16 +15,17 @@ import {
   loadRefined,
   loadSource,
   refinedJsonPath,
-  saveRefined,
   saveSource,
   sourceJsonPath,
   sourceMdPath,
 } from '../../profile/serializer.ts';
 import { fileExists } from '../../utils/fs.ts';
+import type { PersistenceTarget } from '../activeDocumentSession.ts';
 import { ConfirmPrompt, InlineEditor, SelectList, Spinner } from '../components/shared/index.ts';
 import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
+import { saveRefinedForPersistenceTarget } from '../saveRefinedForPersistenceTarget.ts';
 import { useAppDispatch, useAppState } from '../store.tsx';
 
 function cloneProfile(p: Profile): Profile {
@@ -48,9 +49,14 @@ async function persistProfile(
   profile: Profile,
   profileDir: string,
   session: RefinementSession | null,
+  persistenceTarget: PersistenceTarget,
 ): Promise<void> {
   if (session) {
-    await saveRefined({ profile, session }, profileDir, { reason: 'profile-editor' });
+    await saveRefinedForPersistenceTarget(
+      persistenceTarget,
+      { profile, session, profileDir },
+      { reason: 'profile-editor' },
+    );
   } else {
     await saveSource(profile, profileDir);
     await profileToMarkdown(profile, sourceMdPath(profileDir));
@@ -72,7 +78,7 @@ type Frame =
   | { k: 'projects' }
   | { k: 'project-edit'; projIdx: number };
 
-type UnsavedAction = { action: 'pop' | 'sidebar' };
+type UnsavedAction = { action: 'pop' | 'leave' };
 
 export interface ProfileEditorScreenProps {
   profileDir: string;
@@ -81,7 +87,8 @@ export interface ProfileEditorScreenProps {
 export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { activeScreen, focusTarget, inTextInput, profileEditorReturnTo } = useAppState();
+  const { activeScreen, focusTarget, inTextInput, persistenceTarget, profileEditorReturnTo } =
+    useAppState();
   const active = activeScreen === 'profile' && focusTarget === 'content';
 
   const [phase, setPhase] = useState<'loading' | 'no-source' | 'ready' | 'saving' | 'err'>(
@@ -114,7 +121,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
   const top = stack.at(-1);
 
   const profileFooterHint = useMemo(() => {
-    const sb = ' · Tab sidebar';
+    const sb = ' · Esc → back';
     if (phase === 'loading') {
       return `Refine · edit sections · loading…${sb}`;
     }
@@ -269,7 +276,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     setPhase('saving');
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
     try {
-      await persistProfile(profile, profileDir, session);
+      await persistProfile(profile, profileDir, session, persistenceTarget);
       baselineRef.current = cloneProfile(profile);
       setDirty(false);
       if (session) {
@@ -285,7 +292,7 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
     } finally {
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
-  }, [dispatch, profile, profileDir, session]);
+  }, [dispatch, persistenceTarget, profile, profileDir, session]);
 
   const discardChanges = useCallback(() => {
     if (baselineRef.current) {
@@ -306,16 +313,15 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       setUnsaved(null);
       if (action === 'pop') {
         popStack();
-      } else {
-        dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
       }
+      /* else: root stack + discard — stay on Profile; user uses : or letter keys to leave. */
     },
-    [dispatch, popStack],
+    [popStack],
   );
 
   const handleEsc = useCallback(() => {
     if (dirty) {
-      setUnsaved({ action: stack.length === 1 ? 'sidebar' : 'pop' });
+      setUnsaved({ action: stack.length === 1 ? 'leave' : 'pop' });
       return;
     }
     if (stack.length > 1) {
@@ -326,8 +332,8 @@ export function ProfileEditorScreen({ profileDir }: ProfileEditorScreenProps) {
       navigate(profileEditorReturnTo);
       return;
     }
-    dispatch({ type: 'SET_FOCUS', target: 'sidebar' });
-  }, [dirty, dispatch, navigate, popStack, profileEditorReturnTo, stack.length]);
+    /* Stay on Profile; global shortcuts (:, r, …) change screen. */
+  }, [dirty, navigate, popStack, profileEditorReturnTo, stack.length]);
 
   useInput(
     (input, key) => {

@@ -5,7 +5,7 @@ import { loadActiveProfile } from '../../profile/serializer.ts';
 import { type ContactFields, mergeContactMeta } from '../../services/contact.ts';
 import { Spinner, TextInput } from '../components/shared/index.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
-import { useAppDispatch, useAppState } from '../store.tsx';
+import { getEffectiveScreen, useAppDispatch, useAppState } from '../store.tsx';
 
 type FieldKey = keyof ContactFields;
 
@@ -30,7 +30,9 @@ export interface ContactScreenProps {
 
 export function ContactScreen({ profileDir }: ContactScreenProps) {
   const dispatch = useAppDispatch();
-  const { focusTarget, activeScreen, inTextInput } = useAppState();
+  const appState = useAppState();
+  const { focusTarget, inTextInput, persistenceTarget } = appState;
+  const effectiveScreen = getEffectiveScreen(appState);
   const [phase, setPhase] = useState<'browse' | 'edit'>('browse');
   const [fieldIndex, setFieldIndex] = useState(0);
   const [values, setValues] = useState<ContactFields>({});
@@ -68,7 +70,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     setSaving(true);
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
     try {
-      await mergeContactMeta(values, profileDir);
+      await mergeContactMeta(values, profileDir, { persistenceTarget });
       setSavedAt(new Date().toLocaleString());
     } catch (e) {
       setSaveErr((e as Error).message);
@@ -76,12 +78,12 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
       setSaving(false);
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
     }
-  }, [dispatch, profileDir, values]);
+  }, [dispatch, persistenceTarget, profileDir, values]);
 
-  const active = activeScreen === 'contact' && focusTarget === 'content';
+  const active = effectiveScreen === 'contact' && focusTarget === 'content';
 
   const contactFooterHint = useMemo(() => {
-    const sb = ' · Tab sidebar';
+    const sb = ' · : palette';
     if (loadErr != null) {
       return `Contact · r retry after fixing files${sb}`;
     }

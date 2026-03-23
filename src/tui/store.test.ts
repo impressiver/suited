@@ -1,12 +1,78 @@
 import { describe, expect, it } from 'vitest';
+import { globalRefinedTarget, jobRefinedTarget } from './activeDocumentSession.ts';
 import { appReducer, createInitialAppState } from './store.tsx';
 
 describe('appReducer', () => {
   const base = createInitialAppState('/tmp/profile');
 
-  it('sets screen', () => {
-    const s = appReducer(base, { type: 'SET_SCREEN', screen: 'settings' });
+  it('sets screen and closes palette', () => {
+    let s = appReducer(base, { type: 'SET_PALETTE_OPEN', open: true });
+    expect(s.paletteOpen).toBe(true);
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'settings' });
     expect(s.activeScreen).toBe('settings');
+    expect(s.paletteOpen).toBe(false);
+  });
+
+  it('SET_SCREEN clears overlay stack', () => {
+    let s = appReducer(base, { type: 'PUSH_OVERLAY', screen: 'import' });
+    s = appReducer(s, { type: 'PUSH_OVERLAY', screen: 'settings' });
+    expect(s.overlayStack).toEqual(['import', 'settings']);
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'jobs' });
+    expect(s.overlayStack).toEqual([]);
+    expect(s.activeScreen).toBe('jobs');
+  });
+
+  it('PUSH_OVERLAY appends and closes palette; duplicate top is no-op push', () => {
+    let s = appReducer(base, { type: 'SET_PALETTE_OPEN', open: true });
+    s = appReducer(s, { type: 'PUSH_OVERLAY', screen: 'contact' });
+    expect(s.overlayStack).toEqual(['contact']);
+    expect(s.paletteOpen).toBe(false);
+    s = appReducer(s, { type: 'PUSH_OVERLAY', screen: 'contact' });
+    expect(s.overlayStack).toEqual(['contact']);
+  });
+
+  it('POP_OVERLAY pops one; POP on empty is no-op', () => {
+    let s = appReducer(base, { type: 'PUSH_OVERLAY', screen: 'import' });
+    s = appReducer(s, { type: 'PUSH_OVERLAY', screen: 'generate' });
+    s = appReducer(s, { type: 'POP_OVERLAY' });
+    expect(s.overlayStack).toEqual(['import']);
+    s = appReducer(s, { type: 'POP_OVERLAY' });
+    expect(s.overlayStack).toEqual([]);
+    expect(appReducer(s, { type: 'POP_OVERLAY' })).toBe(s);
+  });
+
+  it('CLEAR_OVERLAYS empties stack', () => {
+    let s = appReducer(base, { type: 'PUSH_OVERLAY', screen: 'settings' });
+    s = appReducer(s, { type: 'CLEAR_OVERLAYS' });
+    expect(s.overlayStack).toEqual([]);
+  });
+
+  it('sets persistence target', () => {
+    const j = jobRefinedTarget('jid', 'acme');
+    const s = appReducer(base, { type: 'SET_PERSISTENCE_TARGET', target: j });
+    expect(s.persistenceTarget).toEqual(j);
+  });
+
+  it('SET_SCREEN to dashboard clears job persistence target', () => {
+    let s = appReducer(base, {
+      type: 'SET_PERSISTENCE_TARGET',
+      target: jobRefinedTarget('jid', 'acme'),
+    });
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'dashboard' });
+    expect(s.persistenceTarget).toEqual(globalRefinedTarget());
+    expect(s.activeScreen).toBe('dashboard');
+  });
+
+  it('SET_SCREEN to non-dashboard keeps job persistence target', () => {
+    const j = jobRefinedTarget('jid', 'acme');
+    let s = appReducer(base, { type: 'SET_PERSISTENCE_TARGET', target: j });
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'generate' });
+    expect(s.persistenceTarget).toEqual(j);
+  });
+
+  it('defaults persistence to global refined', () => {
+    expect(base.persistenceTarget).toEqual(globalRefinedTarget());
+    expect(base.paletteOpen).toBe(false);
   });
 
   it('toggles operation lock and cancel', () => {
@@ -63,5 +129,13 @@ describe('appReducer', () => {
     expect(s.profileEditorReturnTo).toBe('refine');
     s = appReducer(s, { type: 'SET_SCREEN', screen: 'refine' });
     expect(s.profileEditorReturnTo).toBe(null);
+  });
+
+  it('sets and clears refine resume intent', () => {
+    const intent = { kind: 'polishSection' as const, sectionId: 'summary' as const };
+    let s = appReducer(base, { type: 'SET_REFINE_RESUME_INTENT', intent });
+    expect(s.refineResumeIntent).toEqual(intent);
+    s = appReducer(s, { type: 'SET_REFINE_RESUME_INTENT', intent: null });
+    expect(s.refineResumeIntent).toBe(null);
   });
 });

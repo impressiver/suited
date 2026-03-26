@@ -7,6 +7,7 @@ import {
   findDisplayRowForSection,
   matchSectionEntryForHeadingLine,
   resumeExperiencePositionIdAtMarkdownOffset,
+  resumeExperiencePositionIdForEditorView,
   resumeSectionIdAtMarkdownOffset,
 } from './resumeSectionIndex.ts';
 
@@ -221,6 +222,58 @@ describe('resumeExperiencePositionIdAtMarkdownOffset', () => {
     expect(resumeExperiencePositionIdAtMarkdownOffset(md, md.indexOf('Body'), entries)).toBe('p2');
     expect(resumeExperiencePositionIdAtMarkdownOffset(md, md.indexOf('- a'), entries)).toBe('p1');
     expect(resumeExperiencePositionIdAtMarkdownOffset(md, md.indexOf('x'), entries)).toBeNull();
+  });
+
+  it('resolves position from ### headings when HTML comments are omitted (editor view)', () => {
+    const profile = minimalProfile({
+      summary: {
+        value: 's',
+        source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+      },
+      positions: [
+        {
+          id: 'p1',
+          title: {
+            value: 'T1',
+            source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+          },
+          company: {
+            value: 'C1',
+            source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+          },
+          startDate: {
+            value: '2020-01',
+            source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+          },
+          bullets: [],
+        },
+        {
+          id: 'p2',
+          title: {
+            value: 'T2',
+            source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+          },
+          company: {
+            value: 'C2',
+            source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+          },
+          startDate: {
+            value: '2021-01',
+            source: { kind: 'user-edit', editedAt: '2020-01-01T00:00:00.000Z' },
+          },
+          bullets: [],
+        },
+      ],
+    });
+    const entries = buildResumeSectionIndex(profile);
+    const md =
+      '## Summary\n\nx\n\n## Experience\n\n### T1 at C1\n\n**Bullets:**\n\n- a\n\n### T2 at C2\n\nBody';
+    expect(resumeExperiencePositionIdForEditorView(md, md.indexOf('Body'), profile, entries)).toBe(
+      'p2',
+    );
+    expect(resumeExperiencePositionIdForEditorView(md, md.indexOf('- a'), profile, entries)).toBe(
+      'p1',
+    );
   });
 
   it('formats short label from profile', () => {

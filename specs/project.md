@@ -40,7 +40,7 @@ Order of stages:
 3. **Jobs** — User stores **job descriptions** (files / metadata under the profile dir).
 4. **Prepare** — Curate the profile **for one saved job** (selection + feedback) before PDF — produces a **curation plan** (what to include).
 5. **Curate** *(TUI — planned)* — Optional **main-menu** step **after prepare** (or in parallel with revisiting a job): **iterate job-scoped refined content** (polish, consultant, manual edits, direct edit) with **per-job persistence**, distinct from global **Refine**. See [`tui-screens.md` — CurateScreen](./tui-screens.md#curatescreen-planned).
-6. **Generate** — Assemble resume + template → **PDF** using job-aware curation (and any job-scoped curated profile on disk).
+6. **Generate** — Assemble resume + template → **PDF** using job-aware curation (and any job-scoped curated profile on disk). Optionally, when implemented, also export a **cover letter PDF** from user-authored per-job text (see [`cover-letter-pdf.md`](./cover-letter-pdf.md)).
 
 **Templates vs flair (orthogonal):** A **template** is the **baseline layout** (structure, typography family, overall pattern). A **flair level** (e.g. 1–5) is chosen **independently** for that template. Flair sets how much **creative freedom** the layout / “designer” side of generation may take when interpreting the baseline: lower flair stays close to the template’s default look; higher flair allows more **artistic license** and run-to-run **variety** in styling and presentation while content remains reference-grounded (see §6). Flair is not a proxy for “which template” — it is a dial on how far an agent may depart from the baseline for a given template.
 
@@ -73,7 +73,7 @@ If validation fails, the pipeline MUST NOT emit a PDF for that run until the inc
 The tool MUST support `--profile-dir` so multiple profiles can coexist. Within a profile, artifacts include (non-exhaustive):
 
 - Global refined profile (`refined.md` / `refined.json`) — editable by the user. **Refinement history:** durable snapshots under **`refined-history/`** (not under `refinements/`) and **restore** via TUI or CLI — see [`refinement-history.md`](./refinement-history.md).
-- Per-job curated copies under `jobs/{job-slug}/` — editable; subsequent runs SHOULD detect changes and offer reload vs re-curation as implemented in commands. **Slug drift:** when the user changes company/title on a **SavedJob**, implementation MUST follow **one** rule (document in serializer + PR): **migrate** `jobs/{oldSlug}/` → `jobs/{newSlug}/`, **or** use a stable directory keyed by **`jobId`** with slug as display-only — pick one approach for the whole product.
+- Per-job curated copies under `jobs/{job-slug}/` — editable; subsequent runs SHOULD detect changes and offer reload vs re-curation as implemented in commands. **Cover letter draft** (when the feature ships) SHOULD be stored as **`jobs/{job-slug}/cover-letter.md`** — see [`cover-letter-pdf.md`](./cover-letter-pdf.md). **Slug drift:** when the user changes company/title on a **SavedJob**, implementation MUST follow **one** rule (document in serializer + PR): **migrate** `jobs/{oldSlug}/` → `jobs/{newSlug}/`, **or** use a stable directory keyed by **`jobId`** with slug as display-only — pick one approach for the whole product.
 - Per-job refinement JSON under `refinements/{jobId}.json` — stores the curation plan plus optional **`pinnedRender`**: the last successful **layout squeeze** tier (and resolved template / flair metadata) so the next generate for the same job, with the same flair and template override, can reuse the same CSS fit-override path for repeatable PDF layout. Re-prepare / re-curate SHOULD preserve `pinnedRender` until a successful export overwrites it. When the user **clears job-scoped curated content** (e.g. Curate **Clear and start over**), implementation SHOULD **clear or invalidate `pinnedRender`** for that `jobId` so the next export does not reuse a squeeze tier tied to discarded layout length; the next successful PDF export may write a fresh `pinnedRender`.
 
 Exact filenames and migration rules live in code and user docs; **behavioral** expectation: **no silent overwrite** of user-edited files without confirmation where the CLI already implements that pattern.
@@ -112,6 +112,7 @@ Exact filenames and migration rules live in code and user docs; **behavioral** e
 | [`tui-definition-of-done.md`](./tui-definition-of-done.md) | Phase A/B/C + Phase D document shell + post–C polish |
 | [`tui-document-shell.md`](./tui-document-shell.md) | Target content-first TUI contract |
 | [`refinement-history.md`](./refinement-history.md) | Snapshots + restore for global refined profile |
+| [`cover-letter-pdf.md`](./cover-letter-pdf.md) | Per-job cover letter PDF (user-first draft, optional light AI + sniff) |
 
 ---
 

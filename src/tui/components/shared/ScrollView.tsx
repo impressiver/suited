@@ -1,10 +1,14 @@
 import { Box, Text } from 'ink';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { linesToWrappedRows } from '../../utils/wrapTextRows.ts';
 
 export interface ScrollViewProps {
   /** Logical lines (used with `wrapWidth`) or alone when not pre-wrapped. */
   lines?: string[];
+  /**
+   * Pre-built rows (e.g. styled markdown). Same length as wrapped `displayLines` for a given source; when set, string `displayLines` are not rendered.
+   */
+  rowElements?: ReactNode[];
   /**
    * Pre-wrapped display rows (skips `lines` / `wrapWidth`). Use with `TextViewport` for one wrap pass.
    */
@@ -23,6 +27,7 @@ export interface ScrollViewProps {
 
 export function ScrollView({
   lines = [],
+  rowElements,
   displayLines: displayLinesProp,
   height,
   scrollOffset = 0,
@@ -38,6 +43,27 @@ export function ScrollView({
     }
     return lines;
   }, [displayLinesProp, lines, wrapWidth]);
+
+  if (rowElements != null) {
+    const end = Math.min(rowElements.length, scrollOffset + height);
+    const slice = rowElements.slice(scrollOffset, end);
+    const pad = padToWidth != null && padToWidth > 0 ? padToWidth : null;
+    return (
+      <Box
+        flexDirection="column"
+        flexGrow={pad == null ? 1 : undefined}
+        width={pad ?? undefined}
+        overflow={pad != null ? 'hidden' : undefined}
+      >
+        {slice.map((el, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: viewport slice offset
+          <Box key={scrollOffset + i} width={pad ?? undefined}>
+            {el}
+          </Box>
+        ))}
+      </Box>
+    );
+  }
 
   const end = Math.min(displayLines.length, scrollOffset + height);
   const slice = displayLines.slice(scrollOffset, end);

@@ -23,6 +23,7 @@ User guide and module layout: [`README.md`](../README.md), [`docs/ARCHITECTURE.m
 | File | Role |
 |------|------|
 | [`refinement-history.md`](./refinement-history.md) | Durable snapshots + revert for global **`refined.json`** / **`refined.md`** |
+| [`cover-letter-pdf.md`](./cover-letter-pdf.md) | Optional per-job **cover letter** draft, light AI + sniff, **PDF** export (TUI + CLI parity) |
 
 ---
 

@@ -1,5 +1,5 @@
-import { Box, Text, useInput, useStdin } from 'ink';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Box, type DOMElement, Text, useInput, useStdin } from 'ink';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { shouldUseNoColor } from '../../env.ts';
 import { useDebouncedStringCallback } from '../../hooks/useDebouncedStringCallback.ts';
 import { terminalChunkIsBackspaceAs127 } from '../../stdinBackspaceAsDelete127.ts';
@@ -14,7 +14,13 @@ import {
   offsetRight,
   offsetUp,
 } from '../../textBufferCursor.ts';
-import { layoutCursorBlockRow } from './freeCursorLayout.ts';
+import {
+  bufferOffsetInEditorViewport,
+  getDomElementScreenRect,
+} from '../../utils/editorViewportLayout.ts';
+import { parseSgrMouseEvent } from '../../utils/sgrMouseWheel.ts';
+import { FreeCursorCaretRow, FreeCursorPlainRow } from './freeCursorLineSegments.tsx';
+import { MarkdownEditorScrollGutter } from './MarkdownEditorScrollGutter.tsx';
 import { TextViewport } from './TextViewport.tsx';
 
 const DEBOUNCE_MS = 16;
@@ -36,6 +42,7 @@ export interface FreeCursorMultilineInputProps {
   externalContentRevision?: number;
   onChange: (value: string) => void;
   focus: boolean;
+  /** Total columns inside the frame; when wider than one column, one is reserved for the scroll gutter. */
   width: number;
   height: number;
   placeholder?: string;
@@ -44,10 +51,16 @@ export interface FreeCursorMultilineInputProps {
   /** Move caret (e.g. outline jump); consumed via `onConsumedJumpToChar`. */
   jumpToChar?: JumpToCharRequest | null;
   onConsumedJumpToChar?: () => void;
+  /**
+   * When dashboard chrome above the editor changes height, pass a new value so Yoga layout
+   * for mouse hit-testing is refreshed.
+   */
+  geometryTie?: string | number;
 }
 
 /**
- * Logical-line multiline editor (one terminal row per logical line, truncated to `width`).
+ * Logical-line multiline editor (one terminal row per logical line, truncated to the text width).
+ * When `width` is greater than 1, the rightmost column is a scroll thumb; editable text uses `width - 1` columns.
  * Arrow keys move the caret; viewport scrolls vertically to keep the caret line visible.
  */
 export function FreeCursorMultilineInput({
@@ -62,7 +75,12 @@ export function FreeCursorMultilineInput({
   onCaretOffsetChange,
   jumpToChar,
   onConsumedJumpToChar,
+  geometryTie,
 }: FreeCursorMultilineInputProps) {
+  const scrollGutterCols = width > 1 ? 1 : 0;
+  const textCols = Math.max(1, width - scrollGutterCols);
+  const framedInnerW = textCols + scrollGutterCols;
+
   const dispatch = useAppDispatch();
   const { stdin } = useStdin();
   const backwardDelete127Ref = useRef(false);
@@ -71,6 +89,12 @@ export function FreeCursorMultilineInput({
   const [cursorOffset, setCursorOffset] = useState(0);
   const [scrollLine, setScrollLine] = useState(0);
   const lastExternalRevisionRef = useRef<number | null>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
+  const dragAnchorRef = useRef<number | null>(null);
+  /** First visible logical line’s `Box` — matches Ink’s drawn row (avoids wrapper/border offset drift). */
+  const editorHitOriginRef = useRef<DOMElement | null>(null);
+  const frameGeomRef = useRef<ReturnType<typeof getDomElementScreenRect>>(null);
 
   const { schedule: scheduleFlush, cancel: cancelDebouncedFlush } = useDebouncedStringCallback(
     onChange,
@@ -85,10 +109,15 @@ export function FreeCursorMultilineInput({
   );
 
   useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
+
+  useEffect(() => {
     if (externalContentRevision === undefined) {
       bufferRef.current = value;
       setDisplayValue(value);
       setCursorOffset((c) => Math.min(c, value.length));
+      setSelection(null);
       return;
     }
     if (lastExternalRevisionRef.current === null) {
@@ -103,6 +132,7 @@ export function FreeCursorMultilineInput({
     bufferRef.current = value;
     setDisplayValue(value);
     setCursorOffset((c) => Math.min(c, value.length));
+    setSelection(null);
   }, [value, externalContentRevision]);
 
   useEffect(() => {
@@ -112,6 +142,7 @@ export function FreeCursorMultilineInput({
     const len = bufferRef.current.length;
     const c = Math.max(0, Math.min(jumpToChar.offset, len));
     setCursorOffset(c);
+    setSelection(null);
     notifyCaret(c);
     onConsumedJumpToChar?.();
   }, [jumpToChar, notifyCaret, onConsumedJumpToChar]);
@@ -146,7 +177,8 @@ export function FreeCursorMultilineInput({
     return displayValue.split('\n');
   }, [displayValue]);
 
-  const padLine = (s: string) => (s.length >= width ? s.slice(0, width) : s.padEnd(width, ' '));
+  const padLine = (s: string) =>
+    s.length >= textCols ? s.slice(0, textCols) : s.padEnd(textCols, ' ');
 
   const applyBuffer = useCallback(
     (next: string, nextCursor: number) => {
@@ -160,25 +192,93 @@ export function FreeCursorMultilineInput({
     [notifyCaret, scheduleFlush],
   );
 
-  useEffect(() => {
-    const { line } = lineColAtOffset(displayValue, cursorOffset);
+  /** Keep the caret line inside [scrollLine, scrollLine + height) before Ink paints (avoids “missing” caret). */
+  useLayoutEffect(() => {
+    const lines = displayValue.length === 0 ? ([''] as string[]) : displayValue.split('\n');
+    const maxSl = Math.max(0, lines.length - height);
+    const { line: caretLine } = lineColAtOffset(displayValue, cursorOffset);
     setScrollLine((sl) => {
-      if (line < sl) {
-        return line;
+      const slClamped = Math.min(Math.max(0, sl), maxSl);
+      if (caretLine < slClamped) {
+        return caretLine;
       }
-      if (line >= sl + height) {
-        return line - height + 1;
+      if (caretLine >= slClamped + height) {
+        return caretLine - height + 1;
       }
-      return sl;
+      return slClamped;
     });
   }, [cursorOffset, displayValue, height]);
 
   const maxScrollLine = Math.max(0, logicalLines.length - height);
   const scrollClamped = Math.min(scrollLine, maxScrollLine);
 
+  // Remeasure after layout: origin is the first *drawn* editor row (matches Ink output).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional remeasure triggers
+  useLayoutEffect(() => {
+    frameGeomRef.current = getDomElementScreenRect(editorHitOriginRef.current);
+  }, [geometryTie, width, height, scrollClamped, displayValue]);
+
+  const scrollClampedRef = useRef(scrollClamped);
+  const maxScrollLineRef = useRef(maxScrollLine);
+  scrollClampedRef.current = scrollClamped;
+  maxScrollLineRef.current = maxScrollLine;
+
   useInput(
     (input, key) => {
       if (!focus) {
+        return;
+      }
+
+      const mouse = parseSgrMouseEvent(input);
+      if (mouse != null) {
+        if (mouse.kind === 'wheel') {
+          const cap = maxScrollLineRef.current;
+          setScrollLine((s) => Math.max(0, Math.min(cap, s + mouse.delta)));
+          return;
+        }
+        if (mouse.kind === 'pointer') {
+          const g = frameGeomRef.current;
+          if (mouse.released) {
+            dragAnchorRef.current = null;
+            return;
+          }
+          if (g != null) {
+            const off = bufferOffsetInEditorViewport(
+              mouse.px,
+              mouse.py,
+              g,
+              textCols,
+              height,
+              scrollClampedRef.current,
+              bufferRef.current,
+            );
+            if (off != null) {
+              if (mouse.leftPress) {
+                dragAnchorRef.current = off;
+                setSelection(null);
+                setCursorOffset(off);
+                notifyCaret(off);
+                return;
+              }
+              if (mouse.leftDrag) {
+                const a = dragAnchorRef.current;
+                if (a != null) {
+                  const lo = Math.min(a, off);
+                  const hi = Math.max(a, off);
+                  if (lo < hi) {
+                    setSelection({ start: lo, end: hi });
+                  } else {
+                    setSelection(null);
+                  }
+                  setCursorOffset(off);
+                  notifyCaret(off);
+                }
+                return;
+              }
+            }
+          }
+          return;
+        }
         return;
       }
 
@@ -189,6 +289,7 @@ export function FreeCursorMultilineInput({
         (input.toLowerCase() === 'd' || input.toLowerCase() === 's')
       ) {
         cancelDebouncedFlush();
+        setSelection(null);
         onChange(bufferRef.current);
         onSubmit?.(bufferRef.current);
         return;
@@ -200,26 +301,33 @@ export function FreeCursorMultilineInput({
 
       const buf = bufferRef.current;
       let cur = cursorOffset;
+      const clearSel = () => {
+        setSelection(null);
+      };
 
       if (key.leftArrow) {
+        clearSel();
         cur = offsetLeft(buf, cur);
         setCursorOffset(cur);
         notifyCaret(cur);
         return;
       }
       if (key.rightArrow) {
+        clearSel();
         cur = offsetRight(buf, cur);
         setCursorOffset(cur);
         notifyCaret(cur);
         return;
       }
       if (key.upArrow) {
+        clearSel();
         cur = offsetUp(buf, cur);
         setCursorOffset(cur);
         notifyCaret(cur);
         return;
       }
       if (key.downArrow) {
+        clearSel();
         cur = offsetDown(buf, cur);
         setCursorOffset(cur);
         notifyCaret(cur);
@@ -227,21 +335,43 @@ export function FreeCursorMultilineInput({
       }
 
       if (key.pageUp) {
+        clearSel();
         setScrollLine((s) => Math.max(0, s - Math.max(1, height - 1)));
         return;
       }
       if (key.pageDown) {
-        setScrollLine((s) => Math.min(maxScrollLine, s + Math.max(1, height - 1)));
+        clearSel();
+        const cap = maxScrollLineRef.current;
+        setScrollLine((s) => Math.min(cap, s + Math.max(1, height - 1)));
         return;
       }
 
+      const applyRangeDelete = (): { base: string; at: number } => {
+        const sel = selectionRef.current;
+        if (sel != null && sel.start < sel.end) {
+          const base = buf.slice(0, sel.start) + buf.slice(sel.end);
+          const at = sel.start;
+          setSelection(null);
+          return { base, at };
+        }
+        return { base: buf, at: cur };
+      };
+
       if (key.return) {
-        const ins = insertAt(buf, cur, '\n');
+        const { base, at } = applyRangeDelete();
+        const ins = insertAt(base, at, '\n');
         applyBuffer(ins.next, ins.cursor);
         return;
       }
 
       if (key.backspace || key.delete) {
+        const sel = selectionRef.current;
+        if (sel != null && sel.start < sel.end) {
+          const next = buf.slice(0, sel.start) + buf.slice(sel.end);
+          applyBuffer(next, sel.start);
+          setSelection(null);
+          return;
+        }
         const backward = key.backspace || backwardDelete127Ref.current;
         backwardDelete127Ref.current = false;
         const out = backward ? deleteBefore(buf, cur) : deleteAfter(buf, cur);
@@ -250,7 +380,8 @@ export function FreeCursorMultilineInput({
       }
 
       if (input && !key.ctrl && !key.meta) {
-        const ins = insertAt(buf, cur, input);
+        const { base, at } = applyRangeDelete();
+        const ins = insertAt(base, at, input);
         applyBuffer(ins.next, ins.cursor);
       }
     },
@@ -264,66 +395,67 @@ export function FreeCursorMultilineInput({
   return (
     <Box flexDirection="column" flexGrow={1}>
       <TextViewport
-        panelWidth={width + 2}
+        panelWidth={framedInnerW + 2}
         viewportHeight={height}
         scrollOffset={scrollClamped}
         totalRows={logicalLines.length}
         kind="Resume (markdown)"
       >
-        <Box flexDirection="column" width={width}>
-          {sliceLines.map((lineRaw, i) => {
-            const globalLine = scrollClamped + i;
-            const isCursorLine = focus && globalLine === curLine;
-            const showPlaceholder =
-              displayValue === '' && globalLine === 0 && i === 0 && Boolean(placeholder);
-            const padded = showPlaceholder
-              ? (placeholder ?? '').slice(0, width).padEnd(width, ' ')
-              : padLine(lineRaw);
-            const cc = isCursorLine ? Math.min(curCol, width) : 0;
-            const blk = layoutCursorBlockRow(padded, cc, width);
-            const midBlank =
-              blk.charUnder === ' ' || blk.charUnder === '' || blk.charUnder === '\t';
-            return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: viewport slice
-              <Box key={`${scrollClamped}-${i}`} flexDirection="row" width={width}>
-                {showPlaceholder ? (
-                  <Text dimColor wrap="truncate-end">
-                    {padded}
-                  </Text>
-                ) : isCursorLine ? (
-                  <Box flexDirection="row" width={width}>
-                    {blk.leftW > 0 ? (
-                      <Box width={blk.leftW}>
-                        <Text wrap="truncate-end">{blk.left}</Text>
-                      </Box>
-                    ) : null}
-                    <Box width={1}>
-                      {midBlank ? (
-                        noColor ? (
-                          <Text bold>▌</Text>
-                        ) : (
-                          <Text bold color="cyan">
-                            ▌
-                          </Text>
-                        )
-                      ) : noColor ? (
-                        <Text bold>{blk.charUnder}</Text>
-                      ) : (
-                        <Text inverse>{blk.charUnder}</Text>
-                      )}
-                    </Box>
-                    {blk.rightW > 0 ? (
-                      <Box width={blk.rightW}>
-                        <Text wrap="truncate-end">{blk.right}</Text>
-                      </Box>
-                    ) : null}
-                  </Box>
-                ) : (
-                  <Text wrap="truncate-end">{padded}</Text>
-                )}
-              </Box>
-            );
-          })}
+        <Box flexDirection="row" width={framedInnerW}>
+          <Box flexDirection="column" width={textCols}>
+            {sliceLines.map((lineRaw, i) => {
+              const globalLine = scrollClamped + i;
+              const isCursorLine = focus && globalLine === curLine;
+              const showPlaceholder =
+                displayValue === '' && globalLine === 0 && i === 0 && Boolean(placeholder);
+              const padded = showPlaceholder
+                ? (placeholder ?? '').slice(0, textCols).padEnd(textCols, ' ')
+                : padLine(lineRaw);
+              const cc = isCursorLine ? Math.min(curCol, textCols) : 0;
+              return (
+                <Box
+                  key={`vp-${scrollClamped}-L${globalLine}`}
+                  ref={i === 0 ? editorHitOriginRef : undefined}
+                  flexDirection="row"
+                  width={textCols}
+                >
+                  {showPlaceholder ? (
+                    <Text dimColor wrap="truncate-end">
+                      {padded}
+                    </Text>
+                  ) : isCursorLine ? (
+                    <FreeCursorCaretRow
+                      text={displayValue}
+                      globalLine={globalLine}
+                      lineRaw={lineRaw}
+                      padded={padded}
+                      cc={cc}
+                      textCols={textCols}
+                      selection={selection}
+                      noColor={noColor}
+                    />
+                  ) : (
+                    <FreeCursorPlainRow
+                      padded={padded}
+                      text={displayValue}
+                      globalLine={globalLine}
+                      lineRaw={lineRaw}
+                      textCols={textCols}
+                      selection={selection}
+                      noColor={noColor}
+                    />
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+          {scrollGutterCols > 0 ? (
+            <MarkdownEditorScrollGutter
+              viewportHeight={height}
+              scrollOffset={scrollClamped}
+              totalLines={logicalLines.length}
+            />
+          ) : null}
         </Box>
       </TextViewport>
     </Box>

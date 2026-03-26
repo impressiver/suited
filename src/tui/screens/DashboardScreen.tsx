@@ -1,6 +1,10 @@
-import { Box, Text, useInput } from 'ink';
+import { Box, type DOMElement, measureElement, Text, useInput } from 'ink';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { parseMarkdownStringToProfile, profileMarkdownContent } from '../../profile/markdown.ts';
+import {
+  parseDisplayMarkdownStringToProfile,
+  profileMarkdownContent,
+  stripHtmlCommentsFromProfileMarkdown,
+} from '../../profile/markdown.ts';
 import type { Profile } from '../../profile/schema.ts';
 import { loadActiveProfile } from '../../profile/serializer.ts';
 import type { HealthScore } from '../../services/improve.ts';
@@ -20,6 +24,7 @@ import { hasApiKey } from '../env.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
 import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
+import { useTerminalSgrMouse } from '../hooks/useTerminalSgrMouse.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
 import { isUserAbort } from '../isUserAbort.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -40,7 +45,7 @@ import {
   matchSectionEntryForHeadingLine,
   type ResumeSectionEntry,
   type ResumeSectionId,
-  resumeExperiencePositionIdAtMarkdownOffset,
+  resumeExperiencePositionIdForEditorView,
   resumeSectionIdAtMarkdownOffset,
 } from '../resumeSectionIndex.ts';
 import { saveRefinedForPersistenceTarget } from '../saveRefinedForPersistenceTarget.ts';
@@ -48,10 +53,23 @@ import { useAppDispatch, useAppState } from '../store.tsx';
 import { suggestedNextLine } from '../suggestedNext.ts';
 import { offsetAtLineCol } from '../textBufferCursor.ts';
 import { SCREEN_ORDER } from '../types.ts';
-import { linesToWrappedRows } from '../utils/wrapTextRows.ts';
+import { wrappedMarkdownHintRows } from '../utils/markdownDisplayHints.tsx';
+import { parseSgrMouseEvent } from '../utils/sgrMouseWheel.ts';
+import { linesToWrappedRows, splitLinesForWrap } from '../utils/wrapTextRows.ts';
 
 function cloneProfile(p: Profile): Profile {
   return JSON.parse(JSON.stringify(p)) as Profile;
+}
+
+/** Rows consumed by `FreeCursorMultilineInput`’s `TextViewport` below the section strip (top+bottom border + dim scroll hint). */
+const RESUME_EDITOR_VIEWPORT_CHROME_ROWS = 3;
+
+/**
+ * Rows for the section strip block above the editor: one hint line, optional parse error line,
+ * and the inner box’s `marginBottom={1}` gap before the markdown frame.
+ */
+function resumeEditorSectionBlockRows(parseErr: string | null): number {
+  return 2 + (parseErr != null ? 1 : 0);
 }
 
 function polishSectionIdsForResumeSection(id: ResumeSectionId | null): string[] | null {
@@ -80,7 +98,7 @@ export interface DashboardScreenProps {
 export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: DashboardScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { activeScreen, persistenceTarget, inTextInput } = useAppState();
+  const { activeScreen, persistenceTarget, inTextInput, paletteOpen } = useAppState();
   const persistenceTargetRef = useRef(persistenceTarget);
   persistenceTargetRef.current = persistenceTarget;
   const { createController, releaseController } = useOperationAbort();
@@ -160,7 +178,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       }
       setEditorBundle(b);
       if (!mdDirtyRef.current) {
-        setMdDraft(profileMarkdownContent(b.profile));
+        setMdDraft(stripHtmlCommentsFromProfileMarkdown(profileMarkdownContent(b.profile)));
         setMdExternalRevision((n) => n + 1);
       }
     });
@@ -231,14 +249,22 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
   const editorMode = snapshot.hasRefined && editorBundle != null;
   const resumeEditorReady = !snapshot.hasRefined || editorBundle != null;
 
-  const mdDisplayRows = useMemo(() => {
+  const mdSourceLines = useMemo(() => {
     if (loadedProfile == null) {
       return [] as string[];
     }
-    const raw = profileMarkdownContent(loadedProfile);
-    const mdLines = raw.split('\n');
-    return linesToWrappedRows(mdLines, textW);
-  }, [loadedProfile, textW]);
+    return splitLinesForWrap(profileMarkdownContent(loadedProfile));
+  }, [loadedProfile]);
+
+  const mdDisplayRows = useMemo(
+    () => linesToWrappedRows(mdSourceLines, textW),
+    [mdSourceLines, textW],
+  );
+
+  const mdRowElements = useMemo(
+    () => wrappedMarkdownHintRows(mdSourceLines, textW),
+    [mdSourceLines, textW],
+  );
 
   const resumeDocVisible =
     panelActive &&
@@ -251,9 +277,9 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
   const panelFooterHintText = resumeDocVisible
     ? editorMode
       ? resumeBodyFocused
-        ? `Resume · Esc: nav mode · Ctrl+O outline · PgUp/PgDn · Ctrl+S save · Ctrl+P polish · Ctrl+E consultant · 1–${SCREEN_ORDER.length} · : palette`
+        ? `Resume · Esc: nav mode · Ctrl+O outline · PgUp/PgDn · wheel scroll · Ctrl+S save · Ctrl+P polish · Ctrl+E consultant · 1–${SCREEN_ORDER.length} · : palette`
         : `Resume · Tab: edit · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette · o / Ctrl+O outline`
-      : `Resume · ↑↓ PgUp/PgDn · o outline · Enter on heading · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette`
+      : `Resume · ↑↓ PgUp/PgDn · wheel scroll · o outline · Enter on heading · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette`
     : `Resume · ↑↓ PgUp/PgDn scroll document · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette`;
   useRegisterPanelFooterHint(panelFooterHintText);
 
@@ -270,9 +296,65 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
   );
 
   const docMenuOpen = outlineOpen || headingMenuEntry != null;
+
+  const resumeEditorHostRef = useRef<DOMElement | null>(null);
+  const [resumeEditorMeasuredLines, setResumeEditorMeasuredLines] = useState<number | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rerun when siblings (API banner, polish, doc menu, status/health/suggested, terminal size) change flex height for the editor host
+  useLayoutEffect(() => {
+    if (!editorMode || editorBundle == null) {
+      setResumeEditorMeasuredLines(null);
+      return;
+    }
+    const el = resumeEditorHostRef.current;
+    if (el?.yogaNode == null) {
+      return;
+    }
+    const allocated = Math.round(measureElement(el).height);
+    if (allocated <= 0) {
+      return;
+    }
+    const lines =
+      allocated - resumeEditorSectionBlockRows(parseErr) - RESUME_EDITOR_VIEWPORT_CHROME_ROWS;
+    setResumeEditorMeasuredLines(Math.max(3, lines));
+  }, [
+    api,
+    docMenuOpen,
+    docPolishDiff,
+    editorBundle,
+    editorMode,
+    health,
+    healthErr,
+    outlineOpen,
+    parseErr,
+    profileLoadErr,
+    termCols,
+    termRows,
+    validationErr,
+    validationRefCount,
+    variant,
+  ]);
+
+  const resumeEditorLineSlots =
+    resumeEditorMeasuredLines ??
+    Math.max(
+      3,
+      viewportH - resumeEditorSectionBlockRows(parseErr) - RESUME_EDITOR_VIEWPORT_CHROME_ROWS,
+    );
+
   useRegisterBlockingUi(
     panelActive && loadedProfile != null && (docMenuOpen || docPolishDiff != null),
   );
+
+  const resumeWheelScrollActive =
+    panelActive &&
+    loadedProfile != null &&
+    !paletteOpen &&
+    !docMenuOpen &&
+    docPolishDiff == null &&
+    ((!editorMode && mdDisplayRows.length > 0) || (editorMode && resumeBodyFocused));
+
+  useTerminalSgrMouse(resumeWheelScrollActive);
 
   const polishDiffBlocks = useMemo(() => {
     if (docPolishDiff == null) {
@@ -286,7 +368,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       return null;
     }
     try {
-      const p = parseMarkdownStringToProfile(mdDraft, editorBundle.profile);
+      const p = parseDisplayMarkdownStringToProfile(mdDraft, editorBundle.profile);
       setParseErr(null);
       return p;
     } catch (e: unknown) {
@@ -306,7 +388,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
         profileDir,
       });
       setEditorBundle((b) => (b ? { ...b, profile } : null));
-      setMdDraft(profileMarkdownContent(profile));
+      setMdDraft(stripHtmlCommentsFromProfileMarkdown(profileMarkdownContent(profile)));
       setMdExternalRevision((n) => n + 1);
       mdDirtyRef.current = false;
       onRefreshSnapshot?.();
@@ -330,7 +412,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
     }
     const experiencePositionId =
       sid === 'experience'
-        ? resumeExperiencePositionIdAtMarkdownOffset(mdDraft, caretOffset, sectionEntries)
+        ? resumeExperiencePositionIdForEditorView(mdDraft, caretOffset, parsed, sectionEntries)
         : null;
     const positionIds =
       experiencePositionId != null && sectionIds.includes('experience')
@@ -399,7 +481,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       });
       const experiencePositionId =
         sid === 'experience'
-          ? resumeExperiencePositionIdAtMarkdownOffset(mdDraft, caretOffset, sectionEntries)
+          ? resumeExperiencePositionIdForEditorView(mdDraft, caretOffset, parsed, sectionEntries)
           : undefined;
       dispatch({
         type: 'SET_REFINE_RESUME_INTENT',
@@ -435,7 +517,12 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
       return 'Preamble / contact';
     }
     if (sid === 'experience') {
-      const pid = resumeExperiencePositionIdAtMarkdownOffset(mdDraft, caretOffset, sectionEntries);
+      const pid = resumeExperiencePositionIdForEditorView(
+        mdDraft,
+        caretOffset,
+        editorBundle.profile,
+        sectionEntries,
+      );
       if (pid != null) {
         const short = experiencePositionShortLabel(editorBundle.profile, pid);
         return short != null ? `Experience · ${short}` : `Experience · ${pid}`;
@@ -501,8 +588,16 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
   }, [mdScrollClamped, profileDir, loadedProfile, snapshot.hasSource]);
 
   useInput(
-    (_input, key) => {
+    (input, key) => {
       if (!panelActive || loadedProfile == null || mdDisplayRows.length === 0 || editorMode) {
+        return;
+      }
+      const mouse = parseSgrMouseEvent(input);
+      if (mouse?.kind === 'wheel') {
+        setMdScroll((s) => Math.max(0, Math.min(mdMaxScroll, s + mouse.delta)));
+        return;
+      }
+      if (mouse != null) {
         return;
       }
       const step = Math.max(1, viewportH - 1);
@@ -694,7 +789,13 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
           </Box>
         )}
       {snapshot.hasSource && loadedProfile != null && editorMode && editorBundle != null && (
-        <Box marginBottom={1} flexGrow={1} flexDirection="column" minHeight={0}>
+        <Box
+          ref={resumeEditorHostRef}
+          marginBottom={1}
+          flexGrow={1}
+          flexDirection="column"
+          minHeight={0}
+        >
           <Box marginBottom={1} flexDirection="column">
             <Text dimColor wrap="truncate-end">
               {resumeBodyFocused
@@ -709,6 +810,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
           </Box>
           <FreeCursorMultilineInput
             value={mdDraft}
+            geometryTie={`${!api}-${parseErr ?? ''}-${resumeEditorLineSlots}`}
             externalContentRevision={mdExternalRevision}
             onChange={(v) => {
               mdDirtyRef.current = true;
@@ -716,7 +818,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
             }}
             focus={panelActive && !docMenuOpen && docPolishDiff == null && resumeBodyFocused}
             width={textW}
-            height={Math.max(3, viewportH - 1 - (parseErr != null ? 1 : 0))}
+            height={resumeEditorLineSlots}
             jumpToChar={jumpToChar}
             onConsumedJumpToChar={() => {
               setJumpToChar(null);
@@ -725,7 +827,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
             onSubmit={(v) => {
               setMdDraft(v);
               try {
-                const p = parseMarkdownStringToProfile(v, editorBundle.profile);
+                const p = parseDisplayMarkdownStringToProfile(v, editorBundle.profile);
                 setParseErr(null);
                 void persistEditorProfile(p);
               } catch (e: unknown) {
@@ -748,7 +850,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
               kind="Resume (read-only)"
             >
               <ScrollView
-                displayLines={mdDisplayRows}
+                rowElements={mdRowElements}
                 height={viewportH}
                 scrollOffset={mdScrollClamped}
                 padToWidth={textW}
@@ -787,7 +889,7 @@ export function DashboardScreen({ snapshot, profileDir, onRefreshSnapshot }: Das
                   profileDir,
                 });
                 setEditorBundle((b) => (b ? { ...b, profile: proposed } : null));
-                setMdDraft(profileMarkdownContent(proposed));
+                setMdDraft(stripHtmlCommentsFromProfileMarkdown(profileMarkdownContent(proposed)));
                 setMdExternalRevision((n) => n + 1);
                 mdDirtyRef.current = false;
                 setDocPolishDiff(null);

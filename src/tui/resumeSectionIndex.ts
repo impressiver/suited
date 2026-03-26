@@ -103,6 +103,20 @@ export function findDisplayRowForSection(
  */
 const POS_ID_HTML_COMMENT = /<!--\s*pos-id:([^>\s]+)\s*-->/;
 
+function parseExperienceHeadingForIndex(line: string): { title: string; company: string } | null {
+  const t = line.trim().replace(/^###\s+/, '');
+  const at = t.lastIndexOf(' at ');
+  if (at === -1) {
+    return null;
+  }
+  const title = t.slice(0, at).trim();
+  const company = t.slice(at + 4).trim();
+  if (!title || !company) {
+    return null;
+  }
+  return { title, company };
+}
+
 /**
  * When the caret is under `## Experience`, the nearest preceding `<!-- pos-id:... -->`
  * marker (per `profileMarkdownContent`) identifies the active role block.
@@ -127,6 +141,67 @@ export function resumeExperiencePositionIdAtMarkdownOffset(
     }
   }
   return null;
+}
+
+/**
+ * Same as {@link resumeExperiencePositionIdAtMarkdownOffset} for **display** markdown
+ * (HTML comments stripped): uses `### Title at Company` blocks in order under `## Experience`.
+ */
+export function resumeExperiencePositionIdForEditorView(
+  md: string,
+  offset: number,
+  profile: Profile,
+  entries: ResumeSectionEntry[],
+): string | null {
+  if (resumeSectionIdAtMarkdownOffset(md, offset, entries) !== 'experience') {
+    return null;
+  }
+  const lines = md.split('\n');
+  const safe = Math.max(0, Math.min(offset, md.length));
+  const lineIdx = safe === 0 ? 0 : (md.slice(0, safe).match(/\n/g)?.length ?? 0);
+
+  let inExp = false;
+  const blockStarts: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const row = (lines[i] ?? '').trim();
+    if (/^##\s+Experience/i.test(row)) {
+      inExp = true;
+      blockStarts.length = 0;
+      continue;
+    }
+    if (inExp && /^##\s+/.test(row)) {
+      break;
+    }
+    if (inExp && /^###\s+/.test(row)) {
+      blockStarts.push(i);
+    }
+  }
+  if (!inExp || blockStarts.length === 0) {
+    return null;
+  }
+  let blockIndex = -1;
+  for (let j = 0; j < blockStarts.length; j++) {
+    const start = blockStarts[j];
+    if (start !== undefined && start <= lineIdx) {
+      blockIndex = j;
+    } else {
+      break;
+    }
+  }
+  if (blockIndex < 0) {
+    return null;
+  }
+  const headingLine = (lines[blockStarts[blockIndex] ?? -1] ?? '').trim();
+  const ph = parseExperienceHeadingForIndex(headingLine);
+  if (ph) {
+    const pos = profile.positions.find(
+      (p) => p.title.value === ph.title && p.company.value === ph.company,
+    );
+    if (pos) {
+      return pos.id;
+    }
+  }
+  return profile.positions[blockIndex]?.id ?? null;
 }
 
 /** Short UI label for the section strip (dashboard editor). */

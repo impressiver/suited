@@ -74,6 +74,7 @@ Sequential **order within TUI** when alone on the team: follow [`tui-implementat
 |----------|------|
 | **Job-targeted editing (ex-Curate)** | [`tui-document-shell.md`](./tui-document-shell.md) §4–6 (job context on document); legacy Curate section in [`tui-screens.md`](./tui-screens.md#curatescreen-planned) |
 | **Refinement history / revert** | [`refinement-history.md`](./refinement-history.md), [`project.md` §7](./project.md#7-profile-directory-layout-conceptual) |
+| **Cover letter PDF (per job)** | [`cover-letter-pdf.md`](./cover-letter-pdf.md), [`project.md`](./project.md) §4 / §7, [`tui-screens.md`](./tui-screens.md) Jobs / Generate |
 | Decide Phase A vs B scope | [`tui-phased-delivery.md`](./tui-phased-delivery.md), [`tui-definition-of-done.md`](./tui-definition-of-done.md) |
 | Layout / keyboard / streaming UI | [`tui-architecture.md`](./tui-architecture.md) |
 | Holistic UX, chrome, blocking confirms | [`tui-document-shell.md`](./tui-document-shell.md), [`tui-ux.md` — Holistic design principles](./tui-ux.md#holistic-design-principles), [`tui-architecture.md`](./tui-architecture.md) (Blocking UI; legacy Header/Footer notes) |

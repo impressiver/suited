@@ -7,8 +7,10 @@ export interface ProfileSnapshot {
   hasSource: boolean;
   hasRefined: boolean;
   name: string | null;
+  headline: string | null;
   positionCount: number;
   skillCount: number;
+  contactFieldCount: number;
   jobsCount: number;
   lastPdfLine: string | null;
 }
@@ -20,8 +22,10 @@ export function useProfileSnapshot(profileDir: string): ProfileSnapshot & { refr
     hasSource: false,
     hasRefined: false,
     name: null,
+    headline: null,
     positionCount: 0,
     skillCount: 0,
+    contactFieldCount: 0,
     jobsCount: 0,
     lastPdfLine: null,
   });

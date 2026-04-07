@@ -87,6 +87,7 @@ export function DashboardScreen({
       {snapshot.hasSource && snapshot.name && (
         <Box marginBottom={1} flexDirection="column">
           <Text bold>{snapshot.name}</Text>
+          {snapshot.headline && <Text>{snapshot.headline}</Text>}
           <Text dimColor>
             {snapshot.positionCount} positions · {snapshot.skillCount} skills
           </Text>
@@ -108,6 +109,11 @@ export function DashboardScreen({
             <Text color={dotColor(snapshot.hasRefined)}>{dot(snapshot.hasRefined)}</Text>
             {' Refined      '}
             <Text dimColor>{refinedStatus}</Text>
+          </Text>
+          <Text>
+            <Text color={dotColor(snapshot.contactFieldCount > 0)}>{dot(snapshot.contactFieldCount > 0)}</Text>
+            {' Contact      '}
+            <Text dimColor>{snapshot.contactFieldCount > 0 ? `${snapshot.contactFieldCount} fields` : 'Not set'}</Text>
           </Text>
           <Text>
             <Text color={dotColor(snapshot.jobsCount > 0)}>{dot(snapshot.jobsCount > 0)}</Text>

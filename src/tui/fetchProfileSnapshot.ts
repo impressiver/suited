@@ -17,8 +17,10 @@ export async function fetchProfileSnapshot(profileDir: string): Promise<ProfileS
   const hasSource = await fileExists(sourceJsonPath(profileDir));
   const hasRefined = await fileExists(refinedJsonPath(profileDir));
   let name: string | null = null;
+  let headline: string | null = null;
   let positionCount = 0;
   let skillCount = 0;
+  let contactFieldCount = 0;
   let lastPdfLine: string | null = null;
 
   if (hasSource) {
@@ -26,6 +28,16 @@ export async function fetchProfileSnapshot(profileDir: string): Promise<ProfileS
     name = source.contact.name.value;
     positionCount = source.positions.length;
     skillCount = source.skills.length;
+    headline = source.contact.headline?.value ?? null;
+    // Count non-empty contact fields
+    const c = source.contact;
+    if (c.name?.value) contactFieldCount++;
+    if (c.email?.value) contactFieldCount++;
+    if (c.phone?.value) contactFieldCount++;
+    if (c.location?.value) contactFieldCount++;
+    if (c.linkedin?.value) contactFieldCount++;
+    if (c.github?.value) contactFieldCount++;
+    if (c.website?.value) contactFieldCount++;
   }
 
   const config = await loadGenerationConfig(profileDir);
@@ -51,8 +63,10 @@ export async function fetchProfileSnapshot(profileDir: string): Promise<ProfileS
     hasSource,
     hasRefined,
     name,
+    headline,
     positionCount,
     skillCount,
+    contactFieldCount,
     jobsCount: jobs.length,
     lastPdfLine,
   };

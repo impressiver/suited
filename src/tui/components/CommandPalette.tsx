@@ -32,13 +32,12 @@ export function CommandPalette({
       overlayDepth > 0
         ? [{ value: 'clear-overlays', label: 'Close overlays / back to underlay' }]
         : [];
-    const rest = SCREEN_ORDER.filter((id) => id !== 'refine').map((id) => ({
+    const rest = SCREEN_ORDER.map((id) => ({
       value: id,
       label: `Go to ${NAV_LABELS[id]}`,
     }));
     return [
       ...clearRow,
-      { value: 'refine', label: 'Refine (r)' },
       ...rest,
       { value: 'help' as const, label: 'Help (? or Ctrl+?)' },
     ];
@@ -67,10 +66,11 @@ export function CommandPalette({
   return (
     <Box
       flexDirection="column"
-      marginBottom={1}
       borderStyle="round"
       borderColor="cyan"
       paddingX={1}
+      paddingY={1}
+      width={40}
     >
       <Text bold>Command palette</Text>
       <Text dimColor>: or Esc close · ↑↓ Enter</Text>

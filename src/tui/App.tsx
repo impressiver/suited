@@ -16,6 +16,7 @@ import { NotificationProvider, useNotifications } from './notificationContext.ts
 import { formatPipelineStrip } from './pipelineStrip.ts';
 import { ContactScreen } from './screens/ContactScreen.tsx';
 import { DashboardScreen } from './screens/DashboardScreen.tsx';
+import { EditorScreen } from './screens/EditorScreen.tsx';
 import { GenerateScreen } from './screens/GenerateScreen.tsx';
 import { ImportScreen } from './screens/ImportScreen.tsx';
 import { JobsScreen } from './screens/JobsScreen.tsx';
@@ -36,7 +37,7 @@ function dispatchScreenNavigation(
   screen: ScreenId,
   activeScreen: ScreenId,
 ) {
-  if (isOverlayNavScreen(screen) && (activeScreen === 'dashboard' || activeScreen === 'jobs')) {
+  if (isOverlayNavScreen(screen) && (activeScreen === 'dashboard' || activeScreen === 'editor' || activeScreen === 'jobs')) {
     dispatch({ type: 'PUSH_OVERLAY', screen });
   } else {
     dispatch({ type: 'SET_SCREEN', screen });
@@ -164,6 +165,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
 
   const screenUsesContentArrows = (screen: ScreenId): boolean =>
     screen === 'dashboard' ||
+    screen === 'editor' ||
     screen === 'contact' ||
     screen === 'jobs' ||
     screen === 'generate' ||
@@ -198,7 +200,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
       }
 
       if (key.escape) {
-        if (effectiveScreen === 'jobs' || effectiveScreen === 'generate') {
+        if (effectiveScreen === 'editor' || effectiveScreen === 'jobs' || effectiveScreen === 'generate') {
           return;
         }
         if (overlayStack.length > 0) {
@@ -277,7 +279,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
       const letterMap: Record<string, ScreenId> = {
         d: 'dashboard',
         i: 'import',
-        r: 'refine',
+        e: 'editor',
         g: 'generate',
         j: 'jobs',
         c: 'contact',
@@ -298,6 +300,15 @@ export function App({ profileDir, flowOptions }: AppProps) {
       case 'dashboard':
         return (
           <DashboardScreen
+            snapshot={snapshot}
+            profileDir={profileDir}
+            onRefreshSnapshot={snapshot.refresh}
+            onSectionChange={setSelectedSection}
+          />
+        );
+      case 'editor':
+        return (
+          <EditorScreen
             snapshot={snapshot}
             profileDir={profileDir}
             onRefreshSnapshot={snapshot.refresh}

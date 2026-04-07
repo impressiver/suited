@@ -110,7 +110,7 @@ export function ResumeEditor({
   persistenceTargetRef.current = persistenceTarget;
   const { createController, releaseController } = useOperationAbort();
   const panelActive =
-    activeScreen === 'dashboard' || activeScreen === 'editor' || activeScreen === 'jobs';
+    activeScreen === 'editor' || activeScreen === 'jobs';
   const [termCols, termRows] = useTerminalSize();
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [outlineIdx, setOutlineIdx] = useState(0);
@@ -269,9 +269,9 @@ export function ResumeEditor({
     ? editorMode
       ? resumeBodyFocused
         ? `Resume · Esc: nav mode · Ctrl+O outline · PgUp/PgDn · wheel scroll · Ctrl+S save · Ctrl+P polish · Ctrl+E consultant · 1–${SCREEN_ORDER.length} · : palette`
-        : `Resume · Tab: edit · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette · o / Ctrl+O outline`
-      : `Resume · ↑↓ PgUp/PgDn · wheel scroll · o outline · Enter on heading · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette`
-    : `Resume · ↑↓ PgUp/PgDn scroll document · 1–${SCREEN_ORDER.length} · d i c j r g s · : palette`;
+        : `Resume · Tab: edit · 1–${SCREEN_ORDER.length} · d i c e j g s · : palette · o / Ctrl+O outline`
+      : `Resume · ↑↓ PgUp/PgDn · wheel scroll · o outline · Enter on heading · 1–${SCREEN_ORDER.length} · d i c e j g s · : palette`
+    : `Resume · ↑↓ PgUp/PgDn scroll document · 1–${SCREEN_ORDER.length} · d i c e j g s · : palette`;
   useRegisterPanelFooterHint(panelFooterHintText);
 
   const mdMaxScroll = Math.max(0, mdDisplayRows.length - viewportH);

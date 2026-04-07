@@ -64,7 +64,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
       }
       if (
         state.editorDirty &&
-        (state.activeScreen === 'editor' || state.activeScreen === 'dashboard') &&
+        state.activeScreen === 'editor' &&
         screen !== state.activeScreen
       ) {
         setPendingNav(screen);

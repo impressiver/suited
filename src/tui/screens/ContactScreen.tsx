@@ -158,11 +158,12 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
       }
       if (phase === 'edit' && key.escape) {
         setPhase('browse');
-        // Validate on exit
         const currentKey = FIELD_ORDER[fieldIndex].key;
         const error = validateField(currentKey, values[currentKey] ?? '');
         if (error) {
           setValidationErrors((prev) => ({ ...prev, [currentKey]: error }));
+        } else {
+          void saveAll();
         }
         return;
       }
@@ -239,6 +240,8 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
                     const error = validateField(key, values[key] ?? '');
                     if (error) {
                       setValidationErrors((prev) => ({ ...prev, [key]: error }));
+                    } else {
+                      void saveAll();
                     }
                     setPhase('browse');
                     setFieldIndex((j) => (j + 1) % FIELD_ORDER.length);

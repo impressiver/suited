@@ -1,7 +1,8 @@
 import { Box, Text } from 'ink';
+import { useCallback, useMemo } from 'react';
 import { globalRefinedTarget } from '../activeDocumentSession.ts';
 import { ResumeEditor } from '../components/ResumeEditor.tsx';
-import { ResumeEditorProvider } from '../components/ResumeEditorContext.tsx';
+import { type ResumeEditorContextValue, ResumeEditorProvider } from '../components/ResumeEditorContext.tsx';
 import { hasApiKey } from '../env.ts';
 import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
@@ -22,6 +23,12 @@ export function EditorScreen({
 }: EditorScreenProps) {
   const navigate = useNavigateToScreen();
   const api = hasApiKey();
+  const onRequestClose = useCallback(() => navigate('dashboard'), [navigate]);
+  const editorContext = useMemo((): ResumeEditorContextValue => ({
+    mode: 'general',
+    persistenceTarget: globalRefinedTarget(),
+    onRequestClose,
+  }), [onRequestClose]);
 
   return (
     <Box flexDirection="column" flexGrow={1} minHeight={0}>
@@ -36,13 +43,7 @@ export function EditorScreen({
           </Text>
         </Box>
       )}
-      <ResumeEditorProvider
-        value={{
-          mode: 'general',
-          persistenceTarget: globalRefinedTarget(),
-          onRequestClose: () => navigate('dashboard'),
-        }}
-      >
+      <ResumeEditorProvider value={editorContext}>
         <ResumeEditor
           snapshot={snapshot}
           profileDir={profileDir}

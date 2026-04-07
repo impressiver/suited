@@ -57,6 +57,7 @@ import {
   TextInput,
   TextViewport,
 } from './shared/index.ts';
+import { persistenceTargetsEqual } from '../activeDocumentSession.ts';
 import { getDashboardVariant } from '../dashboardVariant.ts';
 import { hasApiKey } from '../env.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
@@ -230,11 +231,18 @@ export function ResumeEditor({
   onRefreshSnapshot,
   onSectionChange,
 }: ResumeEditorProps) {
-  const { persistenceTarget, onRequestClose, mode, jobDescription, jobId } = useResumeEditorContext();
+  const { persistenceTarget: ctxTarget, onRequestClose, mode, jobDescription, jobId } = useResumeEditorContext();
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
   const { activeScreen, inTextInput, paletteOpen, editorCommand } = useAppState();
-  const persistenceTargetRef = useRef(persistenceTarget);
+  // Stabilize persistenceTarget by value so effects don't re-fire on referential changes
+  const persistenceTargetRef = useRef(ctxTarget);
+  const persistenceTarget = useMemo(() => {
+    if (persistenceTargetsEqual(persistenceTargetRef.current, ctxTarget)) {
+      return persistenceTargetRef.current;
+    }
+    return ctxTarget;
+  }, [ctxTarget]);
   persistenceTargetRef.current = persistenceTarget;
   const { createController, releaseController } = useOperationAbort();
   const panelActive =
@@ -375,7 +383,7 @@ export function ResumeEditor({
     const target = persistenceTarget;
     let cancelled = false;
     void loadRefinedTuiState(profileDir, target).then((b) => {
-      if (cancelled || persistenceTargetRef.current !== target) {
+      if (cancelled || !persistenceTargetsEqual(persistenceTargetRef.current, target)) {
         return;
       }
       setEditorBundle(b);

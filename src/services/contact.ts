@@ -26,20 +26,10 @@ export const ContactFieldsSchema = z.object({
   linkedin: z
     .union([
       z.literal(''),
-      z
-        .string()
-        .url('Invalid LinkedIn URL')
-        .startsWith('https://linkedin.com/', 'LinkedIn URL should start with https://linkedin.com/')
-        .startsWith(
-          'https://www.linkedin.com/',
-          'LinkedIn URL should start with https://linkedin.com/',
-        )
-        .or(
-          z
-            .string()
-            .url()
-            .regex(/linkedin\.com\//),
-        ),
+      // Full URL
+      z.string().url().regex(/linkedin\.com\//, 'Invalid LinkedIn URL'),
+      // Username or in/username — normalized to full URL before save
+      z.string().regex(/^(in\/)?[a-zA-Z0-9._-]+$/, 'Enter a LinkedIn username or full URL'),
     ])
     .optional(),
   website: z
@@ -95,6 +85,18 @@ function userEdit(value: string): Sourced<string> {
   return { value, source: { kind: 'user-edit' as const, editedAt: new Date().toISOString() } };
 }
 
+/** Normalize a LinkedIn input to a full URL. Accepts username, in/username, or full URL. */
+function normalizeLinkedin(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  // Already a URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  // in/username format
+  if (trimmed.startsWith('in/')) return `https://www.linkedin.com/${trimmed}`;
+  // Bare username
+  return `https://www.linkedin.com/in/${trimmed}`;
+}
+
 function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profile {
   const contact = { ...profile.contact };
 
@@ -116,6 +118,10 @@ function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profil
   updateField('email', 'email');
   updateField('phone', 'phone');
   updateField('location', 'location');
+  // Normalize LinkedIn username to full URL before saving
+  if (fields.linkedin && fields.linkedin.trim()) {
+    fields = { ...fields, linkedin: normalizeLinkedin(fields.linkedin) };
+  }
   updateField('linkedin', 'linkedin');
   updateField('website', 'website');
   updateField('github', 'github');

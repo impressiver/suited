@@ -2,6 +2,7 @@ export type ScreenId =
   | 'dashboard'
   | 'import'
   | 'refine'
+  | 'editor'
   | 'generate'
   | 'jobs'
   | 'profile'
@@ -13,8 +14,8 @@ export const SCREEN_ORDER: ScreenId[] = [
   'dashboard',
   'import',
   'contact',
+  'editor',
   'jobs',
-  'refine',
   'generate',
   'settings',
 ];
@@ -29,9 +30,10 @@ export function isOverlayNavScreen(id: ScreenId): boolean {
 export type FocusTarget = 'sidebar' | 'content';
 
 export const NAV_LABELS: Record<ScreenId, string> = {
-  dashboard: 'Resume',
+  dashboard: 'Dashboard',
   import: 'Import',
   refine: 'Refine',
+  editor: 'Editor',
   generate: 'Generate',
   jobs: 'Jobs',
   profile: 'Edit sections',

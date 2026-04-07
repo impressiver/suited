@@ -45,6 +45,8 @@ export interface AppState {
   deferLetterShortcutsFor: ScreenId | null;
   /** True while Profile editor has unsaved local edits (Phase C navigate-away guard). */
   profileEditorDirty: boolean;
+  /** True while ResumeEditor has unsaved changes (navigation guard). */
+  editorDirty: boolean;
   /** When set, ProfileEditorScreen root Esc (no dirty) navigates here instead of staying on Profile. */
   profileEditorReturnTo: ScreenId | null;
   /**
@@ -79,6 +81,7 @@ export type AppAction =
   /** Clears async lock (Esc during `operationInProgress`); extend later for AbortSignal. */
   | { type: 'CANCEL_OPERATION' }
   | { type: 'SET_PROFILE_EDITOR_DIRTY'; value: boolean }
+  | { type: 'SET_EDITOR_DIRTY'; value: boolean }
   | { type: 'SET_PROFILE_EDITOR_RETURN_TO'; screen: ScreenId | null }
   | { type: 'INCREMENT_BLOCKING_UI' }
   | { type: 'DECREMENT_BLOCKING_UI' }
@@ -103,6 +106,7 @@ export function createInitialAppState(profileDir: string): AppState {
     pendingJobId: null,
     deferLetterShortcutsFor: null,
     profileEditorDirty: false,
+    editorDirty: false,
     profileEditorReturnTo: null,
     blockingUiDepth: 0,
     persistenceTarget: globalRefinedTarget(),
@@ -137,6 +141,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         overlayStack: [],
         paletteOpen: false,
         profileEditorReturnTo: action.screen === 'profile' ? state.profileEditorReturnTo : null,
+        editorDirty: action.screen === 'editor' || action.screen === 'jobs' ? state.editorDirty : false,
         persistenceTarget,
       };
     }
@@ -164,6 +169,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'SET_PROFILE_EDITOR_DIRTY':
       return { ...state, profileEditorDirty: action.value };
+    case 'SET_EDITOR_DIRTY':
+      return { ...state, editorDirty: action.value };
     case 'SET_PROFILE_EDITOR_RETURN_TO':
       return { ...state, profileEditorReturnTo: action.screen };
     case 'INCREMENT_BLOCKING_UI':

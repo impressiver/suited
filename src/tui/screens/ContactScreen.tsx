@@ -212,16 +212,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     <Box flexDirection="column">
       <Text bold>Contact</Text>
       {savedAt != null && <Text color="green">Last saved: {savedAt}</Text>}
-      {(saveErr != null || Object.values(validationErrors).some(Boolean)) && (
-        <Box flexDirection="column">
-          {saveErr != null && <Text color="red">{saveErr}</Text>}
-          {Object.entries(validationErrors).filter(([, err]) => err).map(([key, err]) => (
-            <Text key={key} color="red">
-              • {FIELD_ORDER.find((f) => f.key === key)?.label}: {err}
-            </Text>
-          ))}
-        </Box>
-      )}
+      {saveErr != null && <Text color="red">{saveErr}</Text>}
       <Box marginTop={1} flexDirection="column">
         {FIELD_ORDER.map(({ key, label, required }, i) => {
           const sel = i === fieldIndex;
@@ -245,7 +236,6 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
                   }}
                   focus={active && phase === 'edit'}
                   onSubmit={() => {
-                    // Validate on submit
                     const error = validateField(key, values[key] ?? '');
                     if (error) {
                       setValidationErrors((prev) => ({ ...prev, [key]: error }));
@@ -255,16 +245,9 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
                   }}
                 />
               ) : (
-                <Box flexDirection="column">
-                  <Text dimColor={!v} color={error ? 'red' : undefined}>
-                    {v || '—'}
-                  </Text>
-                  {error && (
-                    <Text color="red" dimColor>
-                      {error}
-                    </Text>
-                  )}
-                </Box>
+                <Text dimColor={!v} color={error ? 'red' : undefined}>
+                  {v || '—'}
+                </Text>
               )}
             </Box>
           );

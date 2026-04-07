@@ -31,6 +31,7 @@ import {
   saveJobRefinement,
 } from '../profile/serializer.ts';
 import { throwIfAborted } from '../utils/abort.ts';
+import { exportCoverLetterPdf } from './coverLetterPdf.ts';
 import { persistJobRefinementPinnedRender } from './jobRefinement.ts';
 import { applyResumeSectionSelection, collectDefaultSectionKeys } from './sectionSelection.ts';
 
@@ -49,11 +50,14 @@ export interface RunTuiGeneratePdfOptions {
    * UI progress: active step index (see `GenerateScreen` labels). Job path: 0…5; full resume: 0…4.
    */
   onProgress?: (stepIndex: number) => void;
+  /** When job-targeted, also export cover letter PDF after resume (if draft non-empty). */
+  alsoExportCoverLetter?: boolean;
 }
 
 export interface RunTuiGeneratePdfResult {
   outputPath: string;
   config: GenerationConfig;
+  coverLetterPath?: string;
 }
 
 /** Result of analyze / assemble / polish — before section checkboxes. TUI shows sections, then calls `runTuiGenerateRenderPhase`. */
@@ -291,6 +295,7 @@ export interface RunTuiGenerateRenderPhaseOptions {
   sectionSelection: string[];
   signal?: AbortSignal;
   onProgress?: (stepIndex: number) => void;
+  alsoExportCoverLetter?: boolean;
 }
 
 /** Apply section selection, HTML squeeze loop, PDF export, save config (after `runTuiGenerateBuildPhase`). */
@@ -369,8 +374,22 @@ export async function runTuiGenerateRenderPhase(
     });
   }
 
+  let coverLetterPath: string | undefined;
+  if (ro.alsoExportCoverLetter && jobId != null && outSlug) {
+    throwIfAborted(signal);
+    ro.onProgress?.(config.jd ? 5 : 4);
+    coverLetterPath = await exportCoverLetterPdf({
+      profileDir,
+      resumesDir,
+      jobSlug: outSlug,
+      profile,
+      company: config.company,
+      jobTitle: config.jobTitle,
+    });
+  }
+
   ro.onProgress?.(config.jd ? 5 : 4);
-  return { outputPath, config };
+  return { outputPath, config, coverLetterPath };
 }
 
 /** One-shot generate with every section included (same as build + render with all keys). */
@@ -383,5 +402,6 @@ export async function runTuiGeneratePdf(
     sectionSelection,
     signal: options.signal,
     onProgress: options.onProgress,
+    alsoExportCoverLetter: options.alsoExportCoverLetter,
   });
 }

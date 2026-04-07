@@ -1,16 +1,16 @@
 # UX & workflow
 
-**Target shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** — one **Resume** markdown viewport, **TopBar** (screen + **Job:**), **StatusBar** (glyphs + pipeline), **`:`** palette, **Ctrl-?** help. **Job-targeted** editing uses the **same** UX as base refined; only **persistence** changes (`jobs/{slug}/refined.*`). Planned **Curate** as a separate sidebar row is **superseded** by **job selection on the document** (see document shell §4–6).
+**Target shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** — **Dashboard** as workflow hub, shared **ResumeEditor** component for both general and job-specific editing, **TopBar** (screen + **Job:**), **StatusBar** (glyphs + pipeline), **`:`** palette, **Ctrl-?** help. See **[`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md)** for the normative redesign.
 
-The CLI mental model remains **Import → Refine → (optional per-job iteration) → Generate**. The **shipped** TUI used a **sidebar** (`SCREEN_ORDER`, Dashboard, etc.); migration moves actions into **palette + overlays** while preserving services.
+The CLI mental model is **Import → Edit resume (with contextual refine tools) → (optional per-job editing) → Generate**. The **Dashboard** is a workflow hub showing pipeline status and navigation. **Refine** is not a separate screen — polish, consultant, Q&A, sniff, and direct edit are contextual actions within the **Editor** and **Jobs** screens.
 
-- **Pipeline status** — **Target:** compact **graphical** segments on **StatusBar right** (and optional **Dashboard** palette dialog). **Not** on TopBar. Legacy: Header pipeline strip until removed.
-- **Suggested next step** — **Target:** palette **Dashboard** / health / validate; empty state on Resume when no source.
+- **Pipeline status** — compact **graphical** segments on **StatusBar right** and **Dashboard** pipeline summary.
+- **Suggested next step** — **Dashboard** highlights the next action based on pipeline state. Empty state when no source → Import CTA.
 - **First-run / blocked** — No API key → StatusBar / modal path to Settings; no source → Import CTA. Non-LLM actions MUST work without a key.
 
-**Discoverability (target):** **`:`** palette + **Ctrl-?** (fallbacks `?`, `h`, Help item) + outline/jump; **MUST NOT** rely only on Tab through every section. Legacy **`1–n`** sidebar jumps **removed** when migration completes. **Manual profile sections:** scoped **Edit** from section context; save respects **active session** target.
+**Discoverability:** **`:`** palette + **Ctrl-?** (fallbacks `?`, `h`, Help item) + outline/jump; **MUST NOT** rely only on Tab through every section. **`1–n`** number keys map to `SCREEN_ORDER`. **Manual profile sections:** scoped **Edit** from editor palette (`:sections`); save respects **active session** target.
 
-**Contextual chrome (target):** **Single-line StatusBar** — left = alerts/ops, right = pipeline/health; **no** two-line footer cheat sheet. Deep overlay footers MAY add one line for that flow only.
+**Contextual chrome:** **Single-line StatusBar** — left = alerts/ops, right = pipeline/health; **no** two-line footer cheat sheet. Deep overlay footers MAY add one line for that flow only.
 
 ```mermaid
 flowchart LR
@@ -19,21 +19,23 @@ flowchart LR
     JD[Job descriptions]
   end
   LI --> Import[Import]
-  Import --> Refine[Refine]
+  Import --> Editor[Editor — general resume]
   JD --> Jobs[Jobs]
-  Refine --> Gen[Generate]
-  Jobs --> Gen
-  Refine -. optional .-> Curate[Curate per job]
-  Jobs -. optional .-> Curate
-  Curate --> Gen
+  Editor --> Gen[Generate]
+  Jobs -->|select job → editor| JobEditor[Editor — job-specific]
+  JobEditor --> Gen
   Gen --> Out[PDFs / artifacts]
 ```
 
-**Per-job iteration** (dotted edges) is **optional**: users may go **Refine → Generate** or **Jobs → Generate** without editing a job copy. When used, **job target + same document UX** replaces the old **Curate** sidebar concept.
+**Refine tools** (polish, consultant, Q&A, sniff, direct edit) are contextual actions available in both the general **Editor** and job-specific editing within **Jobs**. They are not a separate screen.
 
-Users may open palette / overlays anytime; **Resume** is the default home for the manuscript.
+**Per-job iteration:** Selecting a job in **Jobs** opens the same `ResumeEditor` component with job context and a collapsible JD pane. Same editing UX, different persistence target.
+
+Users may open palette / overlays anytime; **Dashboard** is the default hub.
 
 **Generate — template vs flair:** **Template** picks the **baseline layout**; **flair** (level) is a **separate** control on how much **creative freedom** the layout/design agent may use when rendering that baseline (more flair → more **variety** and **artistic license** in the visual result). Defaults in Settings apply only to the initial flair level, not to template choice.
+
+**Onboarding flow:** On first entry to the Editor with source but no refined data, the user is guided through Q&A → polish → consultant → sniff in sequence. Each step can be accepted, discarded, or skipped. After onboarding, each tool is available individually via keybinds/palette. See [`dashboard-editor-redesign.md` §7](./dashboard-editor-redesign.md#7-onboarding-flow-first-refinement).
 
 ---
 

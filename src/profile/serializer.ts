@@ -189,6 +189,11 @@ export function jobRefinedMdPath(profileDir: string, slug: string): string {
   return join(profileDir, 'jobs', slug, 'refined.md');
 }
 
+/** Per-job cover letter draft (Markdown). See specs/cover-letter-pdf.md. */
+export function coverLetterMdPath(profileDir: string, slug: string): string {
+  return join(profileDir, 'jobs', slug, 'cover-letter.md');
+}
+
 export async function saveJobRefinedProfile(
   profile: Profile,
   profileDir: string,
@@ -253,6 +258,11 @@ export async function loadJobs(profileDir: string): Promise<SavedJob[]> {
   const path = jobsJsonPath(profileDir);
   if (!(await fileExists(path))) return [];
   return readJson<SavedJob[]>(path);
+}
+
+export async function loadSavedJobById(profileDir: string, id: string): Promise<SavedJob | null> {
+  const jobs = await loadJobs(profileDir);
+  return jobs.find((j) => j.id === id) ?? null;
 }
 
 export async function saveJob(job: SavedJob, profileDir: string): Promise<void> {

@@ -117,9 +117,9 @@ export async function runContact(options: ContactOptions): Promise<void> {
       continue;
     }
 
-    const patch: ContactFields =
+    const patch: Partial<ContactFields> =
       field === 'name' ? { name: trimmed || profile.contact.name.value } : { [field]: trimmed };
-    await mergeContactMeta(patch, profileDir);
+    await mergeContactMeta(patch as ContactFields, profileDir);
     profile = await loadActiveProfile(profileDir);
     console.log(`\n${c.ok} ${c.success(`${field} updated.`)}`);
   }

@@ -8,7 +8,7 @@ export type ScreenId =
   | 'contact'
   | 'settings';
 
-/** Sidebar order only. `profile` (manual section editor) is opened from Refine, not listed here. */
+/** Sidebar order only. `profile` (manual section editor) is opened from editor palette, not listed here. */
 export const SCREEN_ORDER: ScreenId[] = [
   'dashboard',
   'import',

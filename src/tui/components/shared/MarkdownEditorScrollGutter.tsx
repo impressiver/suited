@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink';
+import { useMemo } from 'react';
 import { shouldUseNoColor } from '../../env.ts';
 
 /** Pure math for a line-based vertical scroll thumb inside a fixed-height track. */
@@ -31,6 +32,8 @@ export interface MarkdownEditorScrollGutterProps {
 
 /**
  * Single-column scrollbar-style hint to the right of the markdown editor text.
+ * Uses grey colors for a subtle, elegant look.
+ * Simplified static rendering to prevent glitching.
  */
 export function MarkdownEditorScrollGutter({
   viewportHeight,
@@ -38,45 +41,44 @@ export function MarkdownEditorScrollGutter({
   totalLines,
 }: MarkdownEditorScrollGutterProps) {
   const noColor = shouldUseNoColor();
-  const { maxScroll, thumbStart, thumbH } = computeMarkdownEditorScrollThumb(
-    viewportHeight,
-    scrollOffset,
-    totalLines,
+
+  // Calculate thumb position
+  const { maxScroll, thumbStart, thumbH } = useMemo(
+    () => computeMarkdownEditorScrollThumb(viewportHeight, scrollOffset, totalLines),
+    [viewportHeight, scrollOffset, totalLines],
   );
 
-  const trackCh = noColor ? ':' : '▒';
+  // Render characters
+  const trackCh = noColor ? ':' : '░';
   const thumbCh = noColor ? '#' : '█';
   const idleCh = noColor ? '·' : '│';
 
+  // Generate array of what to render
+  const rows = useMemo(() => {
+    if (maxScroll === 0) {
+      return Array.from({ length: viewportHeight }, () => ({ char: idleCh, isThumb: false }));
+    }
+    return Array.from({ length: viewportHeight }, (_, r) => {
+      const isThumb = r >= thumbStart && r < thumbStart + thumbH;
+      return { char: isThumb ? thumbCh : trackCh, isThumb };
+    });
+  }, [maxScroll, viewportHeight, thumbStart, thumbH, trackCh, thumbCh, idleCh]);
+
+  // Static rendering - no animations, no dynamic updates
   return (
     <Box flexDirection="column" width={1}>
-      {Array.from({ length: viewportHeight }, (_, r) => {
-        const isThumb = maxScroll > 0 && r >= thumbStart && r < thumbStart + thumbH;
-        if (maxScroll === 0) {
-          return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: fixed viewport slice
-            <Box key={r} width={1}>
-              <Text dimColor>{idleCh}</Text>
-            </Box>
-          );
-        }
-        return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: fixed viewport slice
-          <Box key={r} width={1}>
-            {isThumb ? (
-              noColor ? (
-                <Text bold>{thumbCh}</Text>
-              ) : (
-                <Text bold color="cyan">
-                  {thumbCh}
-                </Text>
-              )
-            ) : (
-              <Text dimColor>{trackCh}</Text>
-            )}
-          </Box>
-        );
-      })}
+      {rows.map((row, r) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: row index is stable in fixed-height viewport
+        <Box key={`gutter-row-${r}`} width={1}>
+          {row.isThumb ? (
+            <Text bold color={noColor ? undefined : 'gray'}>
+              {row.char}
+            </Text>
+          ) : (
+            <Text color={noColor ? undefined : 'gray'}>{row.char}</Text>
+          )}
+        </Box>
+      ))}
     </Box>
   );
 }

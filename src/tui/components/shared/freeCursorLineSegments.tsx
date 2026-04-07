@@ -32,7 +32,8 @@ function colSelected(
   return g >= selection.start && g < selection.end;
 }
 
-/** One terminal cell per buffer character; selection merged into Text runs. */
+/** One terminal cell per buffer character; selection merged into Text runs.
+ * Uses inverse video to respect the terminal's configured palette colors. */
 function segmentedPlainRow(
   padded: string,
   text: string,
@@ -64,7 +65,7 @@ function segmentedPlainRow(
             </Text>
           ) : (
             // biome-ignore lint/suspicious/noArrayIndexKey: stable run list
-            <Text key={i} backgroundColor="blue" color="white" wrap="truncate-end">
+            <Text key={i} inverse wrap="truncate-end">
               {r.t}
             </Text>
           )
@@ -115,7 +116,8 @@ export function FreeCursorPlainRow({
   );
 }
 
-/** Caret line: selection backgrounds on left/right; mid cell uses inverse/bold caret styling. */
+/** Caret line: selection backgrounds on left/right; mid cell uses inverse/bold caret styling.
+ * Uses inverse video for selection to respect terminal's configured palette colors. */
 export function FreeCursorCaretRow({
   text,
   globalLine,
@@ -167,7 +169,7 @@ export function FreeCursorCaretRow({
               </Text>
             ) : (
               // biome-ignore lint/suspicious/noArrayIndexKey: stable run list
-              <Text key={i} backgroundColor="blue" color="white">
+              <Text key={i} inverse>
                 {r.t}
               </Text>
             )

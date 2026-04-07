@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { profileToMarkdown } from '../profile/markdown.ts';
 import type { ContactMeta, Profile, Sourced } from '../profile/schema.ts';
 import {
@@ -15,17 +16,80 @@ import {
 import type { PersistenceTarget } from '../tui/activeDocumentSession.ts';
 import { fileExists } from '../utils/fs.ts';
 
-/** Editable contact fields (subset of `ContactInfo`). */
-export type ContactFields = Partial<{
-  name: string;
-  headline: string;
-  email: string;
-  phone: string;
-  location: string;
-  linkedin: string;
-  website: string;
-  github: string;
-}>;
+/** Zod schema for contact field validation. */
+export const ContactFieldsSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name is too long'),
+  headline: z.string().max(200, 'Headline is too long').optional(),
+  email: z.union([z.literal(''), z.string().email('Invalid email address')]).optional(),
+  phone: z.string().max(50, 'Phone number is too long').optional(),
+  location: z.string().max(100, 'Location is too long').optional(),
+  linkedin: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .url('Invalid LinkedIn URL')
+        .startsWith('https://linkedin.com/', 'LinkedIn URL should start with https://linkedin.com/')
+        .startsWith(
+          'https://www.linkedin.com/',
+          'LinkedIn URL should start with https://linkedin.com/',
+        )
+        .or(
+          z
+            .string()
+            .url()
+            .regex(/linkedin\.com\//),
+        ),
+    ])
+    .optional(),
+  website: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .url('Invalid website URL')
+        .startsWith('https://', 'URL should start with https://'),
+    ])
+    .optional(),
+  github: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .url('Invalid GitHub URL')
+        .startsWith('https://github.com/', 'GitHub URL should start with https://github.com/')
+        .or(z.string().regex(/^@[a-zA-Z0-9_-]+$/, 'GitHub username should start with @')),
+    ])
+    .optional(),
+});
+
+/** Inferred type from Zod schema. */
+export type ContactFields = z.infer<typeof ContactFieldsSchema>;
+
+/** Validate contact fields and return parsed/trimmed values or validation errors. */
+export function validateContactFields(fields: Partial<ContactFields>):
+  | {
+      success: true;
+      data: ContactFields;
+    }
+  | {
+      success: false;
+      errors: Record<string, string>;
+    } {
+  const result = ContactFieldsSchema.safeParse(fields);
+
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+
+  const errors: Record<string, string> = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0] as string;
+    errors[key] = issue.message;
+  }
+
+  return { success: false, errors };
+}
 
 function userEdit(value: string): Sourced<string> {
   return { value, source: { kind: 'user-edit' as const, editedAt: new Date().toISOString() } };
@@ -34,30 +98,27 @@ function userEdit(value: string): Sourced<string> {
 function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profile {
   const contact = { ...profile.contact };
 
-  if (fields.name !== undefined) {
-    contact.name = userEdit(fields.name || contact.name.value);
-  }
-  if (fields.headline !== undefined) {
-    contact.headline = fields.headline.trim() ? userEdit(fields.headline.trim()) : undefined;
-  }
-  if (fields.email !== undefined) {
-    contact.email = fields.email.trim() ? userEdit(fields.email.trim()) : undefined;
-  }
-  if (fields.phone !== undefined) {
-    contact.phone = fields.phone.trim() ? userEdit(fields.phone.trim()) : undefined;
-  }
-  if (fields.location !== undefined) {
-    contact.location = fields.location.trim() ? userEdit(fields.location.trim()) : undefined;
-  }
-  if (fields.linkedin !== undefined) {
-    contact.linkedin = fields.linkedin.trim() ? userEdit(fields.linkedin.trim()) : undefined;
-  }
-  if (fields.website !== undefined) {
-    contact.website = fields.website.trim() ? userEdit(fields.website.trim()) : undefined;
-  }
-  if (fields.github !== undefined) {
-    contact.github = fields.github.trim() ? userEdit(fields.github.trim()) : undefined;
-  }
+  // Helper to handle field updates - empty string clears the field, undefined keeps existing
+  const updateField = (key: keyof ContactFields, targetKey: keyof typeof contact) => {
+    const value = fields[key];
+    if (value === undefined) return; // Not provided, keep existing
+    if (typeof value === 'string' && value.trim() === '') {
+      // Empty string - clear the field (set to undefined for optional fields)
+      (contact as Record<string, unknown>)[targetKey] = undefined;
+    } else if (value !== undefined) {
+      // Non-empty value - update with user edit (ensure it's a string)
+      (contact as Record<string, unknown>)[targetKey] = userEdit(String(value).trim());
+    }
+  };
+
+  updateField('name', 'name');
+  updateField('headline', 'headline');
+  updateField('email', 'email');
+  updateField('phone', 'phone');
+  updateField('location', 'location');
+  updateField('linkedin', 'linkedin');
+  updateField('website', 'website');
+  updateField('github', 'github');
 
   return { ...profile, contact };
 }

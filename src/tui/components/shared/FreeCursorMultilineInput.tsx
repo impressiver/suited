@@ -92,7 +92,12 @@ export function FreeCursorMultilineInput({
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const selectionRef = useRef<{ start: number; end: number } | null>(null);
   const dragAnchorRef = useRef<number | null>(null);
-  /** First visible logical line’s `Box` — matches Ink’s drawn row (avoids wrapper/border offset drift). */
+  const scrollbarDragRef = useRef<{
+    dragging: boolean;
+    startY: number;
+    startScroll: number;
+  } | null>(null);
+  /** First visible logical line's `Box` — matches Ink's drawn row (avoids wrapper/border offset drift). */
   const editorHitOriginRef = useRef<DOMElement | null>(null);
   const frameGeomRef = useRef<ReturnType<typeof getDomElementScreenRect>>(null);
 
@@ -240,9 +245,44 @@ export function FreeCursorMultilineInput({
           const g = frameGeomRef.current;
           if (mouse.released) {
             dragAnchorRef.current = null;
+            scrollbarDragRef.current = null;
             return;
           }
           if (g != null) {
+            // Check if the click is on the scrollbar column (rightmost column of the text area)
+            const relativeX = mouse.px - g.left;
+            const relativeY = mouse.py - g.top;
+
+            // Scrollbar is at column textCols (0-indexed), so check if click is there
+            const isOnScrollbar = scrollGutterCols > 0 && relativeX === textCols;
+
+            if (isOnScrollbar && maxScrollLineRef.current > 0) {
+              // Handle scrollbar drag
+              if (mouse.leftPress) {
+                // Start scrollbar drag
+                scrollbarDragRef.current = {
+                  dragging: true,
+                  startY: relativeY,
+                  startScroll: scrollClampedRef.current,
+                };
+                // Also jump to the clicked position proportionally
+                const clickedRatio = relativeY / height;
+                const targetScroll = Math.round(clickedRatio * maxScrollLineRef.current);
+                setScrollLine(Math.max(0, Math.min(maxScrollLineRef.current, targetScroll)));
+                return;
+              }
+              if (mouse.leftDrag && scrollbarDragRef.current?.dragging) {
+                // Continue scrollbar drag - move proportionally
+                const dragDelta = relativeY - scrollbarDragRef.current.startY;
+                const scrollDelta = Math.round((dragDelta / height) * maxScrollLineRef.current);
+                const targetScroll = scrollbarDragRef.current.startScroll + scrollDelta;
+                setScrollLine(Math.max(0, Math.min(maxScrollLineRef.current, targetScroll)));
+                return;
+              }
+              return;
+            }
+
+            // Not on scrollbar - handle as text selection
             const off = bufferOffsetInEditorViewport(
               mouse.px,
               mouse.py,
@@ -412,9 +452,10 @@ export function FreeCursorMultilineInput({
                 ? (placeholder ?? '').slice(0, textCols).padEnd(textCols, ' ')
                 : padLine(lineRaw);
               const cc = isCursorLine ? Math.min(curCol, textCols) : 0;
+              // Stable key - only depends on logical line number, not scroll position
               return (
                 <Box
-                  key={`vp-${scrollClamped}-L${globalLine}`}
+                  key={`ln-${globalLine}`}
                   ref={i === 0 ? editorHitOriginRef : undefined}
                   flexDirection="row"
                   width={textCols}
@@ -449,13 +490,16 @@ export function FreeCursorMultilineInput({
               );
             })}
           </Box>
-          {scrollGutterCols > 0 ? (
-            <MarkdownEditorScrollGutter
-              viewportHeight={height}
-              scrollOffset={scrollClamped}
-              totalLines={logicalLines.length}
-            />
-          ) : null}
+          {/* Scrollbar gutter - always render but may be empty when no scroll needed */}
+          <Box width={scrollGutterCols}>
+            {scrollGutterCols > 0 && (
+              <MarkdownEditorScrollGutter
+                viewportHeight={height}
+                scrollOffset={scrollClamped}
+                totalLines={logicalLines.length}
+              />
+            )}
+          </Box>
         </Box>
       </TextViewport>
     </Box>

@@ -144,6 +144,15 @@ program
   .option('--jd <text|path>', 'Job description text or file path (skips prompt)')
   .option('--flair <1-5>', 'Flair level (skips prompt)')
   .option(
+    '--cover-letter',
+    'When job-targeted, also export cover letter PDF after the resume PDF (non-empty draft)',
+  )
+  .option(
+    '--cover-letter-only',
+    'Skip resume; export only the cover letter PDF (requires --job-id)',
+  )
+  .option('--job-id <id>', 'Saved job id (required for --cover-letter-only)')
+  .option(
     '--no-history-snapshot',
     'Do not append refined-history/ snapshots when saving refined.json (this command)',
   )
@@ -153,6 +162,9 @@ program
       output?: string;
       jd?: string;
       flair?: string;
+      coverLetter?: boolean;
+      coverLetterOnly?: boolean;
+      jobId?: string;
       noHistorySnapshot?: boolean;
     }) => {
       try {

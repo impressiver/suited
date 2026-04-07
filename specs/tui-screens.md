@@ -1,26 +1,61 @@
 # Screen details
 
-**Target shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** is normative for the **document-first** UI: **Resume** = markdown viewport + optional outline; **Import / Settings / Contact / Generate** = **full-viewport overlays**; **Jobs** actions via **palette** or dialog; **Refine hub** via **palette**. **TopBar** = screen + **Job:** only; **StatusBar** = notifications + pipeline/health.
+> **Redesign:** See [`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md) for the normative redesign. Dashboard is a workflow hub, Editor is a new screen hosting the shared `ResumeEditor` component, Refine is absorbed into the editor as contextual actions, CurateScreen is superseded by Jobs + `ResumeEditor`.
 
-The sections below document the **sidebar-era** implementation (per-screen mount, state machines, components) and remain a **reference** until each flow is mounted under `DocumentShell` overlays. **No state may delegate to CLI or Inquirer** (Phase C). See [Phased delivery](./tui-phased-delivery.md).
+**Target shell:** **[`tui-document-shell.md`](./tui-document-shell.md)** is normative for layout (TopBar, StatusBar, ElegantShell). **Import / Settings / Contact / Generate** = **full-viewport overlays**. **No state may delegate to CLI or Inquirer.**
 
-### DocumentShell (target) — summary
+### Screen summary (target)
 
-| Overlay / mode | Loads | Notes |
-|----------------|-------|--------|
-| **Resume** | `Profile` for active `persistenceTarget`; **read-only** wrapped viewport without refined, **`FreeCursorMultilineInput`** + section strip when **`hasRefined`** (see [`tui-document-shell.md`](./tui-document-shell.md) §8) | `isMdNewerThanJson` global or `jobRefinedMdPath`+json job pair → sync banner |
-| **Import** | Same as ImportScreen today | Returns to Resume on success / Esc |
-| **Settings / Contact** | Same as today | TopBar label matches mode |
-| **Generate** | `pendingJobId` + TopBar job precedence per document shell | Full wizard as overlay |
-| **Jobs** | `loadJobs()` | Picker sets session job slug + TopBar `Job:` |
-| **Refine hub** | Palette: Q&A, polish, sniff, consultant (whole + section-scoped), direct edit, history | Modals reuse RefineScreen state machines |
-| **Profile editor** | From scoped **Edit** | Save via session dispatch only |
+| Screen | Role | Notes |
+|--------|------|-------|
+| **Dashboard** | Workflow hub — pipeline status + navigation | No editor. `SelectList` of actions. |
+| **Import** | Bring in resume data | Unchanged |
+| **Contact** | Contact info fields | Unchanged |
+| **Editor** | Edit general resume | Wraps shared `ResumeEditor` with `mode: 'general'` |
+| **Jobs** | Manage jobs + edit job-specific resumes | List → select job → `ResumeEditor` with `mode: 'job'` + JD pane |
+| **Generate** | Produce PDFs | Unchanged |
+| **Settings** | API keys, output, defaults | Unchanged |
+| **Profile editor** | Structured section editing | Not in nav; via `:sections` palette from editor |
 
 ---
 
-## Appendix: legacy sidebar-era screens
+## DashboardScreen (Workflow Hub)
 
-### DashboardScreen (Resume)
+> **Supersedes** the previous DashboardScreen which combined overview + editor.
+
+**Purpose:** Visual summary of the user's current state. Shows pipeline status, profile identity, and navigation to every function. No editor.
+
+**Layout:** Profile identity at top (name, headline, counts). Pipeline section showing status of each step (Source, Refined, Contact, Jobs, PDF) with filled/empty dots and one-line summaries. Quick Actions `SelectList` for navigation to other screens.
+
+**Data:** `ProfileSnapshot` drives all indicators. `loadActiveProfile` for identity.
+
+**States:** No source → Import CTA. Source only → emphasize Editor (triggers onboarding). Refined → full pipeline. Has jobs → count + prep status. Has PDFs → last filename/date.
+
+**Behavior:** Action list `SelectList` with Enter to navigate. Letter shortcuts work globally. Esc: no-op (top level).
+
+**Components:** `SelectList`, `Text` (status lines).
+
+See [`dashboard-editor-redesign.md` §3](./dashboard-editor-redesign.md#3-dashboard--workflow-hub) for full layout mockup.
+
+---
+
+## EditorScreen (General Resume)
+
+> **New screen.** See [`dashboard-editor-redesign.md` §6](./dashboard-editor-redesign.md#6-editor-screen-general-resume).
+
+**Purpose:** Edit the general/imported resume. Hosts the shared `ResumeEditor` component with `mode: 'general'` and `persistenceTarget: global-refined`.
+
+**No refined data gate:** Shows read-only source with CTA to start onboarding (Q&A → polish → consultant → sniff). See [`dashboard-editor-redesign.md` §7](./dashboard-editor-redesign.md#7-onboarding-flow-first-refinement).
+
+**Refine tools:** All available as contextual keybinds/palette commands within the editor: `Ctrl+P` polish, `Ctrl+E` consultant, `:sniff`, `:edit`, `:qa`, `:history`, `:sections`.
+
+**Esc:** Body focused → blur. Overlay active → cancel. Nav mode → dashboard.
+
+**Components:** `ResumeEditor` (shared component), `ResumeEditorProvider`.
+
+---
+
+## DashboardScreen (Resume) — legacy reference
 
 **Loads on mount:** snapshot via `fetchProfileSnapshot`; when `hasSource`, `loadActiveProfile` for markdown preview (`profileMarkdownContent`), health (`computeHealthScore` when refined), and validation. When **`hasRefined`**, additionally **`loadRefinedTuiState`** for the editable body + session target. Detects API key presence from `process.env`.
 
@@ -48,7 +83,9 @@ The sections below document the **sidebar-era** implementation (per-screen mount
 
 **Components:** `TextViewport`, `ScrollView`, `TextInput`, `Spinner`, `MultilineInput`, `SelectList` (error recovery).
 
-### RefineScreen
+### RefineScreen — SUPERSEDED
+
+> **Superseded by [`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md).** Refine is no longer a top-level screen. All refine flows are contextual actions within the shared `ResumeEditor` component, available in both the Editor screen and Jobs screen. The state machines below are preserved as reference for porting into editor overlay states.
 
 **Loads on mount:** `loadRefined()` / `loadSource()`. If `refined.json` exists, start at **`already-refined`** menu; else start at **`first-refine-menu`** (Q&A pass **or** manual section edit on `source.json` — no auto-start Q&A until the user picks).
 
@@ -106,9 +143,11 @@ already-refined:
 
 **Backlog — side-by-side suggestion diffs:** Replace or augment unified `DiffView` with a **before | after** (side-by-side) layout for all AI-suggestion review steps above. Tracked as a post–Phase C task in [`tui-definition-of-done.md`](./tui-definition-of-done.md) (**Suggestion diffs (side-by-side)**).
 
-### CurateScreen (planned)
+### CurateScreen — SUPERSEDED
 
-**Purpose:** **Job-targeted curation of refined content** — same *family* of actions as **Refine** (polish, consultant, manual section edit, direct edit), but scoped to **one saved job** and a **per-job curated copy** of the profile derived from global **`refined.json`**, not the global refine hub.
+> **Superseded by [`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md).** The planned CurateScreen is replaced by the Jobs screen hosting the shared `ResumeEditor` in job mode. All planned curate actions (polish, consultant, edit, direct edit, clear-and-restart) map to editor keybinds and palette commands. "Clear and start over" → palette `:reset-job`.
+
+**Original purpose (preserved as reference):** **Job-targeted curation of refined content** — same *family* of actions as **Refine** (polish, consultant, manual section edit, direct edit), but scoped to **one saved job** and a **per-job curated copy** of the profile derived from global **`refined.json`**, not the global refine hub.
 
 **Relationship to other screens:**
 
@@ -202,9 +241,13 @@ pipeline (all cancellable via Esc + AbortSignal):
 
 ### JobsScreen
 
+> **Redesign:** See [`dashboard-editor-redesign.md` §8](./dashboard-editor-redesign.md#8-jobs-screen-changes). The job detail menu is removed. Selecting a job opens the shared `ResumeEditor` in job mode with a collapsible JD pane. Job actions (prepare, feedback, generate, cover letter) become keybinds in editor nav mode.
+
 **Loads on mount:** `loadJobs()`.
 
-**Layout:** Job **list** and **Preview** are **always stacked** (preview below the list). **Detail** mode on wide layouts (**80+** cols, `jobsUseSplitPane`) keeps the job list visible on the left (read-only) with actions on the right (`jobsListPaneWidth` in `src/tui/jobsLayout.ts`).
+**Layout (target):** Job list with `a` (add), `d` (delete), Enter (select → editor). Selecting a job renders `ResumeEditor` with job context. The JD pane is available via `Ctrl+J` (hidden → peek → full). Job-specific keybinds in nav mode: `p` (prepare), `f` (feedback), `g` (generate), `l` (cover letter). Esc from editor → back to list. Esc from list → dashboard.
+
+**Layout (legacy, preserved as reference):** Job **list** and **Preview** are **always stacked** (preview below the list). **Detail** mode on wide layouts (**80+** cols, `jobsUseSplitPane`) keeps the job list visible on the left (read-only) with actions on the right (`jobsListPaneWidth` in `src/tui/jobsLayout.ts`).
 
 **Errors:** Prepare failures offer **Retry prepare**, **Check Settings** after repeated failures, **Back to list** (`SelectList`); Esc still returns to list.
 

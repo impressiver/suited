@@ -1,6 +1,6 @@
 # Architecture
 
-> **Target UI:** **[`tui-document-shell.md`](./tui-document-shell.md)** defines the **document-first** shell (TopBar, StatusBar, **active document session**, palette, overlays, section context). This file remains authoritative for **`useInput`** discipline, **blocking UI**, **streaming**, and **shared components**. **Shipped (Phase D in progress):** `DocumentShell` replaces **Header + Sidebar + Footer**; **`Sidebar.tsx` removed** — navigation is **TopBar** + **`:`** palette (+ legacy **1–n** / letter jumps until fully retired). Remaining sections that still mention **sidebar** / **Header pipeline** as the live chrome may lag — treat **document shell** + this file’s **target store** list as normative going forward.
+> **Target UI:** **[`tui-document-shell.md`](./tui-document-shell.md)** defines the shell (TopBar, StatusBar, **active document session**, palette, overlays, section context). **[`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md)** defines the screen restructure: Dashboard as workflow hub, Editor as a new screen with shared `ResumeEditor` component, Refine absorbed into editor, CurateScreen superseded. This file remains authoritative for **`useInput`** discipline, **blocking UI**, **streaming**, and **shared components**.
 
 ## Target additions to global state (document shell)
 
@@ -68,7 +68,7 @@ Start simple. Cross-screen state growth is an implementation detail.
 | `Enter` | Confirm / activate; submit single-line input |
 | `Esc` | **Generate** / **Jobs** handle inner back first; else **`POP_OVERLAY`** when **`overlayStack`** non-empty; else go to **Resume** (`dashboard`) from other full screens. On **Resume** refined editor, **Esc** first blurs the markdown body (clears **`inTextInput`**) so **:** / **1–n** / letter jumps work; a second **Esc** from an already-unfocused **dashboard** is a no-op for navigation. |
 | `1–n` | Direct jump via `SCREEN_ORDER` (`n` = row count; **↑↓** screen-cycle suppressed while an overlay is open; suppressed when `operationInProgress` or `inTextInput`) |
-| Letter shortcuts | Screen jump per implementation map (same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred). **Planned:** **`u` → Curate** when that sidebar row ships ([resolved list](./tui-open-questions.md#resolved)). |
+| Letter shortcuts | Screen jump per implementation map (`d i c e j g s`; same suppression; **`p`** is not global — Jobs uses **`p`** for prepare when deferred). `r` freed (Refine absorbed into editor). `e` → Editor. Curate superseded. |
 | `:` or `/` | Open command palette |
 | `q` | Quit (suppressed during any text input) |
 | `Ctrl+C` | Hard exit (always works; documented in footer when relevant) |
@@ -206,13 +206,22 @@ Ink processes input one character at a time via `useInput`. Pasting a large bloc
 
 ## Screen index
 
-**Today (`SCREEN_ORDER` in code):** seven sidebar rows (order may differ from this table — **Profile** / *Edit sections* is not a sidebar row). Numeric keys **`1`…`n`** map to that array in order.
+> **Redesign:** See [`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md) for the normative screen structure. Dashboard is a workflow hub, Editor is a new screen, Refine is absorbed into the editor, CurateScreen is superseded.
 
-| Concept | Notes |
-|---------|--------|
-| Dashboard, Import, Contact, Jobs, Refine, Generate, Settings | Current top-level destinations |
-| **Curate** *(planned)* | New row: **job list → per-job curate hub** (polish, consultant, edit sections, direct edit, clear & restart). **Letter `u`.** Insert **after Refine, before Generate** when implemented; renumber keys in the same PR. See [CurateScreen](./tui-screens.md#curatescreen-planned). |
-| ProfileEditorScreen | Not in sidebar; opened from Refine or *(planned)* Curate with `profileEditorReturnTo`. |
+**`SCREEN_ORDER` (target):** seven screens. Numeric keys **`1`…`n`** map to the array in order.
+
+| # | Screen | Letter | Notes |
+|---|--------|--------|-------|
+| 1 | Dashboard | `d` | Workflow hub — pipeline status + navigation |
+| 2 | Import | `i` | Bring in resume data |
+| 3 | Contact | `c` | Contact info fields |
+| 4 | Editor | `e` | Edit general resume (NEW — shared `ResumeEditor` component) |
+| 5 | Jobs | `j` | Manage jobs; select job → `ResumeEditor` in job mode |
+| 6 | Generate | `g` | Produce PDFs |
+| 7 | Settings | `s` | API keys, output, defaults |
+
+**Removed:** `refine` (absorbed into editor as contextual actions), `curate` (superseded by Jobs + ResumeEditor).
+**Not in SCREEN_ORDER:** `ProfileEditorScreen` — reachable from editor via `:sections` palette command.
 
 ---
 
@@ -304,20 +313,24 @@ Across the shell, **at most one** list-style **caret** (`›`, bright / `white` 
 
 ## Component hierarchy
 
+> **Target** (after [`dashboard-editor-redesign.md`](./dashboard-editor-redesign.md)):
+
 ```
 <App>
   {paletteOpen && <CommandPalette … />}
-  <Layout>               ← wraps DocumentShell (TopBar + main + StatusBar)
-    <DashboardScreen />      (screen === 'dashboard')
-    <ImportScreen />         (screen === 'import')
-    <RefineScreen />         (screen === 'refine')
-    <GenerateScreen />       (screen === 'generate')
-    <JobsScreen />           (screen === 'jobs')
-    <ProfileEditorScreen />  (screen === 'profile')
-    <ContactScreen />        (screen === 'contact')
-    <SettingsScreen />       (screen === 'settings')
-  </Layout>
+  <ElegantShell>           ← TopBar + ContextBar + main + StatusBar
+    <DashboardScreen />        (screen === 'dashboard')  — workflow hub
+    <ImportScreen />           (screen === 'import')
+    <EditorScreen />           (screen === 'editor')     — wraps <ResumeEditor mode="general" />
+    <GenerateScreen />         (screen === 'generate')
+    <JobsScreen />             (screen === 'jobs')        — list + <ResumeEditor mode="job" />
+    <ProfileEditorScreen />    (screen === 'profile')     — via palette :sections
+    <ContactScreen />          (screen === 'contact')
+    <SettingsScreen />         (screen === 'settings')
+  </ElegantShell>
 </App>
 ```
+
+**`ResumeEditor`** is a shared component (not a screen) used by both `EditorScreen` and `JobsScreen`. It receives context via `ResumeEditorProvider` specifying mode, persistence target, and job metadata.
 
 **No subprocess delegation.** `runTui` renders the app once and awaits exit — no while-loop re-render, no `exitBag`, no `cliArgs.ts` argv-building. Every interaction that was previously delegated to a CLI subcommand (refine, generate, import, profile, contact) **MUST** run as an inline screen component via `src/services/`. `DelegateScreen` does not exist in this architecture.

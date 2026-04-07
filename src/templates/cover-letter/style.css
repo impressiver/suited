@@ -1,0 +1,81 @@
+@page {
+  size: letter;
+  margin: 0.75in;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.cover-letter {
+  margin: 0;
+  padding: 0;
+  font-family: "Georgia", "Times New Roman", serif;
+  font-size: 11pt;
+  line-height: 1.45;
+  color: #111;
+}
+
+.letter-meta {
+  margin-bottom: 1.25em;
+}
+
+.letter-date {
+  margin-bottom: 1em;
+}
+
+.letter-from,
+.letter-to {
+  white-space: pre-line;
+  margin-bottom: 0.75em;
+}
+
+.letter-to strong {
+  font-weight: 600;
+}
+
+.letter-body {
+  margin-top: 1em;
+}
+
+.letter-body p {
+  margin: 0 0 0.85em;
+}
+
+.letter-body ul,
+.letter-body ol {
+  margin: 0 0 0.85em 1.25em;
+  padding: 0;
+}
+
+.letter-body li {
+  margin-bottom: 0.35em;
+}
+
+.letter-body h1,
+.letter-body h2,
+.letter-body h3,
+.letter-body h4,
+.letter-body h5,
+.letter-body h6 {
+  font-size: 11pt;
+  font-weight: 600;
+  margin: 0.75em 0 0.5em;
+}
+
+.letter-body code {
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.95em;
+}
+
+.letter-salutation {
+  margin: 1em 0 0.5em;
+}
+
+.letter-closing {
+  margin-top: 1.5em;
+}
+
+.letter-signature {
+  margin-top: 2.5em;
+}

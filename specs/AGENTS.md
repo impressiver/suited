@@ -203,6 +203,10 @@ Phase A checklist in [`tui-definition-of-done.md`](./tui-definition-of-done.md) 
 
 - **Optional follow-ups:** first section of [`tui-definition-of-done.md`](./tui-definition-of-done.md) (*What’s left (post–Phase C polish)*) — streaming UI, Generate JD checkpoints, deep profile forms, etc.
 
+### Cover letter PDF (per job)
+
+- **Shipped:** [`cover-letter-pdf.md`](./cover-letter-pdf.md) — `jobs/{slug}/cover-letter.md`, light refine + AI sniff (`src/services/coverLetterAssist.ts`), PDF via `src/services/coverLetterPdf.ts` + `src/templates/cover-letter/style.css`, **Jobs → Cover letter (edit)**, **Generate** checkbox **Also export cover letter PDF**, CLI `generate --cover-letter` / `generate --cover-letter-only --job-id <id>`.
+
 ### Refinement history (global refined)
 
 - **Shipped:** [`refinement-history.md`](./refinement-history.md) — `saveRefined` snapshots previous **`RefinedData`** under **`refined-history/`** (cap 50), atomic temp+rename, identity no-op (ignores `profile.updatedAt` only), restore clears **`pinnedRender`** on all job refinements; TUI **Refine** menu + CLI **`suited refine history`**.

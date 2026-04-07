@@ -1,7 +1,8 @@
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlairLevel, SavedJob, TemplateName } from '../../profile/schema.ts';
-import { loadJobs } from '../../profile/serializer.ts';
+import { loadJobs, makeJobSlug } from '../../profile/serializer.ts';
+import { readCoverLetterDraft } from '../../services/coverLetterPdf.ts';
 import {
   runTuiGenerateBuildPhase,
   runTuiGenerateRenderPhase,
@@ -47,7 +48,7 @@ type Phase =
   | { p: 'building'; ctx: GenerateRunCtx }
   | { p: 'pick-sections'; ctx: GenerateRunCtx }
   | { p: 'run' }
-  | { p: 'done'; path: string }
+  | { p: 'done'; path: string; coverLetterPath?: string }
   | { p: 'err'; msg: string; kind: 'preflight' | 'generate' };
 
 const JOB_PROGRESS_LABELS = [
@@ -119,6 +120,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
     Array<{ value: string; label: string; checked: boolean }>
   >([]);
   const [sectionFocusIdx, setSectionFocusIdx] = useState(0);
+  const [coverLetterExportable, setCoverLetterExportable] = useState(false);
 
   const active = effectiveScreen === 'generate' && focusTarget === 'content';
 
@@ -216,6 +218,50 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
   );
 
   useEffect(() => {
+    if (phase.p !== 'pick-sections') {
+      return;
+    }
+    const ctx = phase.ctx;
+    if (!ctx.jobId) {
+      setCoverLetterExportable(false);
+      return;
+    }
+    const slug = makeJobSlug(ctx.company, ctx.title);
+    let cancelled = false;
+    void readCoverLetterDraft(profileDir, slug).then((d) => {
+      if (!cancelled) {
+        setCoverLetterExportable(d != null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, profileDir]);
+
+  useEffect(() => {
+    if (phase.p !== 'pick-sections') {
+      return;
+    }
+    if (!coverLetterExportable) {
+      setSectionItems((prev) => prev.filter((i) => i.value !== '__cover_pdf__'));
+      return;
+    }
+    setSectionItems((prev) => {
+      if (prev.some((i) => i.value === '__cover_pdf__')) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          value: '__cover_pdf__',
+          label: 'Also export cover letter PDF',
+          checked: true,
+        },
+      ];
+    });
+  }, [phase.p, coverLetterExportable]);
+
+  useEffect(() => {
     const id = pendingJobId;
     if (!id) {
       return;
@@ -252,15 +298,19 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
       dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
       const ac = createController();
       try {
-        const { outputPath, config } = await runTuiGenerateRenderPhase(built, {
+        const alsoExport =
+          sectionItems.find((i) => i.value === '__cover_pdf__')?.checked === true &&
+          coverLetterExportable;
+        const { outputPath, config, coverLetterPath } = await runTuiGenerateRenderPhase(built, {
           sectionSelection,
           signal: ac.signal,
           onProgress: setRunStepIndex,
+          alsoExportCoverLetter: alsoExport,
         });
         lastSectionSelectionRef.current = config.sectionSelection ?? sectionSelection;
         setApiFailureStreak(0);
         setDoneMenuIdx(0);
-        setPhase({ p: 'done', path: outputPath });
+        setPhase({ p: 'done', path: outputPath, coverLetterPath });
       } catch (e) {
         if (isUserAbort(e)) {
           const snap = recoverFlairRef.current;
@@ -279,7 +329,7 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
         dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     },
-    [createController, dispatch, releaseController],
+    [coverLetterExportable, createController, dispatch, releaseController, sectionItems],
   );
 
   const startBuildPhase = useCallback(
@@ -371,6 +421,11 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           Include in PDF — first {MIN_VISIBLE_RESUME_POSITIONS} roles (when you have that many) stay
           on for a full experience block; gaps between selected roles are filled automatically.
         </Text>
+        {phase.ctx.jobId && !coverLetterExportable ? (
+          <Text dimColor>
+            Cover letter PDF: add a draft from Jobs (job detail) first, or leave the checkbox off.
+          </Text>
+        ) : null}
         <Box marginTop={1}>
           {built == null ? (
             <Text color="red">Internal error — no built document. Esc to go back.</Text>
@@ -391,7 +446,9 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
                 const selected =
                   sectionItems.length === 0
                     ? collectDefaultSectionKeys(b.resumeDocFull)
-                    : sectionItems.filter((i) => i.checked).map((i) => i.value);
+                    : sectionItems
+                        .filter((i) => i.checked && i.value !== '__cover_pdf__')
+                        .map((i) => i.value);
                 void runRenderPhase(b, selected);
               }}
             />
@@ -408,6 +465,11 @@ export function GenerateScreen({ profileDir }: GenerateScreenProps) {
           PDF ready
         </Text>
         <Text>{phase.path}</Text>
+        {phase.coverLetterPath ? (
+          <Box marginTop={1}>
+            <Text dimColor>Cover letter: {phase.coverLetterPath}</Text>
+          </Box>
+        ) : null}
         <Box marginTop={1} flexDirection="column">
           <Text bold>Next</Text>
           <SelectList

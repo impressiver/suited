@@ -155,6 +155,8 @@ suited import https://www.linkedin.com/in/your-username --headed
 suited generate --jd "path/to/job.txt"   # skip the JD prompt
 suited generate --flair 3                # set visual intensity (1–5)
 suited generate --output output/resumes  # PDF output directory (see below)
+suited generate --cover-letter            # with a job-targeted run, also export cover letter PDF (non-empty draft)
+suited generate --cover-letter-only --job-id job-123   # only cover letter PDF (requires saved job id)
 ```
 
 **PDF output:** By default, PDFs go under **`./resumes`** relative to the **current working directory** (job-tailored runs use subfolders such as `./resumes/{job-slug}/`). Use **`--output <dir>`** for a different path (relative paths resolve from cwd). Older releases defaulted to `output/resumes` under `--profile-dir`; existing files there are not moved. To keep that layout, pass e.g. `--output output/resumes`.

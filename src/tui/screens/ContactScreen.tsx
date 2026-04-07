@@ -2,15 +2,19 @@ import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Sourced } from '../../profile/schema.ts';
 import { loadActiveProfile } from '../../profile/serializer.ts';
-import { type ContactFields, mergeContactMeta } from '../../services/contact.ts';
+import {
+  type ContactFields,
+  mergeContactMeta,
+  validateContactFields,
+} from '../../services/contact.ts';
 import { Spinner, TextInput } from '../components/shared/index.ts';
 import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { getEffectiveScreen, useAppDispatch, useAppState } from '../store.tsx';
 
 type FieldKey = keyof ContactFields;
 
-const FIELD_ORDER: { key: FieldKey; label: string }[] = [
-  { key: 'name', label: 'Name' },
+const FIELD_ORDER: { key: FieldKey; label: string; required?: boolean }[] = [
+  { key: 'name', label: 'Name', required: true },
   { key: 'headline', label: 'Headline' },
   { key: 'email', label: 'Email' },
   { key: 'phone', label: 'Phone' },
@@ -35,7 +39,8 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   const effectiveScreen = getEffectiveScreen(appState);
   const [phase, setPhase] = useState<'browse' | 'edit'>('browse');
   const [fieldIndex, setFieldIndex] = useState(0);
-  const [values, setValues] = useState<ContactFields>({});
+  const [values, setValues] = useState<ContactFields>({ name: '' });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -59,19 +64,49 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
           website: pickString(c.website),
           github: pickString(c.github),
         });
+        setValidationErrors({});
       } catch (e) {
         setLoadErr((e as Error).message);
       }
     })();
   }, [profileDir, loadNonce]);
 
+  const validateField = useCallback(
+    (key: FieldKey, value: string): string | null => {
+      const result = validateContactFields({ ...values, [key]: value });
+      if (!result.success) {
+        return result.errors[key] ?? null;
+      }
+      return null;
+    },
+    [values],
+  );
+
+  const setField = useCallback((key: FieldKey, v: string) => {
+    setValues((prev) => ({ ...prev, [key]: v }));
+    // Clear validation error when user starts typing
+    setValidationErrors((prev) => ({ ...prev, [key]: undefined as unknown as string }));
+  }, []);
+
   const saveAll = useCallback(async () => {
     setSaveErr(null);
+    setValidationErrors({});
+
+    // Validate before saving
+    const validation = validateContactFields(values);
+    if (!validation.success) {
+      setValidationErrors(validation.errors);
+      setSaveErr('Please fix validation errors before saving.');
+      return;
+    }
+
     setSaving(true);
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
     try {
-      await mergeContactMeta(values, profileDir, { persistenceTarget });
+      await mergeContactMeta(validation.data, profileDir, { persistenceTarget });
       setSavedAt(new Date().toLocaleString());
+      // Reload to ensure we show the saved state (with any transformations applied)
+      setLoadNonce((n) => n + 1);
     } catch (e) {
       setSaveErr((e as Error).message);
     } finally {
@@ -92,7 +127,7 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     }
     const errNote = saveErr != null ? ' · fix issue then s save' : '';
     if (phase === 'browse') {
-      return `Contact · ↑↓ Tab field · Enter edit · s save all (profile + global contact config)${errNote}${sb}`;
+      return `Contact · ↑↓ Tab field · Enter edit · s save all${errNote}${sb}`;
     }
     return `Contact · Esc leave field · Enter next field${errNote}${sb}`;
   }, [loadErr, phase, saveErr, saving]);
@@ -119,6 +154,12 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
       }
       if (phase === 'edit' && key.escape) {
         setPhase('browse');
+        // Validate on exit
+        const currentKey = FIELD_ORDER[fieldIndex].key;
+        const error = validateField(currentKey, values[currentKey] ?? '');
+        if (error) {
+          setValidationErrors((prev) => ({ ...prev, [currentKey]: error }));
+        }
         return;
       }
       if (phase !== 'browse' || inTextInput) {
@@ -145,10 +186,6 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     { isActive: active },
   );
 
-  const setField = (key: FieldKey, v: string) => {
-    setValues((prev) => ({ ...prev, [key]: v }));
-  };
-
   if (loadErr) {
     return (
       <Box flexDirection="column">
@@ -171,22 +208,29 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     <Box flexDirection="column">
       <Text bold>Contact</Text>
       {savedAt != null && <Text color="green">Last saved: {savedAt}</Text>}
-      {saveErr != null && (
+      {(saveErr != null || Object.keys(validationErrors).length > 0) && (
         <Box flexDirection="column">
-          <Text color="red">{saveErr}</Text>
+          {saveErr != null && <Text color="red">{saveErr}</Text>}
+          {Object.entries(validationErrors).map(([key, err]) => (
+            <Text key={key} color="red">
+              • {FIELD_ORDER.find((f) => f.key === key)?.label}: {err}
+            </Text>
+          ))}
         </Box>
       )}
       <Box marginTop={1} flexDirection="column">
-        {FIELD_ORDER.map(({ key, label }, i) => {
+        {FIELD_ORDER.map(({ key, label, required }, i) => {
           const sel = i === fieldIndex;
           const v = values[key] ?? '';
           const showMenuCaret = active && phase === 'browse' && sel;
+          const error = validationErrors[key];
           return (
             <Box key={key} flexDirection="row">
               <Box width={12}>
-                <Text bold={showMenuCaret} color="white">
+                <Text bold={showMenuCaret} color={error ? 'red' : 'white'}>
                   {showMenuCaret ? '› ' : '  '}
                   {label}
+                  {required && <Text color="yellow">*</Text>}
                 </Text>
               </Box>
               {phase === 'edit' && sel ? (
@@ -197,12 +241,26 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
                   }}
                   focus={active && phase === 'edit'}
                   onSubmit={() => {
+                    // Validate on submit
+                    const error = validateField(key, values[key] ?? '');
+                    if (error) {
+                      setValidationErrors((prev) => ({ ...prev, [key]: error }));
+                    }
                     setPhase('browse');
                     setFieldIndex((j) => (j + 1) % FIELD_ORDER.length);
                   }}
                 />
               ) : (
-                <Text dimColor>{v || '—'}</Text>
+                <Box flexDirection="column">
+                  <Text dimColor={!v} color={error ? 'red' : undefined}>
+                    {v || '—'}
+                  </Text>
+                  {error && (
+                    <Text color="red" dimColor>
+                      {error}
+                    </Text>
+                  )}
+                </Box>
               )}
             </Box>
           );

@@ -26,7 +26,7 @@ import type {
   Sourced,
 } from '../../profile/schema.ts';
 import type { RefinementSaveReason } from '../../profile/serializer.ts';
-import { hashSource, isMdNewerThanJson, loadActiveProfile, loadSource } from '../../profile/serializer.ts';
+import { hashSource, loadActiveProfile, loadSource } from '../../profile/serializer.ts';
 import { formatProfileEvaluationLines } from '../../services/jobEvaluationText.ts';
 import {
   applyConsultantFindingsToProfile,
@@ -99,7 +99,6 @@ import { SCREEN_ORDER } from '../types.ts';
 import { wrappedMarkdownHintRows } from '../utils/markdownDisplayHints.tsx';
 import { parseSgrMouseEvent } from '../utils/sgrMouseWheel.ts';
 import { linesToWrappedRows, splitLinesForWrap, wrappedScrollMax } from '../utils/wrapTextRows.ts';
-import { fileExists } from '../../utils/fs.ts';
 import { useValidationState } from '../validationContext.tsx';
 import { useResumeEditorContext } from './ResumeEditorContext.tsx';
 import { type JdPaneMode, JdPane } from './JdPane.tsx';
@@ -1315,8 +1314,10 @@ export function ResumeEditor({
   // Consume editor commands dispatched from CommandPalette
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!editorCommand || overlay != null) return;
+    if (!editorCommand) return;
+    // Always clear the command to prevent stale commands firing after overlay dismissal
     dispatch({ type: 'SET_EDITOR_COMMAND', command: null });
+    if (overlay != null) return;
     switch (editorCommand) {
       case ':qa':
         void overlayBeginQaFlow();

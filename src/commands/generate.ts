@@ -50,6 +50,7 @@ import {
   loadJobs,
   loadLogoCache,
   loadRefined,
+  loadSavedJobById,
   makeJobSlug,
   refinedJsonPath,
   refinedMdPath,
@@ -60,6 +61,7 @@ import {
   saveLogoCache,
   saveRefined,
 } from '../profile/serializer.ts';
+import { exportCoverLetterPdf } from '../services/coverLetterPdf.ts';
 import { persistJobRefinementPinnedRender } from '../services/jobRefinement.ts';
 import {
   applyResumeSectionSelection,
@@ -77,6 +79,12 @@ export interface GenerateOptions {
   output?: string;
   jd?: string;
   flair?: string;
+  /** When job-targeted, also export cover letter PDF after resume (non-empty draft). */
+  coverLetter?: boolean;
+  /** Skip resume; export only cover letter PDF (requires `jobId`). */
+  coverLetterOnly?: boolean;
+  /** Saved job id (required for `coverLetterOnly`). */
+  jobId?: string;
 }
 
 async function persistPinnedRenderForJob(
@@ -116,6 +124,29 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
   const profileDir = options.profileDir ?? 'output';
   const resumesDir = options.output ?? 'resumes';
+
+  if (options.coverLetterOnly) {
+    const jid = options.jobId?.trim();
+    if (!jid) {
+      throw new Error('--cover-letter-only requires --job-id <id>');
+    }
+    const job = await loadSavedJobById(profileDir, jid);
+    if (!job) {
+      throw new Error(`No saved job with id ${jid}`);
+    }
+    const profile = await loadActiveProfile(profileDir);
+    const slug = makeJobSlug(job.company, job.title);
+    const path = await exportCoverLetterPdf({
+      profileDir,
+      resumesDir,
+      jobSlug: slug,
+      profile,
+      company: job.company,
+      jobTitle: job.title,
+    });
+    console.log(`\n${c.ok} ${c.success('Cover letter PDF:')} ${c.path(path)}`);
+    return;
+  }
 
   // Detect external edits to refined.md — sync to JSON before generating
   if (await isMdNewerThanJson(refinedMdPath(profileDir), refinedJsonPath(profileDir))) {
@@ -727,6 +758,30 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         templateOverride,
         appliedSqueezeLevel,
       );
+
+      if (options.coverLetter) {
+        if (config.jobId && jobSlug) {
+          try {
+            const clPath = await exportCoverLetterPdf({
+              profileDir,
+              resumesDir,
+              jobSlug,
+              profile,
+              company: config.company,
+              jobTitle: config.jobTitle,
+            });
+            console.log(c.muted(`  Cover letter PDF: ${clPath}`));
+          } catch (e) {
+            console.log(
+              `\n${c.warn} ${c.warning(`Cover letter export failed: ${(e as Error).message}`)}`,
+            );
+          }
+        } else {
+          console.log(
+            `\n${c.warn} ${c.warning('--cover-letter ignored: run is not job-targeted (no saved job).')}`,
+          );
+        }
+      }
 
       // Save config; stamp resolved template + profile version
       config.profileUpdatedAt = profile.updatedAt;

@@ -102,6 +102,7 @@ import { linesToWrappedRows, splitLinesForWrap, wrappedScrollMax } from '../util
 import { fileExists } from '../../utils/fs.ts';
 import { useValidationState } from '../validationContext.tsx';
 import { useResumeEditorContext } from './ResumeEditorContext.tsx';
+import { type JdPaneMode, JdPane } from './JdPane.tsx';
 
 function cloneProfile(p: Profile): Profile {
   return JSON.parse(JSON.stringify(p)) as Profile;
@@ -230,10 +231,10 @@ export function ResumeEditor({
   onRefreshSnapshot,
   onSectionChange,
 }: ResumeEditorProps) {
-  const { persistenceTarget, onRequestClose } = useResumeEditorContext();
+  const { persistenceTarget, onRequestClose, mode, jobDescription, jobId } = useResumeEditorContext();
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
-  const { activeScreen, inTextInput, paletteOpen } = useAppState();
+  const { activeScreen, inTextInput, paletteOpen, editorCommand } = useAppState();
   const persistenceTargetRef = useRef(persistenceTarget);
   persistenceTargetRef.current = persistenceTarget;
   const { createController, releaseController } = useOperationAbort();
@@ -279,6 +280,9 @@ export function ResumeEditor({
   // ---------------------------------------------------------------------------
   const [overlay, setOverlay] = useState<EditorOverlay>(null);
   const overlayActive = panelActive && overlay != null;
+
+  // JD pane state (only meaningful when mode === 'job')
+  const [jdPaneMode, setJdPaneMode] = useState<JdPaneMode>('hidden');
 
   // QA state
   const [qaSource, setQaSource] = useState<Profile | null>(null);
@@ -1308,6 +1312,48 @@ export function ResumeEditor({
   );
 
   // ---------------------------------------------------------------------------
+  // Consume editor commands dispatched from CommandPalette
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!editorCommand || overlay != null) return;
+    dispatch({ type: 'SET_EDITOR_COMMAND', command: null });
+    switch (editorCommand) {
+      case ':qa':
+        void overlayBeginQaFlow();
+        break;
+      case ':polish':
+        setOverlay({ k: 'polish-pick' });
+        break;
+      case ':sniff':
+        void overlayRunAiSniff();
+        break;
+      case ':edit':
+        setOverlay({ k: 'direct-edit-input' });
+        break;
+      case ':consultant':
+        void overlayRunConsultantReview();
+        break;
+      case ':history':
+        void overlayOpenRefinementHistory();
+        break;
+      case ':sections':
+        dispatch({ type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: activeScreen });
+        navigate('profile');
+        break;
+    }
+  }, [
+    editorCommand,
+    overlay,
+    dispatch,
+    overlayBeginQaFlow,
+    overlayRunAiSniff,
+    overlayRunConsultantReview,
+    overlayOpenRefinementHistory,
+    activeScreen,
+    navigate,
+  ]);
+
+  // ---------------------------------------------------------------------------
   // Existing inline polish (Ctrl+P)
   // ---------------------------------------------------------------------------
   const runDashboardPolish = useCallback(async () => {
@@ -1630,6 +1676,51 @@ export function ResumeEditor({
     {
       isActive:
         panelActive && editorMode && !resumeBodyFocused && !docMenuOpen && docPolishDiff == null && overlay == null,
+    },
+  );
+
+  // Ctrl+J: cycle JD pane modes (hidden -> peek -> full -> hidden), only in job mode
+  useInput(
+    (input, key) => {
+      if (key.ctrl && input === 'j') {
+        setJdPaneMode((m) => {
+          if (m === 'hidden') return 'peek';
+          if (m === 'peek') return 'full';
+          return 'hidden';
+        });
+      }
+    },
+    { isActive: panelActive && mode === 'job' && overlay == null },
+  );
+
+  // Job-mode nav keybinds (when not editing body)
+  useInput(
+    (input, _key) => {
+      if (input === 'p') {
+        // Prepare: no-op until CurateScreen is wired
+      }
+      if (input === 'f') {
+        // Feedback/job-fit evaluation: future overlay
+      }
+      if (input === 'g') {
+        // Generate: open Generate with this job pre-selected
+        if (jobId) {
+          dispatch({ type: 'SET_PENDING_JOB', jobId });
+          navigate('generate');
+        }
+      }
+      if (input === 'l') {
+        // Cover letter: future overlay
+      }
+    },
+    {
+      isActive:
+        panelActive &&
+        mode === 'job' &&
+        !resumeBodyFocused &&
+        !docMenuOpen &&
+        overlay == null &&
+        docPolishDiff == null,
     },
   );
 
@@ -2528,42 +2619,55 @@ export function ResumeEditor({
           flexDirection="column"
           minHeight={0}
         >
-          <EditorHint isFocused={resumeBodyFocused} sectionLabel={activeSectionLabel} />
-          {parseErr != null && (
-            <Box marginBottom={1}>
-              <Text color="red" wrap="truncate-end">
-                {parseErr}
-              </Text>
+          {mode === 'job' && jobDescription && (
+            <JdPane
+              jobDescription={jobDescription}
+              mode={jdPaneMode}
+              peekHeight={Math.floor(termRows / 3)}
+              fullHeight={viewportH}
+              isActive={panelActive && jdPaneMode === 'full'}
+            />
+          )}
+          {jdPaneMode !== 'full' && (
+            <Box flexDirection="column" flexGrow={1} minHeight={0}>
+              <EditorHint isFocused={resumeBodyFocused} sectionLabel={activeSectionLabel} />
+              {parseErr != null && (
+                <Box marginBottom={1}>
+                  <Text color="red" wrap="truncate-end">
+                    {parseErr}
+                  </Text>
+                </Box>
+              )}
+              <FreeCursorMultilineInput
+                value={mdDraft}
+                geometryTie={`${!api}-${parseErr ?? ''}-${resumeEditorLineSlots}`}
+                externalContentRevision={mdExternalRevision}
+                onChange={(v) => {
+                  mdDirtyRef.current = true;
+                  dispatch({ type: 'SET_EDITOR_DIRTY', value: true });
+                  setMdDraft(v);
+                }}
+                focus={panelActive && !docMenuOpen && docPolishDiff == null && overlay == null && resumeBodyFocused}
+                width={textW}
+                height={resumeEditorLineSlots}
+                jumpToChar={jumpToChar}
+                onConsumedJumpToChar={() => {
+                  setJumpToChar(null);
+                }}
+                onCaretOffsetChange={setCaretOffset}
+                onSubmit={(v) => {
+                  setMdDraft(v);
+                  try {
+                    const p = parseDisplayMarkdownStringToProfile(v, editorBundle.profile);
+                    setParseErr(null);
+                    void persistEditorProfile(p);
+                  } catch (e: unknown) {
+                    setParseErr(e instanceof Error ? e.message : String(e));
+                  }
+                }}
+              />
             </Box>
           )}
-          <FreeCursorMultilineInput
-            value={mdDraft}
-            geometryTie={`${!api}-${parseErr ?? ''}-${resumeEditorLineSlots}`}
-            externalContentRevision={mdExternalRevision}
-            onChange={(v) => {
-              mdDirtyRef.current = true;
-              dispatch({ type: 'SET_EDITOR_DIRTY', value: true });
-              setMdDraft(v);
-            }}
-            focus={panelActive && !docMenuOpen && docPolishDiff == null && overlay == null && resumeBodyFocused}
-            width={textW}
-            height={resumeEditorLineSlots}
-            jumpToChar={jumpToChar}
-            onConsumedJumpToChar={() => {
-              setJumpToChar(null);
-            }}
-            onCaretOffsetChange={setCaretOffset}
-            onSubmit={(v) => {
-              setMdDraft(v);
-              try {
-                const p = parseDisplayMarkdownStringToProfile(v, editorBundle.profile);
-                setParseErr(null);
-                void persistEditorProfile(p);
-              } catch (e: unknown) {
-                setParseErr(e instanceof Error ? e.message : String(e));
-              }
-            }}
-          />
         </Box>
       )}
       {snapshot.hasSource &&

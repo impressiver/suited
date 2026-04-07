@@ -4,7 +4,7 @@ import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { NAV_LABELS, SCREEN_ORDER, type ScreenId } from '../types.ts';
 import { type SelectItem, SelectList } from './shared/SelectList.tsx';
 
-type PaletteValue = ScreenId | 'help' | 'clear-overlays';
+type PaletteValue = ScreenId | 'help' | 'clear-overlays' | `:${string}`;
 
 export interface CommandPaletteProps {
   active: boolean;
@@ -15,6 +15,10 @@ export interface CommandPaletteProps {
   overlayDepth: number;
   /** Clears the overlay stack (`CLEAR_OVERLAYS`); used when the user picks the close-all row. */
   onClearOverlays?: () => void;
+  /** The effective screen currently visible; used to show editor-specific commands. */
+  currentScreen: ScreenId;
+  /** Called when an editor-specific command (`:cmd`) is selected. */
+  onCommand?: (command: string) => void;
 }
 
 export function CommandPalette({
@@ -24,6 +28,8 @@ export function CommandPalette({
   onHelp,
   overlayDepth,
   onClearOverlays,
+  currentScreen,
+  onCommand,
 }: CommandPaletteProps) {
   useRegisterBlockingUi(active);
 
@@ -32,16 +38,31 @@ export function CommandPalette({
       overlayDepth > 0
         ? [{ value: 'clear-overlays', label: 'Close overlays / back to underlay' }]
         : [];
+
+    const editorCommands: Array<SelectItem<PaletteValue>> =
+      currentScreen === 'editor' || currentScreen === 'jobs'
+        ? [
+            { value: ':qa', label: 'Q&A Refinement' },
+            { value: ':polish', label: 'Polish sections (AI)' },
+            { value: ':sniff', label: 'AI Sniff (reduce AI phrasing)' },
+            { value: ':edit', label: 'Direct AI Edit' },
+            { value: ':consultant', label: 'Consultant review (whole profile)' },
+            { value: ':history', label: 'Refinement History' },
+            { value: ':sections', label: 'Structured Section Editor' },
+          ]
+        : [];
+
     const rest = SCREEN_ORDER.map((id) => ({
       value: id,
       label: `Go to ${NAV_LABELS[id]}`,
     }));
     return [
       ...clearRow,
+      ...editorCommands,
       ...rest,
       { value: 'help' as const, label: 'Help (? or Ctrl+?)' },
     ];
-  }, [overlayDepth]);
+  }, [overlayDepth, currentScreen]);
 
   const [idx, setIdx] = useState(0);
 
@@ -81,6 +102,11 @@ export function CommandPalette({
           onChange={(i) => setIdx(i)}
           isActive={active}
           onSubmit={(item) => {
+            if (typeof item.value === 'string' && item.value.startsWith(':')) {
+              onCommand?.(item.value);
+              onClose();
+              return;
+            }
             if (item.value === 'clear-overlays') {
               onClearOverlays?.();
               onClose();
@@ -91,7 +117,7 @@ export function CommandPalette({
               onClose();
               return;
             }
-            onSelectScreen(item.value);
+            onSelectScreen(item.value as ScreenId);
             onClose();
           }}
         />

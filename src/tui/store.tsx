@@ -58,6 +58,8 @@ export interface AppState {
   persistenceTarget: PersistenceTarget;
   /** Command palette (`:`) open; captures keys ahead of global nav when true. */
   paletteOpen: boolean;
+  /** One-shot editor command dispatched from CommandPalette (e.g. ':qa', ':polish'); consumed by ResumeEditor. */
+  editorCommand: string | null;
   /** Cleared by RefineScreen after apply or discard (no refined yet). */
   refineResumeIntent: RefineResumeIntent | null;
   /**
@@ -87,6 +89,7 @@ export type AppAction =
   | { type: 'DECREMENT_BLOCKING_UI' }
   | { type: 'SET_PERSISTENCE_TARGET'; target: PersistenceTarget }
   | { type: 'SET_PALETTE_OPEN'; open: boolean }
+  | { type: 'SET_EDITOR_COMMAND'; command: string | null }
   | { type: 'PUSH_OVERLAY'; screen: ScreenId }
   | { type: 'POP_OVERLAY' }
   | { type: 'CLEAR_OVERLAYS' }
@@ -111,6 +114,7 @@ export function createInitialAppState(profileDir: string): AppState {
     blockingUiDepth: 0,
     persistenceTarget: globalRefinedTarget(),
     paletteOpen: false,
+    editorCommand: null,
     overlayStack: [],
     refineResumeIntent: null,
   };
@@ -184,6 +188,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, persistenceTarget: action.target };
     case 'SET_PALETTE_OPEN':
       return { ...state, paletteOpen: action.open };
+    case 'SET_EDITOR_COMMAND':
+      return { ...state, editorCommand: action.command };
     case 'PUSH_OVERLAY': {
       const top = state.overlayStack[state.overlayStack.length - 1];
       if (top === action.screen) {

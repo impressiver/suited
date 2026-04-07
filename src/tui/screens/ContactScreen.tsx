@@ -85,7 +85,11 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
   const setField = useCallback((key: FieldKey, v: string) => {
     setValues((prev) => ({ ...prev, [key]: v }));
     // Clear validation error when user starts typing
-    setValidationErrors((prev) => ({ ...prev, [key]: undefined as unknown as string }));
+    setValidationErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   }, []);
 
   const saveAll = useCallback(async () => {
@@ -208,10 +212,10 @@ export function ContactScreen({ profileDir }: ContactScreenProps) {
     <Box flexDirection="column">
       <Text bold>Contact</Text>
       {savedAt != null && <Text color="green">Last saved: {savedAt}</Text>}
-      {(saveErr != null || Object.keys(validationErrors).length > 0) && (
+      {(saveErr != null || Object.values(validationErrors).some(Boolean)) && (
         <Box flexDirection="column">
           {saveErr != null && <Text color="red">{saveErr}</Text>}
-          {Object.entries(validationErrors).map(([key, err]) => (
+          {Object.entries(validationErrors).filter(([, err]) => err).map(([key, err]) => (
             <Text key={key} color="red">
               • {FIELD_ORDER.find((f) => f.key === key)?.label}: {err}
             </Text>

@@ -1,6 +1,6 @@
 import { Box, useApp, useInput } from 'ink';
 import type { Dispatch } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatTopBarJobLine } from './activeDocumentSession.ts';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { ElegantShell } from './components/ElegantShell.tsx';
@@ -51,6 +51,13 @@ export function App({ profileDir, flowOptions }: AppProps) {
   const dispatch = useAppDispatch();
   const [pendingNav, setPendingNav] = useState<ScreenId | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  /** Brief suppression after closing an overlay dialog — prevents Esc from propagating to underlying screen. */
+  /** Brief suppression after closing an overlay dialog — prevents Esc from propagating to underlying screen. */
+  const escSuppressedRef = useRef(false);
+  const suppressEsc = useCallback(() => {
+    escSuppressedRef.current = true;
+    setTimeout(() => { escSuppressedRef.current = false; }, 50);
+  }, []);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const { state: validationState } = useValidation();
   const { notifications } = useNotifications();
@@ -172,6 +179,9 @@ export function App({ profileDir, flowOptions }: AppProps) {
 
   useInput(
     (input, key) => {
+      if (escSuppressedRef.current && key.escape) {
+        return;
+      }
       if (pendingNav != null) {
         return;
       }
@@ -346,7 +356,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
           <HelpDialog
             width={cols}
             height={rows}
-            onClose={() => setHelpOpen(false)}
+            onClose={() => { suppressEsc(); setHelpOpen(false); }}
             _currentScreen={effectiveScreen}
           />
         ) : (
@@ -381,7 +391,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
                     setPendingNav(null);
                     dispatchScreenNavigation(dispatch, target, state.activeScreen);
                   }}
-                  onCancel={() => setPendingNav(null)}
+                  onCancel={() => { suppressEsc(); setPendingNav(null); }}
                 />
               </Box>
             )}
@@ -390,7 +400,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
                 <CommandPalette
                   active={state.paletteOpen}
                   currentScreen={effectiveScreen}
-                  onClose={() => dispatch({ type: 'SET_PALETTE_OPEN', open: false })}
+                  onClose={() => { suppressEsc(); dispatch({ type: 'SET_PALETTE_OPEN', open: false }); }}
                   onSelectScreen={(s) => goToScreen(s)}
                   onHelp={() => setHelpOpen(true)}
                   overlayDepth={overlayStack.length}

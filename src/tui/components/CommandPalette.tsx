@@ -19,6 +19,8 @@ export interface CommandPaletteProps {
   currentScreen: ScreenId;
   /** Called when an editor-specific command (`:cmd`) is selected. */
   onCommand?: (command: string) => void;
+  /** When true, editor commands are suppressed (overlay active). */
+  editorBusy?: boolean;
   /** Terminal width for centering. */
   width: number;
   /** Terminal height for centering. */
@@ -34,6 +36,7 @@ export function CommandPalette({
   onClearOverlays,
   currentScreen,
   onCommand,
+  editorBusy,
   width: termWidth,
   height: termHeight,
 }: CommandPaletteProps) {
@@ -46,7 +49,7 @@ export function CommandPalette({
         : [];
 
     const editorCommands: Array<SelectItem<PaletteValue>> =
-      currentScreen === 'editor' || currentScreen === 'jobs'
+      (currentScreen === 'editor' || currentScreen === 'jobs') && !editorBusy
         ? [
             { value: ':qa', label: 'Q&A Refinement' },
             { value: ':polish', label: 'Polish sections (AI)' },
@@ -68,7 +71,7 @@ export function CommandPalette({
       ...rest,
       { value: 'help' as const, label: 'Help (? or Ctrl+?)' },
     ];
-  }, [overlayDepth, currentScreen]);
+  }, [overlayDepth, currentScreen, editorBusy]);
 
   const [idx, setIdx] = useState(0);
 

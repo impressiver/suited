@@ -396,6 +396,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
                   overlayDepth={overlayStack.length}
                   onClearOverlays={() => dispatch({ type: 'CLEAR_OVERLAYS' })}
                   onCommand={(cmd) => dispatch({ type: 'SET_EDITOR_COMMAND', command: cmd })}
+                  editorBusy={state.operationInProgress || state.blockingUiDepth > 1}
                   width={cols}
                   height={rows}
                 />

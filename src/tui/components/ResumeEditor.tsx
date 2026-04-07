@@ -26,8 +26,9 @@ import type {
   Sourced,
 } from '../../profile/schema.ts';
 import type { RefinementSaveReason } from '../../profile/serializer.ts';
-import { hashSource, loadActiveProfile, loadSource } from '../../profile/serializer.ts';
+import { hashSource, isMdNewerThanJson, loadActiveProfile, loadSource } from '../../profile/serializer.ts';
 import { formatProfileEvaluationLines } from '../../services/jobEvaluationText.ts';
+import type { DiffBlock } from '../../services/refine.ts';
 import {
   applyConsultantFindingsToProfile,
   applyDirectEdit,
@@ -110,6 +111,22 @@ function cloneProfile(p: Profile): Profile {
   return JSON.parse(JSON.stringify(p)) as Profile;
 }
 
+/** Build a diff overlay with precomputed blocks. */
+function makeDiffOverlay(
+  original: Profile,
+  proposed: Profile,
+  opts?: { saveMode?: 'qa' | 'keep-session'; keepSessionReason?: RefinementSaveReason },
+): Extract<EditorOverlay, { k: 'diff' }> {
+  return {
+    k: 'diff',
+    original,
+    proposed,
+    blocks: computeRefinementDiff(original, proposed),
+    saveMode: opts?.saveMode,
+    keepSessionReason: opts?.keepSessionReason,
+  };
+}
+
 function userEditSourced(value: string): Sourced<string> {
   const now = new Date().toISOString();
   return { value, source: { kind: 'user-edit', editedAt: now } };
@@ -184,6 +201,7 @@ type EditorOverlay =
       k: 'diff';
       original: Profile;
       proposed: Profile;
+      blocks: DiffBlock[];
       saveMode?: 'qa' | 'keep-session';
       keepSessionReason?: RefinementSaveReason;
     }
@@ -200,6 +218,7 @@ type EditorOverlay =
       entry: RefinementHistoryListEntry;
       list: { entries: RefinementHistoryListEntry[]; warnings: string[] };
     }
+  | { k: 'sync-prompt' }
   | { k: 'syncing-md' }
   | { k: 'saving' }
   | { k: 'done'; note: string }
@@ -410,6 +429,23 @@ export function ResumeEditor({
     snapshot.hasSource,
     snapshot.loading,
   ]);
+
+  // Check if refined.md was edited externally (newer than refined.json)
+  useEffect(() => {
+    if (!snapshot.hasRefined || snapshot.loading || !snapshot.hasSource || editorBundle == null) {
+      return;
+    }
+    if (overlay != null) return; // don't interrupt an active overlay
+    let cancelled = false;
+    const jsonPath = refinedJsonPathForTarget(profileDir, persistenceTarget);
+    const mdPath = refinedMdPathForTarget(profileDir, persistenceTarget);
+    void isMdNewerThanJson(mdPath, jsonPath).then((isNewer) => {
+      if (cancelled || !isNewer) return;
+      setOverlay({ k: 'sync-prompt' });
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when bundle loads
+  }, [editorBundle, snapshot.hasRefined]);
 
   useEffect(() => {
     resumeScrollRestoredRef.current = false;
@@ -872,7 +908,7 @@ export function ResumeEditor({
           return;
         }
         setApiFailureStreak(0);
-        setOverlay({ k: 'diff', original: qaSource, proposed, saveMode: 'qa' });
+        setOverlay(makeDiffOverlay(qaSource, proposed, { saveMode: 'qa' }));
       } catch (e) {
         if (isUserAbort(e)) {
           setQaListFocus(false);
@@ -907,7 +943,7 @@ export function ResumeEditor({
           persistenceTarget,
         );
         const base = cloneProfile(existingProfile);
-        let proposed = base;
+        let proposed: Profile | null = null;
         for await (const ev of polishProfile(
           base,
           { sections, positionIds: polishOpts?.positionIds },
@@ -917,19 +953,17 @@ export function ResumeEditor({
             proposed = ev.result;
           }
         }
+        if (proposed == null) {
+          setOverlay({ k: 'done', note: 'No result from API — try again.' });
+          return;
+        }
         const blocks = computeRefinementDiff(base, proposed);
         setApiFailureStreak(0);
         if (blocks.length === 0) {
           await overlayPersistRefinedKeepSession(proposed, 'polish');
           return;
         }
-        setOverlay({
-          k: 'diff',
-          original: base,
-          proposed,
-          saveMode: 'keep-session',
-          keepSessionReason: 'polish',
-        });
+        setOverlay(makeDiffOverlay(base, proposed, { saveMode: 'keep-session', keepSessionReason: 'polish' }));
       } catch (e) {
         if (isUserAbort(e)) {
           dismissOverlay();
@@ -965,11 +999,15 @@ export function ResumeEditor({
     try {
       const { profile: existingProfile } = await loadRefinedTuiState(profileDir, persistenceTarget);
       const base = cloneProfile(existingProfile);
-      let proposed = base;
+      let proposed: Profile | null = null;
       for await (const ev of sniffReduceAiTellsProfile(base, ac.signal)) {
         if (ev.type === 'done') {
           proposed = ev.result;
         }
+      }
+      if (proposed == null) {
+        setOverlay({ k: 'done', note: 'No result from API — try again.' });
+        return;
       }
       const blocks = computeRefinementDiff(base, proposed);
       setApiFailureStreak(0);
@@ -977,13 +1015,7 @@ export function ResumeEditor({
         await overlayPersistRefinedKeepSession(proposed, 'ai-sniff');
         return;
       }
-      setOverlay({
-        k: 'diff',
-        original: base,
-        proposed,
-        saveMode: 'keep-session',
-        keepSessionReason: 'ai-sniff',
-      });
+      setOverlay(makeDiffOverlay(base, proposed, { saveMode: 'keep-session', keepSessionReason: 'ai-sniff' }));
     } catch (e) {
       if (isUserAbort(e)) {
         dismissOverlay();
@@ -1022,11 +1054,15 @@ export function ResumeEditor({
           persistenceTarget,
         );
         const base = cloneProfile(existingProfile);
-        let proposed = base;
+        let proposed: Profile | null = null;
         for await (const ev of applyDirectEdit(base, instructions, ac.signal)) {
           if (ev.type === 'done') {
             proposed = ev.result;
           }
+        }
+        if (proposed == null) {
+          setOverlay({ k: 'done', note: 'No result from API — try again.' });
+          return;
         }
         const blocks = computeRefinementDiff(base, proposed);
         setApiFailureStreak(0);
@@ -1034,13 +1070,7 @@ export function ResumeEditor({
           await overlayPersistRefinedKeepSession(proposed, 'direct-edit');
           return;
         }
-        setOverlay({
-          k: 'diff',
-          original: base,
-          proposed,
-          saveMode: 'keep-session',
-          keepSessionReason: 'direct-edit',
-        });
+        setOverlay(makeDiffOverlay(base, proposed, { saveMode: 'keep-session', keepSessionReason: 'direct-edit' }));
       } catch (e) {
         if (isUserAbort(e)) {
           dismissOverlay();
@@ -1199,13 +1229,7 @@ export function ResumeEditor({
           await overlayPersistRefinedKeepSession(proposed, 'consultant');
           return;
         }
-        setOverlay({
-          k: 'diff',
-          original: base,
-          proposed,
-          saveMode: 'keep-session',
-          keepSessionReason: 'consultant',
-        });
+        setOverlay(makeDiffOverlay(base, proposed, { saveMode: 'keep-session', keepSessionReason: 'consultant' }));
       } catch (e) {
         if (isUserAbort(e)) {
           setConsultantMenuIdx(0);
@@ -1398,7 +1422,7 @@ export function ResumeEditor({
     dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
     try {
       const base = cloneProfile(parsed);
-      let proposed = base;
+      let proposed: Profile | null = null;
       for await (const ev of polishProfile(
         base,
         { sections: sectionIds, positionIds },
@@ -1407,6 +1431,10 @@ export function ResumeEditor({
         if (ev.type === 'done') {
           proposed = ev.result;
         }
+      }
+      if (proposed == null) {
+        setParseErr('No result from API — try again.');
+        return;
       }
       const blocks = computeRefinementDiff(base, proposed);
       if (blocks.length === 0) {
@@ -1786,13 +1814,10 @@ export function ResumeEditor({
         return;
       }
       if (key.escape) {
-        setOverlay({
-          k: 'diff',
-          original: overlay.original,
-          proposed: overlay.proposed,
+        setOverlay(makeDiffOverlay(overlay.original, overlay.proposed, {
           saveMode: overlay.saveMode,
           keepSessionReason: overlay.keepSessionReason,
-        });
+        }));
       }
     },
     { isActive: overlayActive && overlay?.k === 'diff-edit-summary' },
@@ -2294,7 +2319,7 @@ export function ResumeEditor({
       }
 
       case 'diff': {
-        const blocks = computeRefinementDiff(overlay.original, overlay.proposed);
+        const { blocks } = overlay;
         if (blocks.length === 0) {
           return (
             <Box flexDirection="column" borderStyle="round" paddingX={1} marginBottom={1}>
@@ -2352,13 +2377,10 @@ export function ResumeEditor({
                   } else {
                     delete next.summary;
                   }
-                  setOverlay({
-                    k: 'diff',
-                    original: overlay.original,
-                    proposed: next,
+                  setOverlay(makeDiffOverlay(overlay.original, next, {
                     saveMode: overlay.saveMode ?? 'qa',
                     keepSessionReason: overlay.keepSessionReason,
-                  });
+                  }));
                 }}
               />
             </Box>
@@ -2449,6 +2471,25 @@ export function ResumeEditor({
                     entries: overlay.list.entries,
                     warnings: overlay.list.warnings,
                   });
+                }}
+              />
+            </Box>
+          </Box>
+        );
+
+      case 'sync-prompt':
+        return (
+          <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginBottom={1}>
+            <Text color="yellow">refined.md is newer than refined.json (edited outside the TUI).</Text>
+            <Box marginTop={1}>
+              <ConfirmPrompt
+                message="Reload refined.json from the edited markdown?"
+                active={overlayActive}
+                onConfirm={() => {
+                  void overlaySyncRefinedFromMarkdown();
+                }}
+                onCancel={() => {
+                  setOverlay(null);
                 }}
               />
             </Box>

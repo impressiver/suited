@@ -40,11 +40,11 @@ export function HelpDialog({ width, height, onClose, _currentScreen }: HelpDialo
         commands: [
           { key: '↑↓', desc: 'Change screen (when not in editor/list)' },
           { key: '1-7', desc: 'Jump to screen by number' },
-          { key: 'd', desc: 'Dashboard (Resume)' },
+          { key: 'd', desc: 'Dashboard' },
           { key: 'i', desc: 'Import' },
           { key: 'c', desc: 'Contact' },
+          { key: 'e', desc: 'Editor' },
           { key: 'j', desc: 'Jobs' },
-          { key: 'r', desc: 'Refine' },
           { key: 'g', desc: 'Generate' },
           { key: 's', desc: 'Settings' },
         ],
@@ -82,12 +82,11 @@ export function HelpDialog({ width, height, onClose, _currentScreen }: HelpDialo
   const lines = useMemo(() => {
     const out: string[] = [];
     out.push('');
-    out.push('  ┌─────────────────────────────────────────────────────────────┐');
-    out.push('  │                    SUITED KEYBOARD REFERENCE                  │');
-    out.push('  └─────────────────────────────────────────────────────────────┘');
+    out.push('  SUITED KEYBOARD REFERENCE');
     out.push('');
 
-    for (const group of commandGroups) {
+    for (let gi = 0; gi < commandGroups.length; gi++) {
+      const group = commandGroups[gi];
       // Group header
       out.push(`  ${group.title}`);
       out.push(`  ${'─'.repeat(62)}`);
@@ -106,11 +105,13 @@ export function HelpDialog({ width, height, onClose, _currentScreen }: HelpDialo
         }
       }
       out.push('');
+      // Extra blank line between sections
+      if (gi < commandGroups.length - 1) {
+        out.push('');
+      }
     }
 
-    out.push('  ┌─────────────────────────────────────────────────────────────┐');
-    out.push('  │  Press ? or Esc to close this dialog                        │');
-    out.push('  └─────────────────────────────────────────────────────────────┘');
+    out.push('  Press ? or Esc to close this dialog');
     out.push('');
 
     return out;

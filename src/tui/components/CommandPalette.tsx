@@ -19,6 +19,10 @@ export interface CommandPaletteProps {
   currentScreen: ScreenId;
   /** Called when an editor-specific command (`:cmd`) is selected. */
   onCommand?: (command: string) => void;
+  /** Terminal width for centering. */
+  width: number;
+  /** Terminal height for centering. */
+  height: number;
 }
 
 export function CommandPalette({
@@ -30,6 +34,8 @@ export function CommandPalette({
   onClearOverlays,
   currentScreen,
   onCommand,
+  width: termWidth,
+  height: termHeight,
 }: CommandPaletteProps) {
   useRegisterBlockingUi(active);
 
@@ -84,43 +90,62 @@ export function CommandPalette({
     { isActive: active },
   );
 
+  const paletteW = 44;
+  const paletteH = items.length + 6; // header(2) + paddingY(2) + border(2) + items
+  const padX = Math.max(0, Math.floor((termWidth - paletteW) / 2));
+  const padY = Math.max(0, Math.floor((termHeight - paletteH) / 2));
+
+  // Solid background: fill the entire terminal so content behind is hidden
+  const bgLines = Array.from({ length: termHeight }, () => ' '.repeat(termWidth));
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      paddingY={1}
-      width={40}
-    >
-      <Text bold>Command palette</Text>
-      <Text dimColor>: or Esc close · ↑↓ Enter</Text>
-      <Box marginTop={1}>
-        <SelectList<PaletteValue>
-          items={items}
-          selectedIndex={Math.min(idx, items.length - 1)}
-          onChange={(i) => setIdx(i)}
-          isActive={active}
-          onSubmit={(item) => {
-            if (typeof item.value === 'string' && item.value.startsWith(':')) {
-              onCommand?.(item.value);
-              onClose();
-              return;
-            }
-            if (item.value === 'clear-overlays') {
-              onClearOverlays?.();
-              onClose();
-              return;
-            }
-            if (item.value === 'help') {
-              onHelp();
-              onClose();
-              return;
-            }
-            onSelectScreen(item.value as ScreenId);
-            onClose();
-          }}
-        />
+    <Box flexDirection="column" width={termWidth} height={termHeight}>
+      {/* Solid background layer */}
+      <Box position="absolute" flexDirection="column" width={termWidth} height={termHeight}>
+        {bgLines.map((line, i) => (
+          <Text key={i}>{line}</Text>
+        ))}
+      </Box>
+      {/* Centered palette */}
+      <Box flexDirection="column" paddingX={padX} paddingTop={padY}>
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="cyan"
+          paddingX={1}
+          paddingY={1}
+          width={paletteW}
+        >
+          <Text bold>Command palette</Text>
+          <Text dimColor>: or Esc close · ↑↓ Enter</Text>
+          <Box marginTop={1}>
+            <SelectList<PaletteValue>
+              items={items}
+              selectedIndex={Math.min(idx, items.length - 1)}
+              onChange={(i) => setIdx(i)}
+              isActive={active}
+              onSubmit={(item) => {
+                if (typeof item.value === 'string' && item.value.startsWith(':')) {
+                  onCommand?.(item.value);
+                  onClose();
+                  return;
+                }
+                if (item.value === 'clear-overlays') {
+                  onClearOverlays?.();
+                  onClose();
+                  return;
+                }
+                if (item.value === 'help') {
+                  onHelp();
+                  onClose();
+                  return;
+                }
+                onSelectScreen(item.value as ScreenId);
+                onClose();
+              }}
+            />
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

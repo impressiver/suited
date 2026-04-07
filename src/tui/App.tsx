@@ -386,7 +386,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
               </Box>
             )}
             {state.paletteOpen && (
-              <Box position="absolute" marginTop={1} width={cols}>
+              <Box position="absolute" width={cols} height={rows}>
                 <CommandPalette
                   active={state.paletteOpen}
                   currentScreen={effectiveScreen}
@@ -396,6 +396,8 @@ export function App({ profileDir, flowOptions }: AppProps) {
                   overlayDepth={overlayStack.length}
                   onClearOverlays={() => dispatch({ type: 'CLEAR_OVERLAYS' })}
                   onCommand={(cmd) => dispatch({ type: 'SET_EDITOR_COMMAND', command: cmd })}
+                  width={cols}
+                  height={rows}
                 />
               </Box>
             )}

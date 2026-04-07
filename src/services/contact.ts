@@ -44,11 +44,10 @@ export const ContactFieldsSchema = z.object({
   github: z
     .union([
       z.literal(''),
-      z
-        .string()
-        .url('Invalid GitHub URL')
-        .startsWith('https://github.com/', 'GitHub URL should start with https://github.com/')
-        .or(z.string().regex(/^@[a-zA-Z0-9_-]+$/, 'GitHub username should start with @')),
+      // Full URL
+      z.string().url().regex(/github\.com\//, 'Invalid GitHub URL'),
+      // Username with or without @ prefix — normalized to full URL before save
+      z.string().regex(/^@?[a-zA-Z0-9._-]+$/, 'Enter a GitHub username or full URL'),
     ])
     .optional(),
 });
@@ -97,6 +96,15 @@ function normalizeLinkedin(value: string): string {
   return `https://www.linkedin.com/in/${trimmed}`;
 }
 
+/** Normalize a GitHub input to a full URL. Accepts username, @username, or full URL. */
+function normalizeGithub(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  const username = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
+  return `https://github.com/${username}`;
+}
+
 function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profile {
   const contact = { ...profile.contact };
 
@@ -124,6 +132,9 @@ function mergeFieldsIntoProfile(profile: Profile, fields: ContactFields): Profil
   }
   updateField('linkedin', 'linkedin');
   updateField('website', 'website');
+  if (fields.github && fields.github.trim()) {
+    fields = { ...fields, github: normalizeGithub(fields.github) };
+  }
   updateField('github', 'github');
 
   return { ...profile, contact };

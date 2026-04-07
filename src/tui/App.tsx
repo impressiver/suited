@@ -3,15 +3,16 @@ import type { Dispatch } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatTopBarJobLine } from './activeDocumentSession.ts';
 import { CommandPalette } from './components/CommandPalette.tsx';
-import { Layout } from './components/Layout.tsx';
-import { ShortcutHelpOverlay } from './components/ShortcutHelpOverlay.tsx';
+import { ElegantShell } from './components/ElegantShell.tsx';
+import { HelpDialog } from './components/HelpDialog.tsx';
+import type { Notification } from './components/StatusBarNotifications.tsx';
 import { ConfirmPrompt } from './components/shared/ConfirmPrompt.tsx';
 import { shouldUseNoColor } from './env.ts';
 import type { FlowOptions } from './flowOptions.ts';
 import { useProfileSnapshot } from './hooks/useProfileSnapshot.ts';
 import { useTerminalSize } from './hooks/useTerminalSize.ts';
 import { NavigateProvider } from './navigationContext.tsx';
-import { PanelFooterHintProvider } from './panelFooterHintContext.tsx';
+import { NotificationProvider, useNotifications } from './notificationContext.tsx';
 import { formatPipelineStrip } from './pipelineStrip.ts';
 import { ContactScreen } from './screens/ContactScreen.tsx';
 import { DashboardScreen } from './screens/DashboardScreen.tsx';
@@ -22,7 +23,8 @@ import { ProfileEditorScreen } from './screens/ProfileEditorScreen.tsx';
 import { RefineScreen } from './screens/RefineScreen.tsx';
 import { SettingsScreen } from './screens/SettingsScreen.tsx';
 import { type AppAction, getEffectiveScreen, useAppDispatch, useAppState } from './store.tsx';
-import { isOverlayNavScreen, NAV_LABELS, SCREEN_ORDER, type ScreenId } from './types.ts';
+import { isOverlayNavScreen, SCREEN_ORDER, type ScreenId } from './types.ts';
+import { useValidation, ValidationProvider } from './validationContext.tsx';
 
 export interface AppProps {
   profileDir: string;
@@ -48,8 +50,10 @@ export function App({ profileDir, flowOptions }: AppProps) {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const [pendingNav, setPendingNav] = useState<ScreenId | null>(null);
-  const [panelFooterHint, setPanelFooterHint] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const { state: validationState } = useValidation();
+  const { notifications } = useNotifications();
 
   const goToScreen = useCallback(
     (screen: ScreenId) => {
@@ -57,15 +61,17 @@ export function App({ profileDir, flowOptions }: AppProps) {
         setPendingNav(screen);
         return;
       }
-      /**
-       * Import / Contact / Settings / Generate use PUSH_OVERLAY when the underlay is Resume (`dashboard`)
-       * or **Jobs** so Esc / pop returns there without losing the shell context. From **Refine** or **Profile**,
-       * the same targets use SET_SCREEN (full switch) so we do not stack overlays on flows that are not
-       * document-shell underlays yet.
-       */
+      if (
+        state.editorDirty &&
+        (state.activeScreen === 'editor' || state.activeScreen === 'dashboard') &&
+        screen !== state.activeScreen
+      ) {
+        setPendingNav(screen);
+        return;
+      }
       dispatchScreenNavigation(dispatch, screen, state.activeScreen);
     },
-    [dispatch, state.profileEditorDirty, state.activeScreen],
+    [dispatch, state.profileEditorDirty, state.editorDirty, state.activeScreen],
   );
 
   const { overlayStack } = state;
@@ -78,62 +84,83 @@ export function App({ profileDir, flowOptions }: AppProps) {
     }
   }, [snapshot.loading, snapshot.hasRefined, snapshot.error, dispatch]);
 
-  const pipelineNoColor = shouldUseNoColor();
-  const pipelineStrip = useMemo(
-    () =>
-      formatPipelineStrip(
-        {
-          hasSource: snapshot.hasSource,
-          hasRefined: snapshot.hasRefined,
-          jobsCount: snapshot.jobsCount,
-          lastPdfLine: snapshot.lastPdfLine,
-        },
-        { noColor: pipelineNoColor },
-      ),
-    [
-      snapshot.hasSource,
-      snapshot.hasRefined,
-      snapshot.jobsCount,
-      snapshot.lastPdfLine,
-      pipelineNoColor,
-    ],
-  );
-
-  const contextualHint = useMemo(() => {
-    const nScreens = SCREEN_ORDER.length;
-    const base = `↑↓ screen (when list does not own arrows) · 1–${nScreens} · d i c j r g s · : palette`;
-    if (state.operationInProgress) {
-      return `${base} · Esc cancels op when supported`;
+  // Build combined status indicator (includes validation)
+  const statusIndicator = useMemo(() => {
+    // Priority: error > warning > ok
+    if (state.lastError) {
+      return { status: 'error' as const, label: 'Error', icon: '✗' };
     }
-    if (state.inTextInput) {
-      const fieldNote = 'Text field · q does not quit · Esc cancels/back';
-      if (panelFooterHint != null && panelFooterHint !== '') {
-        return `${panelFooterHint} · ${fieldNote}`;
-      }
-      return fieldNote;
-    }
-    if (panelFooterHint != null && panelFooterHint !== '') {
-      return panelFooterHint;
-    }
-    return `${NAV_LABELS[effectiveScreen]} · ${base}`;
-  }, [effectiveScreen, panelFooterHint, state.inTextInput, state.operationInProgress]);
-
-  const baselineHint = ': palette · ? or Ctrl+? help · q quit · Ctrl+C exit';
-
-  const statusLeft = useMemo(() => {
-    if (state.lastError != null && state.lastError !== '') {
-      return state.lastError;
+    if (validationState.error) {
+      return { status: 'error' as const, label: 'Invalid', icon: '✗' };
     }
     if (state.operationInProgress) {
-      return 'Working…';
+      return { status: 'neutral' as const, label: 'Working…', icon: '◐' };
+    }
+    if (validationState.valid === true) {
+      return { status: 'ok' as const, label: 'Ready', icon: '✓' };
     }
     return null;
-  }, [state.lastError, state.operationInProgress]);
+  }, [state.lastError, state.operationInProgress, validationState]);
+
+  // Build pipeline indicator with colors
+  const pipeline = useMemo(() => {
+    return {
+      hasSource: snapshot.hasSource,
+      hasRefined: snapshot.hasRefined,
+      hasJobs: snapshot.jobsCount > 0,
+      hasPdf: Boolean(snapshot.lastPdfLine),
+    };
+  }, [snapshot.hasSource, snapshot.hasRefined, snapshot.jobsCount, snapshot.lastPdfLine]);
+
+  // Build notifications array (up to 2)
+  const currentNotifications = useMemo((): Notification[] => {
+    const notes: Notification[] = [];
+
+    // Priority: error > warning > info
+    if (state.lastError) {
+      notes.push({ id: 'error', message: state.lastError, type: 'error' });
+    } else if (validationState.error) {
+      notes.push({
+        id: 'validation',
+        message: `Validation: ${validationState.error}`,
+        type: 'warn',
+      });
+    }
+
+    // Add context notifications (up to 2 total)
+    for (const ctxNotification of notifications.slice(0, 2)) {
+      if (notes.length < 2) {
+        notes.push({
+          id: ctxNotification.id,
+          message: ctxNotification.message,
+          type: ctxNotification.type as 'info' | 'warn' | 'error' | 'success',
+        });
+      }
+    }
+
+    return notes;
+  }, [state.lastError, validationState.error, notifications]);
+
+  // Build context info for the title bar
+  const contextInfo = useMemo(() => {
+    if (state.operationInProgress) {
+      return 'working…';
+    }
+    return null;
+  }, [state.operationInProgress]);
 
   const jobLine = useMemo(
     () => formatTopBarJobLine(state.persistenceTarget),
     [state.persistenceTarget],
   );
+
+  // Extract context target from persistence target (strip "Job: " prefix)
+  const contextTarget = useMemo(() => {
+    if (state.persistenceTarget.kind === 'job') {
+      return state.persistenceTarget.slug;
+    }
+    return null;
+  }, [state.persistenceTarget]);
 
   const screenUsesContentArrows = (screen: ScreenId): boolean =>
     screen === 'dashboard' ||
@@ -171,7 +198,6 @@ export function App({ profileDir, flowOptions }: AppProps) {
       }
 
       if (key.escape) {
-        // Jobs / Generate own Esc for inner wizards even when shown as overlays (stack non-empty).
         if (effectiveScreen === 'jobs' || effectiveScreen === 'generate') {
           return;
         }
@@ -235,7 +261,6 @@ export function App({ profileDir, flowOptions }: AppProps) {
         return;
       }
 
-      /** Profile editor: a/d lists, s save — do not steal global letter jumps (d→dashboard, s→settings). */
       const profileLetterDefer = new Set(['a', 'd', 's']);
       if (
         profileLetterDefer.has(input.toLowerCase()) &&
@@ -245,7 +270,6 @@ export function App({ profileDir, flowOptions }: AppProps) {
         return;
       }
 
-      /** Contact browse: s save-all — do not steal s→settings. */
       if (effectiveScreen === 'contact' && !state.inTextInput && (input === 's' || input === 'S')) {
         return;
       }
@@ -277,6 +301,7 @@ export function App({ profileDir, flowOptions }: AppProps) {
             snapshot={snapshot}
             profileDir={profileDir}
             onRefreshSnapshot={snapshot.refresh}
+            onSectionChange={setSelectedSection}
           />
         );
       case 'import':
@@ -311,17 +336,40 @@ export function App({ profileDir, flowOptions }: AppProps) {
     <NavigateProvider value={goToScreen}>
       <Box flexDirection="column" width={cols} height={rows}>
         {helpOpen ? (
-          <ShortcutHelpOverlay width={cols} height={rows} onClose={() => setHelpOpen(false)} />
+          <HelpDialog
+            width={cols}
+            height={rows}
+            onClose={() => setHelpOpen(false)}
+            _currentScreen={effectiveScreen}
+          />
         ) : (
           <>
+            {/* Main content - always rendered */}
+            <ElegantShell
+              activeScreen={effectiveScreen}
+              jobLine={jobLine}
+              contextInfo={contextInfo}
+              contextTarget={contextTarget}
+              selectedSection={selectedSection}
+              statusIndicator={statusIndicator}
+              pipeline={pipeline}
+              notifications={currentNotifications}
+              width={cols}
+              height={rows}
+            >
+              {content}
+            </ElegantShell>
+
+            {/* Overlays - rendered on top, don't affect layout height */}
             {pendingNav != null && (
-              <Box marginBottom={1} flexDirection="column">
+              <Box position="absolute" marginTop={1} flexDirection="column" width={cols}>
                 <ConfirmPrompt
-                  message="Profile has unsaved changes. Leave without saving?"
+                  message="Unsaved changes. Leave without saving?"
                   active
                   registerBlocking={false}
                   onConfirm={() => {
                     dispatch({ type: 'SET_PROFILE_EDITOR_DIRTY', value: false });
+                    dispatch({ type: 'SET_EDITOR_DIRTY', value: false });
                     const target = pendingNav;
                     setPendingNav(null);
                     dispatchScreenNavigation(dispatch, target, state.activeScreen);
@@ -330,8 +378,8 @@ export function App({ profileDir, flowOptions }: AppProps) {
                 />
               </Box>
             )}
-            <PanelFooterHintProvider setHint={setPanelFooterHint}>
-              {state.paletteOpen && (
+            {state.paletteOpen && (
+              <Box position="absolute" marginTop={1} width={cols}>
                 <CommandPalette
                   active={state.paletteOpen}
                   onClose={() => dispatch({ type: 'SET_PALETTE_OPEN', open: false })}
@@ -340,22 +388,21 @@ export function App({ profileDir, flowOptions }: AppProps) {
                   overlayDepth={overlayStack.length}
                   onClearOverlays={() => dispatch({ type: 'CLEAR_OVERLAYS' })}
                 />
-              )}
-              <Layout
-                activeScreen={effectiveScreen}
-                jobLine={jobLine}
-                statusLeft={statusLeft}
-                statusLeftWarn={Boolean(state.lastError)}
-                statusRight={pipelineStrip}
-                baselineHint={baselineHint}
-                contextualHint={contextualHint}
-              >
-                {content}
-              </Layout>
-            </PanelFooterHintProvider>
+              </Box>
+            )}
           </>
         )}
       </Box>
     </NavigateProvider>
+  );
+}
+
+export function AppWithProviders(props: AppProps) {
+  return (
+    <ValidationProvider>
+      <NotificationProvider>
+        <App {...props} />
+      </NotificationProvider>
+    </ValidationProvider>
   );
 }

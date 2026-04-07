@@ -1,7 +1,6 @@
 export type ScreenId =
   | 'dashboard'
   | 'import'
-  | 'refine'
   | 'editor'
   | 'generate'
   | 'jobs'
@@ -32,7 +31,6 @@ export type FocusTarget = 'sidebar' | 'content';
 export const NAV_LABELS: Record<ScreenId, string> = {
   dashboard: 'Dashboard',
   import: 'Import',
-  refine: 'Refine',
   editor: 'Editor',
   generate: 'Generate',
   jobs: 'Jobs',

@@ -21,7 +21,6 @@ import { GenerateScreen } from './screens/GenerateScreen.tsx';
 import { ImportScreen } from './screens/ImportScreen.tsx';
 import { JobsScreen } from './screens/JobsScreen.tsx';
 import { ProfileEditorScreen } from './screens/ProfileEditorScreen.tsx';
-import { RefineScreen } from './screens/RefineScreen.tsx';
 import { SettingsScreen } from './screens/SettingsScreen.tsx';
 import { type AppAction, getEffectiveScreen, useAppDispatch, useAppState } from './store.tsx';
 import { isOverlayNavScreen, SCREEN_ORDER, type ScreenId } from './types.ts';
@@ -169,7 +168,6 @@ export function App({ profileDir, flowOptions }: AppProps) {
     screen === 'contact' ||
     screen === 'jobs' ||
     screen === 'generate' ||
-    screen === 'refine' ||
     screen === 'profile';
 
   useInput(
@@ -324,12 +322,10 @@ export function App({ profileDir, flowOptions }: AppProps) {
             onSourceChanged={snapshot.refresh}
           />
         );
-      case 'refine':
-        return <RefineScreen profileDir={profileDir} />;
       case 'generate':
         return <GenerateScreen profileDir={profileDir} />;
       case 'jobs':
-        return <JobsScreen profileDir={profileDir} />;
+        return <JobsScreen profileDir={profileDir} snapshot={snapshot} />;
       case 'profile':
         return <ProfileEditorScreen profileDir={profileDir} />;
       case 'contact':

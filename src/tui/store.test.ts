@@ -123,19 +123,11 @@ describe('appReducer', () => {
   });
 
   it('sets profile editor return screen and clears when leaving profile', () => {
-    let s = appReducer(base, { type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: 'refine' });
-    expect(s.profileEditorReturnTo).toBe('refine');
+    let s = appReducer(base, { type: 'SET_PROFILE_EDITOR_RETURN_TO', screen: 'editor' });
+    expect(s.profileEditorReturnTo).toBe('editor');
     s = appReducer(s, { type: 'SET_SCREEN', screen: 'profile' });
-    expect(s.profileEditorReturnTo).toBe('refine');
-    s = appReducer(s, { type: 'SET_SCREEN', screen: 'refine' });
+    expect(s.profileEditorReturnTo).toBe('editor');
+    s = appReducer(s, { type: 'SET_SCREEN', screen: 'editor' });
     expect(s.profileEditorReturnTo).toBe(null);
-  });
-
-  it('sets and clears refine resume intent', () => {
-    const intent = { kind: 'polishSection' as const, sectionId: 'summary' as const };
-    let s = appReducer(base, { type: 'SET_REFINE_RESUME_INTENT', intent });
-    expect(s.refineResumeIntent).toEqual(intent);
-    s = appReducer(s, { type: 'SET_REFINE_RESUME_INTENT', intent: null });
-    expect(s.refineResumeIntent).toBe(null);
   });
 });

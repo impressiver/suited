@@ -14,16 +14,22 @@ import {
   makeJobSlug,
   saveJob,
 } from '../../profile/serializer.ts';
+import { lightRefineCoverLetter, sniffCoverLetter } from '../../services/coverLetterAssist.ts';
+import { readCoverLetterDraft, saveCoverLetterDraft } from '../../services/coverLetterPdf.ts';
 import { formatCurationPreviewLines } from '../../services/curationPreview.ts';
 import { formatJobEvaluationLines } from '../../services/jobEvaluationText.ts';
 import { runJobRefinementPipeline } from '../../services/jobRefinement.ts';
+import type { DiffBlock } from '../../services/refine.ts';
 import {
   globalRefinedTarget,
   jobRefinedTarget,
   persistenceTargetsEqual,
 } from '../activeDocumentSession.ts';
+import { ResumeEditor } from '../components/ResumeEditor.tsx';
+import { ResumeEditorProvider } from '../components/ResumeEditorContext.tsx';
 import {
   ConfirmPrompt,
+  DiffView,
   MultilineInput,
   ScrollView,
   SelectList,
@@ -31,8 +37,11 @@ import {
   TextInput,
   TextViewport,
 } from '../components/shared/index.ts';
+import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
+import { useOperationAbort } from '../hooks/useOperationAbort.ts';
 import { useRegisterBlockingUi } from '../hooks/useRegisterBlockingUi.ts';
 import { useTerminalSize } from '../hooks/useTerminalSize.ts';
+import { isUserAbort } from '../isUserAbort.ts';
 import { jobsListPaneWidth, jobsUseSplitPane } from '../jobsLayout.ts';
 import { useNavigateToScreen } from '../navigationContext.tsx';
 import {
@@ -48,6 +57,7 @@ const ADD_SENTINEL = '__add__';
 
 type Mode =
   | { m: 'list' }
+  | { m: 'jobEditor'; job: SavedJob }
   | { m: 'detail'; job: SavedJob }
   | { m: 'addTitle' }
   | { m: 'addCompany'; title: string }
@@ -74,10 +84,26 @@ type Mode =
     }
   | { m: 'feedbackApply'; job: SavedJob }
   | { m: 'feedbackDone'; note: string }
+  | {
+      m: 'coverLetterEdit';
+      job: SavedJob;
+      slug: string;
+      draft: string;
+      menuIndex: number;
+    }
+  | {
+      m: 'coverLetterReview';
+      job: SavedJob;
+      slug: string;
+      before: string;
+      proposed: string;
+      reviewMenuIdx: number;
+    }
   | { m: 'err'; msg: string; canRetryPrepare?: boolean };
 
 function jobFromMode(mode: Mode): SavedJob | null {
   switch (mode.m) {
+    case 'jobEditor':
     case 'detail':
     case 'viewJd':
     case 'deleteAsk':
@@ -88,6 +114,9 @@ function jobFromMode(mode: Mode): SavedJob | null {
     case 'feedbackView':
     case 'feedbackApply':
       return mode.job;
+    case 'coverLetterEdit':
+    case 'coverLetterReview':
+      return mode.job;
     default:
       return null;
   }
@@ -95,11 +124,13 @@ function jobFromMode(mode: Mode): SavedJob | null {
 
 export interface JobsScreenProps {
   profileDir: string;
+  snapshot: ProfileSnapshot;
 }
 
-export function JobsScreen({ profileDir }: JobsScreenProps) {
+export function JobsScreen({ profileDir, snapshot }: JobsScreenProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigateToScreen();
+  const { createController, releaseController } = useOperationAbort();
   const { activeScreen, focusTarget, inTextInput, operationInProgress, persistenceTarget } =
     useAppState();
   const [cols, rows] = useTerminalSize();
@@ -201,7 +232,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
 
   const active = activeScreen === 'jobs' && focusTarget === 'content';
 
-  useRegisterBlockingUi(active && mode.m === 'err');
+  useRegisterBlockingUi(active && (mode.m === 'err' || mode.m === 'coverLetterReview'));
 
   const jobsFooterHint = useMemo(() => {
     const sb = ' · : palette';
@@ -227,6 +258,10 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
         return `Jobs · PgUp/PgDn scroll text · ↑↓ actions · Enter · Esc back${sb}`;
       case 'feedbackDone':
         return `Jobs · Esc → list${sb}`;
+      case 'coverLetterEdit':
+        return `Jobs · Cover letter · ↑↓ menu · Enter · Ctrl+D save from editor · Esc back${sb}`;
+      case 'coverLetterReview':
+        return `Jobs · Review · ↑↓ · Enter accept/reject · Esc reject${sb}`;
       case 'err':
         return `Jobs · ↑↓ Enter · Esc → list when menu not focused${sb}`;
       default:
@@ -248,7 +283,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     const defer =
       activeScreen === 'jobs' &&
       focusTarget === 'content' &&
-      (mode.m === 'list' || mode.m === 'detail') &&
+      (mode.m === 'list' || mode.m === 'detail' || mode.m === 'coverLetterEdit') &&
       !operationInProgress;
     dispatch({
       type: 'SET_DEFER_LETTER_SHORTCUTS',
@@ -389,7 +424,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       const j = jobs.find((x) => x.id === item.value);
       if (j) {
         setMenuIndex(0);
-        setMode({ m: 'detail', job: j });
+        setMode({ m: 'jobEditor', job: j });
       }
     },
     [jobs, startAdd],
@@ -457,6 +492,20 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
       }
       if (mode.m === 'detail') {
         setMode({ m: 'list' });
+        return;
+      }
+      if (mode.m === 'coverLetterReview') {
+        setMode({
+          m: 'coverLetterEdit',
+          job: mode.job,
+          slug: mode.slug,
+          draft: mode.before,
+          menuIndex: 0,
+        });
+        return;
+      }
+      if (mode.m === 'coverLetterEdit') {
+        setMode({ m: 'detail', job: mode.job });
         return;
       }
       if (mode.m === 'viewPrep' || mode.m === 'feedbackView') {
@@ -555,6 +604,7 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
   const detailMenuItems = useMemo(() => {
     const items: { value: string; label: string }[] = [
       { value: 'jd', label: 'View job description' },
+      { value: 'cover', label: 'Cover letter (edit)' },
     ];
     if (detailRefinement) {
       items.push(
@@ -573,6 +623,52 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     );
     return items;
   }, [detailRefinement]);
+
+  const runCoverAssist = useCallback(
+    async (kind: 'refine' | 'sniff') => {
+      if (mode.m !== 'coverLetterEdit') {
+        return;
+      }
+      const { job, slug, draft } = mode;
+      if (!draft.trim()) {
+        setErrMenuIdx(0);
+        setMode({ m: 'err', msg: 'Cover letter is empty.', canRetryPrepare: false });
+        return;
+      }
+      const ac = createController();
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const ctx = { company: job.company, jobTitle: job.title, jdExcerpt: job.text };
+        const gen =
+          kind === 'refine'
+            ? lightRefineCoverLetter(draft, ctx, ac.signal)
+            : sniffCoverLetter(draft, ctx, ac.signal);
+        let proposed = '';
+        for await (const ev of gen) {
+          if (ev.type === 'done') {
+            proposed = ev.result;
+          }
+        }
+        setMode({
+          m: 'coverLetterReview',
+          job,
+          slug,
+          before: draft,
+          proposed,
+          reviewMenuIdx: 0,
+        });
+      } catch (e) {
+        if (!isUserAbort(e)) {
+          setErrMenuIdx(0);
+          setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: false });
+        }
+      } finally {
+        releaseController(ac);
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
+      }
+    },
+    [createController, dispatch, mode, releaseController],
+  );
 
   const finalizeNewJob = useCallback(
     async (jd: string, title: string, company: string) => {
@@ -605,6 +701,32 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
     },
     [dispatch, profileDir, reload],
   );
+
+  if (mode.m === 'jobEditor') {
+    const slug = makeJobSlug(mode.job.company, mode.job.title);
+    return (
+      <ResumeEditorProvider
+        value={{
+          mode: 'job',
+          jobDescription: mode.job.text,
+          jobTitle: mode.job.title,
+          company: mode.job.company,
+          jobId: mode.job.id,
+          persistenceTarget: jobRefinedTarget(mode.job.id, slug),
+          onRequestClose: () => {
+            setMode({ m: 'list' });
+            void reload();
+          },
+        }}
+      >
+        <ResumeEditor
+          snapshot={snapshot}
+          profileDir={profileDir}
+          onRefreshSnapshot={() => void reload()}
+        />
+      </ResumeEditorProvider>
+    );
+  }
 
   if (mode.m === 'prepareRun') {
     return (
@@ -739,6 +861,147 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
           Feedback
         </Text>
         <Text>{mode.note}</Text>
+      </Box>
+    );
+  }
+
+  if (mode.m === 'coverLetterEdit' && operationInProgress) {
+    return (
+      <Box flexDirection="column">
+        <Text bold>Cover letter</Text>
+        <Spinner label="AI assist…" />
+      </Box>
+    );
+  }
+
+  if (mode.m === 'coverLetterReview') {
+    const blocks: DiffBlock[] = [{ kind: 'summary', old: mode.before, new: mode.proposed }];
+    const reviewItems = [
+      { value: 'accept', label: 'Accept and replace draft' },
+      { value: 'reject', label: 'Reject' },
+    ];
+    return (
+      <Box flexDirection="column" flexGrow={1}>
+        <Text bold>Cover letter — review</Text>
+        <Text dimColor>↑↓ · Enter · Esc rejects</Text>
+        <Box marginTop={1} flexGrow={1}>
+          <DiffView blocks={blocks} />
+        </Box>
+        <Box marginTop={1}>
+          <SelectList
+            items={reviewItems}
+            selectedIndex={mode.reviewMenuIdx}
+            onChange={(i) =>
+              setMode((m) => (m.m === 'coverLetterReview' ? { ...m, reviewMenuIdx: i } : m))
+            }
+            isActive={active}
+            onSubmit={(item) => {
+              if (mode.m !== 'coverLetterReview') {
+                return;
+              }
+              const rev = mode;
+              if (item.value === 'reject') {
+                setMode({
+                  m: 'coverLetterEdit',
+                  job: rev.job,
+                  slug: rev.slug,
+                  draft: rev.before,
+                  menuIndex: 0,
+                });
+                return;
+              }
+              void (async () => {
+                try {
+                  await saveCoverLetterDraft(profileDir, rev.slug, rev.proposed);
+                  setMode({
+                    m: 'coverLetterEdit',
+                    job: rev.job,
+                    slug: rev.slug,
+                    draft: rev.proposed,
+                    menuIndex: 0,
+                  });
+                } catch (e) {
+                  setErrMenuIdx(0);
+                  setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: false });
+                }
+              })();
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (mode.m === 'coverLetterEdit') {
+    const coverMenu = [
+      { value: 'refine', label: 'Light refine (grammar, clarity)' },
+      { value: 'sniff', label: 'AI sniff pass (less generic phrasing)' },
+      { value: 'save', label: 'Save to disk' },
+      { value: 'back', label: '← Back to job menu' },
+    ];
+    return (
+      <Box flexDirection="column" flexGrow={1}>
+        <Text bold>
+          Cover letter — {mode.job.title} @ {mode.job.company}
+        </Text>
+        <Text dimColor>
+          Markdown · Ctrl+D or Ctrl+S to save from editor · Esc to job menu · empty draft blocks AI
+        </Text>
+        <Box marginTop={1} flexGrow={1}>
+          <MultilineInput
+            value={mode.draft}
+            onChange={(next) =>
+              setMode((m) => (m.m === 'coverLetterEdit' ? { ...m, draft: next } : m))
+            }
+            focus={active}
+            width={textW}
+            height={jdEditorH}
+            onSubmit={(text) => {
+              void (async () => {
+                try {
+                  await saveCoverLetterDraft(profileDir, mode.slug, text);
+                } catch (e) {
+                  setErrMenuIdx(0);
+                  setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: false });
+                }
+              })();
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <SelectList
+            items={coverMenu}
+            selectedIndex={mode.menuIndex}
+            onChange={(i) =>
+              setMode((m) => (m.m === 'coverLetterEdit' ? { ...m, menuIndex: i } : m))
+            }
+            isActive={active && !inTextInput}
+            onSubmit={(item) => {
+              if (item.value === 'back') {
+                setMode({ m: 'detail', job: mode.job });
+                return;
+              }
+              if (item.value === 'save') {
+                void (async () => {
+                  try {
+                    await saveCoverLetterDraft(profileDir, mode.slug, mode.draft);
+                  } catch (e) {
+                    setErrMenuIdx(0);
+                    setMode({ m: 'err', msg: (e as Error).message, canRetryPrepare: false });
+                  }
+                })();
+                return;
+              }
+              if (item.value === 'refine') {
+                void runCoverAssist('refine');
+                return;
+              }
+              if (item.value === 'sniff') {
+                void runCoverAssist('sniff');
+              }
+            }}
+          />
+        </Box>
       </Box>
     );
   }
@@ -921,6 +1184,18 @@ export function JobsScreen({ profileDir }: JobsScreenProps) {
             onSubmit={(item) => {
               if (item.value === 'jd') {
                 setMode({ m: 'viewJd', job: mode.job, scroll: 0 });
+              } else if (item.value === 'cover') {
+                void (async () => {
+                  const slug = makeJobSlug(mode.job.company, mode.job.title);
+                  const existing = await readCoverLetterDraft(profileDir, slug);
+                  setMode({
+                    m: 'coverLetterEdit',
+                    job: mode.job,
+                    slug,
+                    draft: existing ?? '',
+                    menuIndex: 0,
+                  });
+                })();
               } else if (item.value === 'viewPrep') {
                 void (async () => {
                   const r = await loadJobRefinement(profileDir, mode.job.id);

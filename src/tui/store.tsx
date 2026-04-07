@@ -11,21 +11,6 @@ import type { PersistenceTarget } from './activeDocumentSession.ts';
 import { globalRefinedTarget } from './activeDocumentSession.ts';
 import type { FocusTarget, ScreenId } from './types.ts';
 
-/** One-shot intent consumed by RefineScreen (e.g. dashboard Polish / Section consultant jumps). */
-export type RefineResumeIntent =
-  | {
-      kind: 'polishSection';
-      sectionId: 'all' | 'summary' | 'experience' | 'skills';
-      /** When set with `experience`, `polishProfile` is limited to this `Position.id`. */
-      positionId?: string;
-    }
-  | {
-      kind: 'consultantSection';
-      sectionId: 'summary' | 'experience' | 'skills';
-      /** When set with `experience`, consultant pass is scoped to this role block. */
-      positionId?: string;
-    };
-
 export interface AppState {
   profileDir: string;
   profile: Profile | null;
@@ -60,8 +45,6 @@ export interface AppState {
   paletteOpen: boolean;
   /** One-shot editor command dispatched from CommandPalette (e.g. ':qa', ':polish'); consumed by ResumeEditor. */
   editorCommand: string | null;
-  /** Cleared by RefineScreen after apply or discard (no refined yet). */
-  refineResumeIntent: RefineResumeIntent | null;
   /**
    * Full-viewport overlays (Import / Contact / Settings / Generate). Top entry is the visible panel;
    * `activeScreen` is the underlay (often `dashboard` / Resume). See `getEffectiveScreen`.
@@ -93,7 +76,7 @@ export type AppAction =
   | { type: 'PUSH_OVERLAY'; screen: ScreenId }
   | { type: 'POP_OVERLAY' }
   | { type: 'CLEAR_OVERLAYS' }
-  | { type: 'SET_REFINE_RESUME_INTENT'; intent: RefineResumeIntent | null };
+;
 
 export function createInitialAppState(profileDir: string): AppState {
   return {
@@ -116,7 +99,6 @@ export function createInitialAppState(profileDir: string): AppState {
     paletteOpen: false,
     editorCommand: null,
     overlayStack: [],
-    refineResumeIntent: null,
   };
 }
 
@@ -211,8 +193,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'CLEAR_OVERLAYS':
       return state.overlayStack.length === 0 ? state : { ...state, overlayStack: [] };
-    case 'SET_REFINE_RESUME_INTENT':
-      return { ...state, refineResumeIntent: action.intent };
   }
 }
 

@@ -320,7 +320,7 @@ export function JobsScreen({ profileDir, snapshot }: JobsScreenProps) {
     const defer =
       activeScreen === 'jobs' &&
       focusTarget === 'content' &&
-      (mode.m === 'list' || mode.m === 'detail' || mode.m === 'coverLetterEdit') &&
+      (mode.m === 'list' || mode.m === 'detail' || mode.m === 'jobEditor' || mode.m === 'coverLetterEdit') &&
       !operationInProgress;
     dispatch({
       type: 'SET_DEFER_LETTER_SHORTCUTS',
@@ -740,9 +740,10 @@ export function JobsScreen({ profileDir, snapshot }: JobsScreenProps) {
   );
 
   const handleJobEditorClose = useCallback(() => {
+    dispatch({ type: 'SET_EDITOR_DIRTY', value: false });
     setMode({ m: 'list' });
     void reload();
-  }, [reload]);
+  }, [dispatch, reload]);
 
   const handleJobEditorRefresh = useCallback(() => {
     void reload();

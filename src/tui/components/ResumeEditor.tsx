@@ -609,7 +609,7 @@ export function ResumeEditor({
     // Force re-load the editor bundle from disk
     const target = persistenceTarget;
     void loadRefinedTuiState(profileDir, target).then((b) => {
-      if (persistenceTargetRef.current !== target) return;
+      if (!persistenceTargetsEqual(persistenceTargetRef.current, target)) return;
       setEditorBundle(b);
       setMdDraft(stripHtmlCommentsFromProfileMarkdown(profileMarkdownContent(b.profile)));
       setMdExternalRevision((n) => n + 1);

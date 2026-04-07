@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DiffBlock } from '../../../services/refine.ts';
 
 /** Pure formatter for tests and non-Ink consumers. */
@@ -117,20 +117,21 @@ export function InteractiveDiffReview({
   const [focusIdx, setFocusIdx] = useState(0);
   const [accepted, setAccepted] = useState<Set<number>>(() => new Set(blocks.map((_, i) => i)));
 
-  const toggle = useCallback(
-    (idx: number) => {
-      setAccepted((prev) => {
-        const next = new Set(prev);
-        if (next.has(idx)) {
-          next.delete(idx);
-        } else {
-          next.add(idx);
-        }
-        return next;
-      });
-    },
-    [],
-  );
+  // Refs mirror state so useInput closure is never stale
+  const acceptedRef = useRef(accepted);
+  acceptedRef.current = accepted;
+  const focusIdxRef = useRef(focusIdx);
+  focusIdxRef.current = focusIdx;
+
+  // Reset when blocks change (e.g. parent transitions to a different diff)
+  const blocksLenRef = useRef(blocks.length);
+  useEffect(() => {
+    if (blocks.length !== blocksLenRef.current) {
+      blocksLenRef.current = blocks.length;
+      setAccepted(new Set(blocks.map((_, i) => i)));
+      setFocusIdx(0);
+    }
+  }, [blocks]);
 
   useInput(
     (input, key) => {
@@ -143,7 +144,16 @@ export function InteractiveDiffReview({
         return;
       }
       if (input === ' ') {
-        toggle(focusIdx);
+        const idx = focusIdxRef.current;
+        setAccepted((prev) => {
+          const next = new Set(prev);
+          if (next.has(idx)) {
+            next.delete(idx);
+          } else {
+            next.add(idx);
+          }
+          return next;
+        });
         return;
       }
       if (input === 'a') {
@@ -155,7 +165,7 @@ export function InteractiveDiffReview({
         return;
       }
       if (key.return) {
-        onConfirm(accepted);
+        onConfirm(new Set(acceptedRef.current));
         return;
       }
       if (key.escape) {

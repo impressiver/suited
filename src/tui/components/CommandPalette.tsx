@@ -96,7 +96,10 @@ export function CommandPalette({
   const padY = Math.max(0, Math.floor((termHeight - paletteH) / 2));
 
   // Solid background: fill the entire terminal so content behind is hidden
-  const bgLines = Array.from({ length: termHeight }, () => ' '.repeat(termWidth));
+  const bgLines = useMemo(
+    () => Array.from({ length: termHeight }, () => ' '.repeat(termWidth)),
+    [termWidth, termHeight],
+  );
 
   return (
     <Box flexDirection="column" width={termWidth} height={termHeight}>

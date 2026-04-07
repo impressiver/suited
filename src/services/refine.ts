@@ -244,9 +244,14 @@ export function applySelectedDiffBlocks(
         }
         break;
       case 'skills-replaced':
-      case 'skills-added':
-        // Revert skills to original
+        // Revert entire skills array to original
         result.skills = JSON.parse(JSON.stringify(original.skills));
+        break;
+      case 'skills-added':
+        // Only remove the newly added skills, keep other changes
+        result.skills = result.skills.filter(
+          (s) => !block.names.includes(s.name.value),
+        );
         break;
     }
   }

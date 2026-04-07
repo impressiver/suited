@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { SelectList } from '../components/shared/SelectList.tsx';
 import { hasApiKey } from '../env.ts';
 import type { ProfileSnapshot } from '../hooks/useProfileSnapshot.ts';
@@ -50,6 +50,11 @@ export function DashboardScreen({
     items.push({ value: 'settings', label: 'Settings', shortcut: 's' });
     return items;
   }, [snapshot.hasSource]);
+
+  const handleActionSubmit = useCallback(
+    (item: { value: ScreenId }) => navigate(item.value),
+    [navigate],
+  );
 
   const actionItems = useMemo(
     () => actions.map((a) => ({ value: a.value, label: `${a.label}  ${a.shortcut}` })),
@@ -130,9 +135,7 @@ export function DashboardScreen({
             selectedIndex={actionIdx}
             onChange={setActionIdx}
             isActive={panelActive}
-            onSubmit={(item) => {
-              navigate(item.value);
-            }}
+            onSubmit={handleActionSubmit}
           />
         </Box>
       </Box>

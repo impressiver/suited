@@ -291,6 +291,11 @@ export function ResumeEditor({
   // JD pane state (only meaningful when mode === 'job')
   const [jdPaneMode, setJdPaneMode] = useState<JdPaneMode>('hidden');
 
+  // Reset JD pane when switching away from job mode
+  useEffect(() => {
+    if (mode !== 'job') setJdPaneMode('hidden');
+  }, [mode]);
+
   // QA state
   const [qaSource, setQaSource] = useState<Profile | null>(null);
   const [qaQuestions, setQaQuestions] = useState<RefinementQuestion[]>([]);
@@ -2666,6 +2671,7 @@ export function ResumeEditor({
                 onCaretOffsetChange={setCaretOffset}
                 onSubmit={(v) => {
                   setMdDraft(v);
+                  if (editorBundle == null) return;
                   try {
                     const p = parseDisplayMarkdownStringToProfile(v, editorBundle.profile);
                     setParseErr(null);

@@ -26,7 +26,10 @@ import {
   persistenceTargetsEqual,
 } from '../activeDocumentSession.ts';
 import { ResumeEditor } from '../components/ResumeEditor.tsx';
-import { ResumeEditorProvider } from '../components/ResumeEditorContext.tsx';
+import {
+  type ResumeEditorContextValue,
+  ResumeEditorProvider,
+} from '../components/ResumeEditorContext.tsx';
 import {
   ConfirmPrompt,
   DiffView,
@@ -120,6 +123,40 @@ function jobFromMode(mode: Mode): SavedJob | null {
     default:
       return null;
   }
+}
+
+/** Extracted component so hooks (useMemo/useCallback) can stabilize context for ResumeEditor. */
+function JobEditorWrapper({
+  job,
+  snapshot,
+  profileDir,
+  onClose,
+  onRefresh,
+}: {
+  job: SavedJob;
+  snapshot: ProfileSnapshot;
+  profileDir: string;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const slug = makeJobSlug(job.company, job.title);
+  const editorContext = useMemo(
+    (): ResumeEditorContextValue => ({
+      mode: 'job',
+      jobDescription: job.text,
+      jobTitle: job.title,
+      company: job.company,
+      jobId: job.id,
+      persistenceTarget: jobRefinedTarget(job.id, slug),
+      onRequestClose: onClose,
+    }),
+    [job.id, job.text, job.title, job.company, slug, onClose],
+  );
+  return (
+    <ResumeEditorProvider value={editorContext}>
+      <ResumeEditor snapshot={snapshot} profileDir={profileDir} onRefreshSnapshot={onRefresh} />
+    </ResumeEditorProvider>
+  );
 }
 
 export interface JobsScreenProps {
@@ -702,29 +739,24 @@ export function JobsScreen({ profileDir, snapshot }: JobsScreenProps) {
     [dispatch, profileDir, reload],
   );
 
+  const handleJobEditorClose = useCallback(() => {
+    setMode({ m: 'list' });
+    void reload();
+  }, [reload]);
+
+  const handleJobEditorRefresh = useCallback(() => {
+    void reload();
+  }, [reload]);
+
   if (mode.m === 'jobEditor') {
-    const slug = makeJobSlug(mode.job.company, mode.job.title);
     return (
-      <ResumeEditorProvider
-        value={{
-          mode: 'job',
-          jobDescription: mode.job.text,
-          jobTitle: mode.job.title,
-          company: mode.job.company,
-          jobId: mode.job.id,
-          persistenceTarget: jobRefinedTarget(mode.job.id, slug),
-          onRequestClose: () => {
-            setMode({ m: 'list' });
-            void reload();
-          },
-        }}
-      >
-        <ResumeEditor
-          snapshot={snapshot}
-          profileDir={profileDir}
-          onRefreshSnapshot={() => void reload()}
-        />
-      </ResumeEditorProvider>
+      <JobEditorWrapper
+        job={mode.job}
+        snapshot={snapshot}
+        profileDir={profileDir}
+        onClose={handleJobEditorClose}
+        onRefresh={handleJobEditorRefresh}
+      />
     );
   }
 

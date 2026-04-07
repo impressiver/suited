@@ -210,6 +210,49 @@ export function computeRefinementDiff(original: Profile, refined: Profile): Diff
   return blocks;
 }
 
+/**
+ * Build a profile that applies only the accepted diff blocks from `proposed`,
+ * keeping the original values for rejected blocks.
+ */
+export function applySelectedDiffBlocks(
+  original: Profile,
+  proposed: Profile,
+  blocks: DiffBlock[],
+  accepted: Set<number>,
+): Profile {
+  const result: Profile = JSON.parse(JSON.stringify(proposed)) as Profile;
+
+  for (let i = 0; i < blocks.length; i++) {
+    if (accepted.has(i)) continue; // accepted = keep proposed (already in result)
+    const block = blocks[i];
+    switch (block.kind) {
+      case 'position-bullets': {
+        // Revert this position's bullets to original
+        const origPos = original.positions.find((p) => p.id === block.positionId);
+        const resultPos = result.positions.find((p) => p.id === block.positionId);
+        if (origPos && resultPos) {
+          resultPos.bullets = JSON.parse(JSON.stringify(origPos.bullets));
+        }
+        break;
+      }
+      case 'summary':
+        // Revert summary to original
+        if (original.summary) {
+          result.summary = JSON.parse(JSON.stringify(original.summary));
+        } else {
+          delete result.summary;
+        }
+        break;
+      case 'skills-replaced':
+      case 'skills-added':
+        // Revert skills to original
+        result.skills = JSON.parse(JSON.stringify(original.skills));
+        break;
+    }
+  }
+  return result;
+}
+
 export async function generateRefinementQuestions(
   profile: Profile,
   signal?: AbortSignal,

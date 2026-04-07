@@ -32,6 +32,7 @@ import {
   applyConsultantFindingsToProfile,
   applyDirectEdit,
   applyRefinements,
+  applySelectedDiffBlocks,
   computeRefinementDiff,
   evaluateProfileSection,
   generateRefinementQuestions,
@@ -50,6 +51,7 @@ import {
   ConfirmPrompt,
   DiffView,
   FreeCursorMultilineInput,
+  InteractiveDiffReview,
   MultilineInput,
   ScrollView,
   SelectList,
@@ -2293,47 +2295,41 @@ export function ResumeEditor({
 
       case 'diff': {
         const blocks = computeRefinementDiff(overlay.original, overlay.proposed);
-        const diffItems = [
-          { value: 'accept', label: 'Accept and save refined profile' },
-          { value: 'edit-summary', label: 'Edit proposed summary (then review diff again)' },
-          { value: 'discard', label: 'Discard — keep profile unchanged' },
-        ];
+        if (blocks.length === 0) {
+          return (
+            <Box flexDirection="column" borderStyle="round" paddingX={1} marginBottom={1}>
+              <Text bold color="green">No changes detected.</Text>
+            </Box>
+          );
+        }
         return (
           <Box flexDirection="column" borderStyle="round" paddingX={1} marginBottom={1}>
-            <Text bold>Review changes</Text>
-            <DiffView blocks={blocks} />
-            <Box marginTop={1}>
-              <SelectList
-                items={diffItems}
-                selectedIndex={overlayDiffSelectIdx}
-                onChange={(i) => setOverlayDiffSelectIdx(i)}
-                isActive={overlayActive}
-                onSubmit={(item) => {
-                  if (overlay.k !== 'diff') return;
-                  if (item.value === 'accept') {
-                    if (overlay.saveMode === 'keep-session') {
-                      void overlayPersistRefinedKeepSession(
-                        overlay.proposed,
-                        overlay.keepSessionReason ?? 'unspecified',
-                      );
-                    } else {
-                      void overlayPersistRefined(overlay.proposed, qaQuestions, qaAnswers);
-                    }
-                  } else if (item.value === 'discard') {
-                    setOverlay({ k: 'done', note: 'Discarded — profile unchanged.' });
-                  } else if (item.value === 'edit-summary') {
-                    setOverlaySummaryTweakDraft(overlay.proposed.summary?.value ?? '');
-                    setOverlay({
-                      k: 'diff-edit-summary',
-                      original: overlay.original,
-                      proposed: overlay.proposed,
-                      saveMode: overlay.saveMode,
-                      keepSessionReason: overlay.keepSessionReason,
-                    });
-                  }
-                }}
-              />
-            </Box>
+            <InteractiveDiffReview
+              blocks={blocks}
+              isActive={overlayActive}
+              onConfirm={(accepted) => {
+                if (overlay.k !== 'diff') return;
+                if (accepted.size === 0) {
+                  setOverlay({ k: 'done', note: 'All changes rejected — profile unchanged.' });
+                  return;
+                }
+                const finalProfile =
+                  accepted.size === blocks.length
+                    ? overlay.proposed
+                    : applySelectedDiffBlocks(overlay.original, overlay.proposed, blocks, accepted);
+                if (overlay.saveMode === 'keep-session') {
+                  void overlayPersistRefinedKeepSession(
+                    finalProfile,
+                    overlay.keepSessionReason ?? 'unspecified',
+                  );
+                } else {
+                  void overlayPersistRefined(finalProfile, qaQuestions, qaAnswers);
+                }
+              }}
+              onCancel={() => {
+                setOverlay({ k: 'done', note: 'Discarded — profile unchanged.' });
+              }}
+            />
           </Box>
         );
       }
@@ -2708,36 +2704,31 @@ export function ResumeEditor({
         )}
       {snapshot.hasSource && loadedProfile != null && docPolishDiff != null && (
         <Box marginBottom={1} flexDirection="column" borderStyle="round" paddingX={1}>
-          <Text bold>Polish preview</Text>
-          <DiffView blocks={polishDiffBlocks} />
-          <SelectList
-            items={[
-              { value: 'accept', label: 'Accept and save' },
-              { value: 'discard', label: 'Discard' },
-            ]}
-            selectedIndex={polishDiffSelectIdx}
-            onChange={(i) => {
-              setPolishDiffSelectIdx(i);
-            }}
+          <InteractiveDiffReview
+            blocks={polishDiffBlocks}
             isActive={panelActive && docPolishDiff != null}
-            onSubmit={async (item) => {
-              if (item.value === 'discard' || docPolishDiff == null) {
+            onConfirm={async (accepted) => {
+              if (docPolishDiff == null || editorBundle == null) {
                 setDocPolishDiff(null);
                 return;
               }
-              const { proposed } = docPolishDiff;
-              if (editorBundle == null) {
+              if (accepted.size === 0) {
                 setDocPolishDiff(null);
                 return;
               }
+              const blocks = polishDiffBlocks;
+              const finalProfile =
+                accepted.size === blocks.length
+                  ? docPolishDiff.proposed
+                  : applySelectedDiffBlocks(docPolishDiff.original, docPolishDiff.proposed, blocks, accepted);
               try {
                 await saveRefinedForPersistenceTarget(persistenceTarget, {
-                  profile: proposed,
+                  profile: finalProfile,
                   session: editorBundle.session,
                   profileDir,
                 });
-                setEditorBundle((b) => (b ? { ...b, profile: proposed } : null));
-                setMdDraft(stripHtmlCommentsFromProfileMarkdown(profileMarkdownContent(proposed)));
+                setEditorBundle((b) => (b ? { ...b, profile: finalProfile } : null));
+                setMdDraft(stripHtmlCommentsFromProfileMarkdown(profileMarkdownContent(finalProfile)));
                 setMdExternalRevision((n) => n + 1);
                 mdDirtyRef.current = false;
                 dispatch({ type: 'SET_EDITOR_DIRTY', value: false });
@@ -2747,6 +2738,7 @@ export function ResumeEditor({
                 setParseErr(e instanceof Error ? e.message : String(e));
               }
             }}
+            onCancel={() => setDocPolishDiff(null)}
           />
         </Box>
       )}

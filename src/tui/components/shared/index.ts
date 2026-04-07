@@ -1,6 +1,12 @@
 export { type CheckboxItem, CheckboxList, type CheckboxListProps } from './CheckboxList.tsx';
 export { ConfirmPrompt, type ConfirmPromptProps } from './ConfirmPrompt.tsx';
-export { DiffView, type DiffViewProps, formatDiffBlockLines } from './DiffView.tsx';
+export {
+  DiffView,
+  type DiffViewProps,
+  formatDiffBlockLines,
+  InteractiveDiffReview,
+  type InteractiveDiffReviewProps,
+} from './DiffView.tsx';
 export {
   FreeCursorMultilineInput,
   type FreeCursorMultilineInputProps,

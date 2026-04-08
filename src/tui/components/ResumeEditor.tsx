@@ -27,8 +27,6 @@ import type {
 } from '../../profile/schema.ts';
 import type { RefinementSaveReason } from '../../profile/serializer.ts';
 import { hashSource, isMdNewerThanJson, loadActiveProfile, loadSource, makeJobSlug } from '../../profile/serializer.ts';
-import { lightRefineCoverLetter, sniffCoverLetter } from '../../services/coverLetterAssist.ts';
-import { readCoverLetterDraft, saveCoverLetterDraft } from '../../services/coverLetterPdf.ts';
 import { formatProfileEvaluationLines } from '../../services/jobEvaluationText.ts';
 import type { DiffBlock } from '../../services/refine.ts';
 import {
@@ -63,6 +61,7 @@ import {
   TextViewport,
 } from './shared/index.ts';
 import { persistenceTargetsEqual } from '../activeDocumentSession.ts';
+import { CoverLetterEditor } from './CoverLetterEditor.tsx';
 import { getDashboardVariant } from '../dashboardVariant.ts';
 import { hasApiKey } from '../env.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
@@ -220,9 +219,6 @@ type EditorOverlay =
       entry: RefinementHistoryListEntry;
       list: { entries: RefinementHistoryListEntry[]; warnings: string[] };
     }
-  | { k: 'cover-letter-edit'; slug: string; draft: string; menuIndex: number }
-  | { k: 'cover-letter-assist'; slug: string; draft: string }
-  | { k: 'cover-letter-review'; slug: string; before: string; proposed: string; reviewMenuIdx: number }
   | { k: 'sync-prompt' }
   | { k: 'syncing-md' }
   | { k: 'saving' }
@@ -239,8 +235,7 @@ type EditorOverlay =
         | 'ai-sniff'
         | 'direct-edit'
         | 'consultant'
-        | 'consultant-section'
-        | 'cover-letter';
+        | 'consultant-section';
     };
 
 export interface ResumeEditorProps {
@@ -317,6 +312,7 @@ export function ResumeEditor({
 
   // JD pane state (only meaningful when mode === 'job')
   const [jdPaneMode, setJdPaneMode] = useState<JdPaneMode>('hidden');
+  const [coverLetterOpen, setCoverLetterOpen] = useState(false);
 
   // Reset JD pane when switching away from job mode
   useEffect(() => {
@@ -1761,11 +1757,7 @@ export function ResumeEditor({
       }
       if (input === 'l') {
         if (jobId && company && jobTitle) {
-          const slug = makeJobSlug(company, jobTitle);
-          void (async () => {
-            const draft = (await readCoverLetterDraft(profileDir, slug)) ?? '';
-            setOverlay({ k: 'cover-letter-edit', slug, draft, menuIndex: 0 });
-          })();
+          setCoverLetterOpen(true);
         }
       }
     },
@@ -1833,77 +1825,6 @@ export function ResumeEditor({
       }
     },
     { isActive: overlayActive && overlay?.k === 'diff-edit-summary' },
-  );
-
-  // ---------------------------------------------------------------------------
-  // Cover letter assist
-  // ---------------------------------------------------------------------------
-  const runCoverLetterAssist = useCallback(
-    async (kind: 'refine' | 'sniff') => {
-      if (overlay?.k !== 'cover-letter-edit') return;
-      const { slug, draft } = overlay;
-      if (!draft.trim()) {
-        setOverlay({ k: 'err', msg: 'Cover letter is empty.', retryKind: 'cover-letter' });
-        return;
-      }
-      setOverlay({ k: 'cover-letter-assist', slug, draft });
-      const ac = createController();
-      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
-      try {
-        const ctx = { company, jobTitle, jdExcerpt: jobDescription };
-        const gen =
-          kind === 'refine'
-            ? lightRefineCoverLetter(draft, ctx, ac.signal)
-            : sniffCoverLetter(draft, ctx, ac.signal);
-        let proposed = '';
-        for await (const ev of gen) {
-          if (ev.type === 'done') {
-            proposed = ev.result;
-          }
-        }
-        if (!proposed) {
-          setOverlay({ k: 'cover-letter-edit', slug, draft, menuIndex: 0 });
-          return;
-        }
-        setOverlay({ k: 'cover-letter-review', slug, before: draft, proposed, reviewMenuIdx: 0 });
-      } catch (e) {
-        if (isUserAbort(e)) {
-          setOverlay({ k: 'cover-letter-edit', slug, draft, menuIndex: 0 });
-          return;
-        }
-        setOverlay({ k: 'err', msg: (e as Error).message, retryKind: 'cover-letter' });
-      } finally {
-        releaseController(ac);
-        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
-      }
-    },
-    [company, createController, dispatch, jobDescription, jobTitle, overlay, releaseController],
-  );
-
-  // Cover letter edit: Esc closes overlay
-  useInput(
-    (_input, key) => {
-      if (key.escape && overlay?.k === 'cover-letter-edit') {
-        setOverlay(null);
-        setResumeBodyFocused(true);
-      }
-    },
-    { isActive: overlayActive && overlay?.k === 'cover-letter-edit' && !inTextInput },
-  );
-
-  // Cover letter review: Esc rejects
-  useInput(
-    (_input, key) => {
-      if (key.escape && overlay?.k === 'cover-letter-review') {
-        setOverlay({
-          k: 'cover-letter-edit',
-          slug: overlay.slug,
-          draft: overlay.before,
-          menuIndex: 0,
-        });
-      }
-    },
-    { isActive: overlayActive && overlay?.k === 'cover-letter-review' },
   );
 
   // Esc for polish-pick, consultant-view, consultant-pick, direct-edit-input
@@ -2035,6 +1956,23 @@ export function ResumeEditor({
         <Text color="red">{snapshot.error}</Text>
         <Text dimColor>Profile dir: {profileDir}</Text>
       </Box>
+    );
+  }
+
+  if (coverLetterOpen && mode === 'job' && company && jobTitle) {
+    const clSlug = makeJobSlug(company, jobTitle);
+    return (
+      <CoverLetterEditor
+        profileDir={profileDir}
+        slug={clSlug}
+        company={company}
+        jobTitle={jobTitle}
+        jobDescription={jobDescription}
+        onClose={() => {
+          setCoverLetterOpen(false);
+          setResumeBodyFocused(false);
+        }}
+      />
     );
   }
 
@@ -2559,138 +2497,6 @@ export function ResumeEditor({
             </Box>
           </Box>
         );
-
-      case 'cover-letter-edit': {
-        const clMenu = [
-          { value: 'refine', label: 'Light refine (grammar, clarity)' },
-          { value: 'sniff', label: 'AI sniff pass (less generic phrasing)' },
-          { value: 'save', label: 'Save to disk' },
-          { value: 'back', label: '← Back to editor' },
-        ];
-        return (
-          <Box flexDirection="column" flexGrow={1} borderStyle="round" paddingX={1} marginBottom={1}>
-            <Text bold>
-              Cover letter{company && jobTitle ? ` — ${jobTitle} @ ${company}` : ''}
-            </Text>
-            <Text dimColor>Markdown · Ctrl+D or Ctrl+S save · Esc back to editor</Text>
-            <Box marginTop={1} flexGrow={1}>
-              <MultilineInput
-                value={overlay.draft}
-                onChange={(next) =>
-                  setOverlay((o) => (o?.k === 'cover-letter-edit' ? { ...o, draft: next } : o))
-                }
-                focus={overlayActive}
-                width={textW}
-                height={Math.max(6, viewportH - 10)}
-                onSubmit={(text) => {
-                  void (async () => {
-                    try {
-                      await saveCoverLetterDraft(profileDir, overlay.slug, text);
-                    } catch (e) {
-                      setParseErr((e as Error).message);
-                    }
-                  })();
-                }}
-              />
-            </Box>
-            <Box marginTop={1}>
-              <SelectList
-                items={clMenu}
-                selectedIndex={overlay.menuIndex}
-                onChange={(i) =>
-                  setOverlay((o) => (o?.k === 'cover-letter-edit' ? { ...o, menuIndex: i } : o))
-                }
-                isActive={overlayActive && !inTextInput}
-                onSubmit={(item) => {
-                  if (overlay.k !== 'cover-letter-edit') return;
-                  if (item.value === 'back') {
-                    setOverlay(null);
-                    setResumeBodyFocused(true);
-                    return;
-                  }
-                  if (item.value === 'save') {
-                    void (async () => {
-                      try {
-                        await saveCoverLetterDraft(profileDir, overlay.slug, overlay.draft);
-                      } catch (e) {
-                        setParseErr((e as Error).message);
-                      }
-                    })();
-                    return;
-                  }
-                  if (item.value === 'refine') {
-                    void runCoverLetterAssist('refine');
-                    return;
-                  }
-                  if (item.value === 'sniff') {
-                    void runCoverLetterAssist('sniff');
-                  }
-                }}
-              />
-            </Box>
-          </Box>
-        );
-      }
-
-      case 'cover-letter-assist':
-        return (
-          <Box flexDirection="column" borderStyle="round" paddingX={1} marginBottom={1}>
-            <Text bold>Cover letter</Text>
-            <Spinner label="AI assist…" />
-          </Box>
-        );
-
-      case 'cover-letter-review': {
-        const clBlocks: DiffBlock[] = [{ kind: 'summary', old: overlay.before, new: overlay.proposed }];
-        const clReviewItems = [
-          { value: 'accept', label: 'Accept and replace draft' },
-          { value: 'reject', label: 'Reject' },
-        ];
-        return (
-          <Box flexDirection="column" flexGrow={1} borderStyle="round" paddingX={1} marginBottom={1}>
-            <Text bold>Cover letter — review</Text>
-            <Text dimColor>↑↓ · Enter · Esc rejects</Text>
-            <Box marginTop={1} flexGrow={1}>
-              <DiffView blocks={clBlocks} />
-            </Box>
-            <Box marginTop={1}>
-              <SelectList
-                items={clReviewItems}
-                selectedIndex={overlay.reviewMenuIdx}
-                onChange={(i) =>
-                  setOverlay((o) => (o?.k === 'cover-letter-review' ? { ...o, reviewMenuIdx: i } : o))
-                }
-                isActive={overlayActive}
-                onSubmit={(item) => {
-                  if (overlay.k !== 'cover-letter-review') return;
-                  if (item.value === 'reject') {
-                    setOverlay({
-                      k: 'cover-letter-edit',
-                      slug: overlay.slug,
-                      draft: overlay.before,
-                      menuIndex: 0,
-                    });
-                    return;
-                  }
-                  void (async () => {
-                    try {
-                      await saveCoverLetterDraft(profileDir, overlay.slug, overlay.proposed);
-                      setOverlay({
-                        k: 'cover-letter-edit',
-                        slug: overlay.slug,
-                        draft: overlay.proposed,
-                        menuIndex: 0,
-                      });
-                    } catch (e) {
-                      setOverlay({ k: 'err', msg: (e as Error).message, retryKind: 'cover-letter' });
-                    }
-                  })();
-                }}
-              />
-            </Box>
-          </Box>
-        );
-      }
 
       case 'sync-prompt':
         return (

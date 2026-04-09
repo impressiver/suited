@@ -9,6 +9,7 @@ import {
   deleteBefore,
   insertAt,
   lineColAtOffset,
+  offsetAtLineCol,
   offsetDown,
   offsetLeft,
   offsetRight,
@@ -22,6 +23,84 @@ import { parseSgrMouseEvent } from '../../utils/sgrMouseWheel.ts';
 import { FreeCursorCaretRow, FreeCursorPlainRow } from './freeCursorLineSegments.tsx';
 import { MarkdownEditorScrollGutter } from './MarkdownEditorScrollGutter.tsx';
 import { TextViewport } from './TextViewport.tsx';
+
+// ---------------------------------------------------------------------------
+// Word-wrap map: maps display rows → logical line positions
+// ---------------------------------------------------------------------------
+
+export interface WrapRow {
+  logLine: number;
+  colStart: number;
+  text: string;
+}
+
+export function buildWrapMap(logicalLines: string[], width: number): WrapRow[] {
+  const rows: WrapRow[] = [];
+  for (let li = 0; li < logicalLines.length; li++) {
+    const line = logicalLines[li]!;
+    if (line.length <= width || width < 1) {
+      rows.push({ logLine: li, colStart: 0, text: line });
+      continue;
+    }
+    let pos = 0;
+    while (pos < line.length) {
+      const remaining = line.length - pos;
+      if (remaining <= width) {
+        rows.push({ logLine: li, colStart: pos, text: line.slice(pos) });
+        break;
+      }
+      let breakPos = pos + width;
+      for (let j = breakPos - 1; j > pos; j--) {
+        if (line[j] === ' ') {
+          breakPos = j + 1;
+          break;
+        }
+      }
+      rows.push({ logLine: li, colStart: pos, text: line.slice(pos, breakPos) });
+      pos = breakPos;
+    }
+  }
+  if (rows.length === 0) {
+    rows.push({ logLine: 0, colStart: 0, text: '' });
+  }
+  return rows;
+}
+
+export function findCursorWrapRow(
+  wrapMap: WrapRow[],
+  logLine: number,
+  col: number,
+): { wrapIdx: number; visualCol: number } {
+  for (let i = 0; i < wrapMap.length; i++) {
+    const row = wrapMap[i]!;
+    if (row.logLine !== logLine) continue;
+    const isLastOfLine = i + 1 >= wrapMap.length || wrapMap[i + 1]!.logLine !== logLine;
+    const colEnd = row.colStart + row.text.length;
+    if (col >= row.colStart && (col < colEnd || isLastOfLine)) {
+      return { wrapIdx: i, visualCol: col - row.colStart };
+    }
+  }
+  const last = wrapMap.length - 1;
+  return { wrapIdx: last, visualCol: Math.max(0, col - (wrapMap[last]?.colStart ?? 0)) };
+}
+
+function wrapOffsetUp(text: string, offset: number, wrapMap: WrapRow[]): number {
+  const { line, col } = lineColAtOffset(text, offset);
+  const { wrapIdx, visualCol } = findCursorWrapRow(wrapMap, line, col);
+  if (wrapIdx <= 0) return 0;
+  const prev = wrapMap[wrapIdx - 1]!;
+  const newCol = prev.colStart + Math.min(visualCol, prev.text.length);
+  return offsetAtLineCol(text, prev.logLine, newCol);
+}
+
+function wrapOffsetDown(text: string, offset: number, wrapMap: WrapRow[]): number {
+  const { line, col } = lineColAtOffset(text, offset);
+  const { wrapIdx, visualCol } = findCursorWrapRow(wrapMap, line, col);
+  if (wrapIdx >= wrapMap.length - 1) return offset;
+  const next = wrapMap[wrapIdx + 1]!;
+  const newCol = next.colStart + Math.min(visualCol, next.text.length);
+  return offsetAtLineCol(text, next.logLine, newCol);
+}
 
 const DEBOUNCE_MS = 16;
 
@@ -56,6 +135,8 @@ export interface FreeCursorMultilineInputProps {
    * for mouse hit-testing is refreshed.
    */
   geometryTie?: string | number;
+  /** Word-wrap long lines instead of truncating. */
+  wordWrap?: boolean;
 }
 
 /**
@@ -76,6 +157,7 @@ export function FreeCursorMultilineInput({
   jumpToChar,
   onConsumedJumpToChar,
   geometryTie,
+  wordWrap,
 }: FreeCursorMultilineInputProps) {
   const scrollGutterCols = width > 1 ? 1 : 0;
   const textCols = Math.max(1, width - scrollGutterCols);
@@ -182,6 +264,15 @@ export function FreeCursorMultilineInput({
     return displayValue.split('\n');
   }, [displayValue]);
 
+  const wrapMap = useMemo(
+    () => (wordWrap ? buildWrapMap(logicalLines, textCols) : null),
+    [wordWrap, logicalLines, textCols],
+  );
+  const wrapMapRef = useRef(wrapMap);
+  wrapMapRef.current = wrapMap;
+
+  const totalDisplayRows = wrapMap ? wrapMap.length : logicalLines.length;
+
   const padLine = (s: string) =>
     s.length >= textCols ? s.slice(0, textCols) : s.padEnd(textCols, ' ');
 
@@ -199,22 +290,27 @@ export function FreeCursorMultilineInput({
 
   /** Keep the caret line inside [scrollLine, scrollLine + height) before Ink paints (avoids “missing” caret). */
   useLayoutEffect(() => {
+    const wm = wrapMapRef.current;
     const lines = displayValue.length === 0 ? ([''] as string[]) : displayValue.split('\n');
-    const maxSl = Math.max(0, lines.length - height);
-    const { line: caretLine } = lineColAtOffset(displayValue, cursorOffset);
+    const rowCount = wm ? wm.length : lines.length;
+    const maxSl = Math.max(0, rowCount - height);
+    const { line: caretLogLine, col: caretCol } = lineColAtOffset(displayValue, cursorOffset);
+    const caretRow = wm
+      ? findCursorWrapRow(wm, caretLogLine, caretCol).wrapIdx
+      : caretLogLine;
     setScrollLine((sl) => {
       const slClamped = Math.min(Math.max(0, sl), maxSl);
-      if (caretLine < slClamped) {
-        return caretLine;
+      if (caretRow < slClamped) {
+        return caretRow;
       }
-      if (caretLine >= slClamped + height) {
-        return caretLine - height + 1;
+      if (caretRow >= slClamped + height) {
+        return caretRow - height + 1;
       }
       return slClamped;
     });
   }, [cursorOffset, displayValue, height]);
 
-  const maxScrollLine = Math.max(0, logicalLines.length - height);
+  const maxScrollLine = Math.max(0, totalDisplayRows - height);
   const scrollClamped = Math.min(scrollLine, maxScrollLine);
 
   // Remeasure after layout: origin is the first *drawn* editor row (matches Ink output).
@@ -361,14 +457,16 @@ export function FreeCursorMultilineInput({
       }
       if (key.upArrow) {
         clearSel();
-        cur = offsetUp(buf, cur);
+        const wm = wrapMapRef.current;
+        cur = wm ? wrapOffsetUp(buf, cur, wm) : offsetUp(buf, cur);
         setCursorOffset(cur);
         notifyCaret(cur);
         return;
       }
       if (key.downArrow) {
         clearSel();
-        cur = offsetDown(buf, cur);
+        const wm = wrapMapRef.current;
+        cur = wm ? wrapOffsetDown(buf, cur, wm) : offsetDown(buf, cur);
         setCursorOffset(cur);
         notifyCaret(cur);
         return;
@@ -428,9 +526,27 @@ export function FreeCursorMultilineInput({
     { isActive: focus },
   );
 
-  const sliceLines = logicalLines.slice(scrollClamped, scrollClamped + height);
-  const { line: curLine, col: curCol } = lineColAtOffset(displayValue, cursorOffset);
+  const { line: curLogLine, col: curLogCol } = lineColAtOffset(displayValue, cursorOffset);
   const noColor = shouldUseNoColor();
+
+  // Compute display rows: either wrapped or 1:1 logical lines
+  const cursorDisplay = wrapMap
+    ? findCursorWrapRow(wrapMap, curLogLine, curLogCol)
+    : { wrapIdx: curLogLine, visualCol: curLogCol };
+
+  const displayRows: { lineRaw: string; logLine: number; colOffset: number; rowIdx: number }[] = [];
+  if (wrapMap) {
+    const slice = wrapMap.slice(scrollClamped, scrollClamped + height);
+    for (let i = 0; i < slice.length; i++) {
+      const wr = slice[i]!;
+      displayRows.push({ lineRaw: wr.text, logLine: wr.logLine, colOffset: wr.colStart, rowIdx: scrollClamped + i });
+    }
+  } else {
+    const slice = logicalLines.slice(scrollClamped, scrollClamped + height);
+    for (let i = 0; i < slice.length; i++) {
+      displayRows.push({ lineRaw: slice[i]!, logLine: scrollClamped + i, colOffset: 0, rowIdx: scrollClamped + i });
+    }
+  }
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -438,24 +554,22 @@ export function FreeCursorMultilineInput({
         panelWidth={framedInnerW + 2}
         viewportHeight={height}
         scrollOffset={scrollClamped}
-        totalRows={logicalLines.length}
+        totalRows={totalDisplayRows}
         kind="Resume (markdown)"
       >
         <Box flexDirection="row" width={framedInnerW}>
           <Box flexDirection="column" width={textCols}>
-            {sliceLines.map((lineRaw, i) => {
-              const globalLine = scrollClamped + i;
-              const isCursorLine = focus && globalLine === curLine;
+            {displayRows.map((dr, i) => {
+              const isCursorRow = focus && dr.rowIdx === cursorDisplay.wrapIdx;
               const showPlaceholder =
-                displayValue === '' && globalLine === 0 && i === 0 && Boolean(placeholder);
+                displayValue === '' && dr.rowIdx === 0 && i === 0 && Boolean(placeholder);
               const padded = showPlaceholder
                 ? (placeholder ?? '').slice(0, textCols).padEnd(textCols, ' ')
-                : padLine(lineRaw);
-              const cc = isCursorLine ? Math.min(curCol, textCols) : 0;
-              // Stable key - only depends on logical line number, not scroll position
+                : padLine(dr.lineRaw);
+              const cc = isCursorRow ? Math.min(cursorDisplay.visualCol, textCols) : 0;
               return (
                 <Box
-                  key={`ln-${globalLine}`}
+                  key={`ln-${dr.rowIdx}`}
                   ref={i === 0 ? editorHitOriginRef : undefined}
                   flexDirection="row"
                   width={textCols}
@@ -464,26 +578,28 @@ export function FreeCursorMultilineInput({
                     <Text dimColor wrap="truncate-end">
                       {padded}
                     </Text>
-                  ) : isCursorLine ? (
+                  ) : isCursorRow ? (
                     <FreeCursorCaretRow
                       text={displayValue}
-                      globalLine={globalLine}
-                      lineRaw={lineRaw}
+                      globalLine={dr.logLine}
+                      lineRaw={dr.lineRaw}
                       padded={padded}
                       cc={cc}
                       textCols={textCols}
                       selection={selection}
                       noColor={noColor}
+                      colOffset={dr.colOffset}
                     />
                   ) : (
                     <FreeCursorPlainRow
                       padded={padded}
                       text={displayValue}
-                      globalLine={globalLine}
-                      lineRaw={lineRaw}
+                      globalLine={dr.logLine}
+                      lineRaw={dr.lineRaw}
                       textCols={textCols}
                       selection={selection}
                       noColor={noColor}
+                      colOffset={dr.colOffset}
                     />
                   )}
                 </Box>
@@ -496,7 +612,7 @@ export function FreeCursorMultilineInput({
               <MarkdownEditorScrollGutter
                 viewportHeight={height}
                 scrollOffset={scrollClamped}
-                totalLines={logicalLines.length}
+                totalLines={totalDisplayRows}
               />
             )}
           </Box>

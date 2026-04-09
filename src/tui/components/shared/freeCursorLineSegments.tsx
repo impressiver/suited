@@ -24,11 +24,12 @@ function colSelected(
   lineRaw: string,
   visualCol: number,
   selection: { start: number; end: number },
+  colOffset = 0,
 ): boolean {
   if (visualCol >= lineRaw.length) {
     return false;
   }
-  const g = offsetAtLineCol(text, globalLine, visualCol);
+  const g = offsetAtLineCol(text, globalLine, colOffset + visualCol);
   return g >= selection.start && g < selection.end;
 }
 
@@ -42,11 +43,12 @@ function segmentedPlainRow(
   textCols: number,
   selection: { start: number; end: number },
   noColor: boolean,
+  colOffset = 0,
 ): ReactElement {
   const runs: { t: string; sel: boolean }[] = [];
   for (let c = 0; c < textCols; c++) {
     const ch = padded[c] ?? ' ';
-    const sel = colSelected(text, globalLine, lineRaw, c, selection);
+    const sel = colSelected(text, globalLine, lineRaw, c, selection, colOffset);
     const last = runs[runs.length - 1];
     if (last !== undefined && last.sel === sel) {
       last.t += ch;
@@ -93,6 +95,7 @@ export function FreeCursorPlainRow({
   textCols,
   selection,
   noColor,
+  colOffset = 0,
 }: {
   padded: string;
   text: string;
@@ -101,13 +104,14 @@ export function FreeCursorPlainRow({
   textCols: number;
   selection: { start: number; end: number } | null;
   noColor: boolean;
+  colOffset?: number;
 }): ReactElement {
   if (
     selection != null &&
     selection.start < selection.end &&
     lineIntersectsSelection(text, globalLine, selection)
   ) {
-    return segmentedPlainRow(padded, text, globalLine, lineRaw, textCols, selection, noColor);
+    return segmentedPlainRow(padded, text, globalLine, lineRaw, textCols, selection, noColor, colOffset);
   }
   return (
     <Box flexDirection="row" width={textCols}>
@@ -127,6 +131,7 @@ export function FreeCursorCaretRow({
   textCols,
   selection,
   noColor,
+  colOffset = 0,
 }: {
   text: string;
   globalLine: number;
@@ -136,6 +141,7 @@ export function FreeCursorCaretRow({
   textCols: number;
   selection: { start: number; end: number } | null;
   noColor: boolean;
+  colOffset?: number;
 }): ReactElement {
   const blk = layoutCursorBlockRow(padded, cc, textCols);
 
@@ -149,7 +155,7 @@ export function FreeCursorCaretRow({
       const sel =
         selection != null &&
         selection.start < selection.end &&
-        colSelected(text, globalLine, lineRaw, visualCol, selection);
+        colSelected(text, globalLine, lineRaw, visualCol, selection, colOffset);
       const ch = slice[i] ?? ' ';
       const last = runs[runs.length - 1];
       if (last !== undefined && last.sel === sel) {

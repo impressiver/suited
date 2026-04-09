@@ -1708,7 +1708,7 @@ export function ResumeEditor({
     },
     {
       isActive:
-        panelActive && editorMode && !docMenuOpen && docPolishDiff == null && overlay == null && !resumeBodyFocused,
+        panelActive && editorMode && !coverLetterOpen && !docMenuOpen && docPolishDiff == null && overlay == null && !resumeBodyFocused,
     },
   );
 
@@ -1721,7 +1721,7 @@ export function ResumeEditor({
     },
     {
       isActive:
-        panelActive && editorMode && !resumeBodyFocused && !docMenuOpen && docPolishDiff == null && overlay == null,
+        panelActive && editorMode && !coverLetterOpen && !resumeBodyFocused && !docMenuOpen && docPolishDiff == null && overlay == null,
     },
   );
 
@@ -1736,7 +1736,7 @@ export function ResumeEditor({
         });
       }
     },
-    { isActive: panelActive && mode === 'job' && overlay == null },
+    { isActive: panelActive && mode === 'job' && !coverLetterOpen && overlay == null },
   );
 
   // Job-mode nav keybinds (when not editing body)
@@ -1765,6 +1765,7 @@ export function ResumeEditor({
       isActive:
         panelActive &&
         mode === 'job' &&
+        !coverLetterOpen &&
         !resumeBodyFocused &&
         !docMenuOpen &&
         overlay == null &&

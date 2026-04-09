@@ -47,7 +47,7 @@ export function CoverLetterEditor({
   const [draft, setDraft] = useState('');
   const [externalRevision, setExternalRevision] = useState(0);
   const [phase, setPhase] = useState<Phase>({ k: 'loading' });
-  const [editorFocused, setEditorFocused] = useState(true);
+  const [editorFocused, setEditorFocused] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -327,7 +327,7 @@ export function CoverLetterEditor({
           {!editorFocused && (
             <Text dimColor color="cyan">
               {' '}
-              r refine · n sniff · s save · Tab edit · Esc close
+              hit tab to edit text · r refine · n sniff · s save · Esc close
             </Text>
           )}
         </Box>
@@ -339,6 +339,7 @@ export function CoverLetterEditor({
         focus={editorFocused}
         width={textW}
         height={editorH}
+        wordWrap
         placeholder="Write your cover letter here (Markdown)…"
         onSubmit={(v) => {
           setDraft(v);

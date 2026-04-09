@@ -11,8 +11,8 @@ Every word in the output traces back to something you actually wrote.
 
 1. **Import** your LinkedIn profile (URL, data export, or paste)
 2. **Refine** — Claude asks targeted questions (and you can polish, direct-edit, or re-run Q&A) to improve **source → refined** data
-3. **Jobs** — save job descriptions; **prepare** curates your profile per job; optional **professional feedback** before generating
-4. **Generate** — paste or pick a saved JD and get a tailored PDF resume
+3. **Jobs** — save job descriptions; **prepare** curates your profile per job; optional **cover letter** with AI refine/sniff; optional **professional feedback** before generating
+4. **Generate** — paste or pick a saved JD and get a tailored PDF resume (and optional cover letter PDF)
 
 Your data stays on your machine. Nothing is sent anywhere except to the AI API you configure.
 
@@ -84,7 +84,7 @@ In a normal **interactive terminal** (TTY):
 suited
 ```
 
-This launches the **Ink-based TUI**: **document shell** (TopBar + main + StatusBar) with **seven** top-level destinations — **Resume** (markdown preview + health), **Import**, **Contact**, **Jobs**, **Refine**, **Generate**, and **Settings** — via **:** (command palette), **`1–7`**, and letter keys. **Manual section editing** (`ProfileEditorScreen`) opens from **Refine** → *Edit profile sections (manual)*. **`p`** is for **Jobs → prepare**, not a global jump. **`Esc`** usually returns to **Resume** (wizards own **Esc** while in nested steps). See [`specs/tui-README.md`](specs/tui-README.md).
+This launches the **Ink-based TUI**: **document shell** (TopBar + main + StatusBar) with **seven** top-level destinations — **Dashboard**, **Import**, **Contact**, **Editor** (general resume), **Jobs**, **Generate**, and **Settings** — via **:** (command palette), **`1–7`**, and letter keys. **Manual section editing** (`ProfileEditorScreen`) opens from the editor palette. In **Jobs**, selecting a job opens the resume editor with job context; **`l`** opens a full-screen **cover letter editor** with word wrap, AI refine (`r`), and AI sniff (`n`). **`Esc`** backs out through overlays and editors; wizards own **Esc** while in nested steps. See [`specs/tui-README.md`](specs/tui-README.md).
 
 Core work runs through **`src/services/`** (shared with CLI subcommands). The TUI does **not** spawn subprocesses for those flows.
 

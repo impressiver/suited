@@ -46,7 +46,7 @@ JD and job metadata (company, title) **MAY** be passed as **context** so the let
   - **Normative helper (implementation):** mirror [`jobRefinedMdPath`](../src/profile/serializer.ts) — e.g. `coverLetterMdPath(profileDir, slug)` returning `join(profileDir, 'jobs', slug, 'cover-letter.md')`.  
   - **Encoding:** UTF-8. **Logical newlines:** LF; the editor **SHOULD** normalize CRLF and lone CR to LF on load (same discipline as the resume markdown editor in [`tui-screens.md`](./tui-screens.md)).
 - **Format:** **Markdown** per [§4.1 Markdown subset](#41-markdown-subset-normative). The file **MUST** use the **`.md`** extension in v1.
-- **Default:** Missing file or empty file body is treated as **no draft**. Optional **static stub** (placeholders only) **MAY** be written on explicit user action (e.g. “Insert template”); the product **MUST NOT** inject LLM-generated body text on first open unless a **future**, explicitly opt-in **starter** feature is specified elsewhere.
+- **Default:** Missing file or empty file body is treated as **no draft**. When opening the TUI cover letter editor with an empty draft **and** a job description is available, the editor **auto-generates** an initial draft from the user's profile and JD context (streaming; cancellable via Esc). The generated draft is saved immediately. The user **MUST** still review and edit before export.
 - **Empty or whitespace-only draft:** After trim, if there is no substantive content, export of the cover letter PDF **MUST NOT** proceed; the UI **SHOULD** disable the export action and/or show a clear error. AI assists that require text **SHOULD** be disabled or no-op with explanation.
 
 ### 4.1 Markdown subset (normative)
@@ -112,8 +112,12 @@ Conceptually: **Jobs** (saved JD) → user prepares/edits draft → **Generate**
 
 **Primary surfaces:**
 
-- **Jobs → job detail:** **Authoring** using a multiline control (e.g. [`FreeCursorMultilineInput`](../src/tui/components/shared/FreeCursorMultilineInput.tsx) or project-standard equivalent). **Light refine** and **AI sniff pass** actions **SHOULD** live here (or in a sub-state), producing **DiffView** (or equivalent) before save.
+- **Jobs → job detail → `l`:** Opens [`CoverLetterEditor`](../src/tui/components/CoverLetterEditor.tsx), a **full-screen** editor replacing the resume editor view. Uses [`FreeCursorMultilineInput`](../src/tui/components/shared/FreeCursorMultilineInput.tsx) with **`wordWrap`** enabled so long lines wrap at word boundaries instead of truncating.
 - **Generate:** **Also export cover letter PDF** when job-selected and draft is valid; **MUST** be disabled or blocked when the draft is empty.
+
+**Editor modes:** The cover letter editor opens in **nav mode** (not edit mode) so keybinds are immediately accessible. **Tab** enters text editing; **Esc** from edit mode returns to nav mode. Nav-mode keybinds: **`r`** light refine, **`n`** AI sniff pass, **`s`** save, **Esc** close editor. Both AI assists produce a **DiffView** review step (accept/reject) before persisting changes. If the draft is empty on open and a job description is available, the editor **auto-generates** an initial draft from the user’s profile and JD context.
+
+**Input isolation:** When the cover letter editor is open, parent `ResumeEditor` input handlers (Esc, Tab, job-mode keybinds) **MUST** be deactivated (`!coverLetterOpen` guard on `isActive`) so keys are owned exclusively by the cover letter screen.
 
 **Shell:** TopBar **Job:** context when working in a job-scoped flow ([`tui-document-shell.md`](./tui-document-shell.md)). **Esc** ownership follows [`tui-screens.md`](./tui-screens.md) (Jobs / Generate own back stacks when content-focused).
 

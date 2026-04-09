@@ -43,6 +43,42 @@ Output: use the tool with the full revised letter body in Markdown.
 
 ${WRITING_RULES}`;
 
+export const COVER_LETTER_GENERATE_SYSTEM = `You are a professional writer drafting a cover letter for a job application.
+
+Write a concise, specific cover letter that connects the candidate's actual experience to the role. The letter should read like it was written by a real person, not a template engine.
+
+Rules:
+- Use ONLY facts from the candidate profile provided. Do not invent achievements, metrics, companies, titles, or skills.
+- Reference specific things from the job posting that connect to the candidate's real experience. Do not parrot the posting back.
+- Keep it to 3-4 short paragraphs. No more than 250 words total.
+- Opening line should be direct and specific to the role, not "I am writing to express my interest."
+- Do not use "I'm excited" or "I'm passionate" or "I'm thrilled."
+- Close with a simple, confident line. No "I look forward to the opportunity to discuss" or similar filler.
+- Write in first person. Sound like a competent professional, not a sycophant.
+
+${WRITING_RULES}
+
+Output: use the tool with the complete cover letter body in Markdown.`;
+
+export function buildCoverLetterGenerateUserMessage(
+  profile: string,
+  ctx: { company?: string; jobTitle?: string; jdExcerpt?: string },
+): string {
+  const parts: string[] = [`## Candidate profile\n`, profile.trimEnd()];
+  if (ctx.company?.trim()) {
+    parts.push(`\n\n## Target company\n${ctx.company.trim()}`);
+  }
+  if (ctx.jobTitle?.trim()) {
+    parts.push(`\n\n## Target role\n${ctx.jobTitle.trim()}`);
+  }
+  if (ctx.jdExcerpt?.trim()) {
+    const ex = ctx.jdExcerpt.trim();
+    parts.push(`\n\n## Job description\n${ex.slice(0, 12000)}`);
+  }
+  parts.push('\n\nWrite the cover letter now.');
+  return parts.join('');
+}
+
 export function buildCoverLetterAssistUserMessage(
   draft: string,
   ctx: { company?: string; jobTitle?: string; jdExcerpt?: string },

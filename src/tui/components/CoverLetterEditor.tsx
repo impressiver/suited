@@ -1,7 +1,9 @@
 import { Box, Text, useInput } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffBlock } from '../../services/refine.ts';
-import { lightRefineCoverLetter, sniffCoverLetter } from '../../services/coverLetterAssist.ts';
+import { profileToRefineText } from '../../claude/prompts/refine.ts';
+import { loadActiveProfile } from '../../profile/serializer.ts';
+import { generateCoverLetterDraft, lightRefineCoverLetter, sniffCoverLetter } from '../../services/coverLetterAssist.ts';
 import { readCoverLetterDraft, saveCoverLetterDraft } from '../../services/coverLetterPdf.ts';
 import { DiffView, FreeCursorMultilineInput, SelectList, Spinner } from './shared/index.ts';
 import { useOperationAbort } from '../hooks/useOperationAbort.ts';
@@ -12,6 +14,8 @@ import { useRegisterPanelFooterHint } from '../panelFooterHintContext.tsx';
 import { useAppDispatch } from '../store.tsx';
 
 type Phase =
+  | { k: 'loading' }
+  | { k: 'generating' }
   | { k: 'edit' }
   | { k: 'assist' }
   | { k: 'review'; before: string; proposed: string; menuIdx: number }
@@ -42,24 +46,67 @@ export function CoverLetterEditor({
 
   const [draft, setDraft] = useState('');
   const [externalRevision, setExternalRevision] = useState(0);
-  const [phase, setPhase] = useState<Phase>({ k: 'edit' });
+  const [phase, setPhase] = useState<Phase>({ k: 'loading' });
   const [editorFocused, setEditorFocused] = useState(true);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
-  // Load draft on mount
+  // Load draft on mount; if empty, auto-generate from profile + job description
   useEffect(() => {
+    let cancelled = false;
+    const ac = createController();
     void (async () => {
       const existing = await readCoverLetterDraft(profileDir, slug);
+      if (cancelled) return;
       if (existing) {
         setDraft(existing);
         setExternalRevision((n) => n + 1);
+        setPhase({ k: 'edit' });
+        return;
+      }
+      // No draft -- generate one from profile + JD
+      setPhase({ k: 'generating' });
+      dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: true });
+      try {
+        const profile = await loadActiveProfile(profileDir);
+        const profileText = profileToRefineText(profile);
+        const ctx = { company, jobTitle, jdExcerpt: jobDescription };
+        let result = '';
+        for await (const ev of generateCoverLetterDraft(profileText, ctx, ac.signal)) {
+          if (ev.type === 'done') {
+            result = ev.result;
+          }
+        }
+        if (cancelled) return;
+        if (result) {
+          setDraft(result);
+          setExternalRevision((n) => n + 1);
+          await saveCoverLetterDraft(profileDir, slug, result);
+          setSavedAt(new Date().toLocaleTimeString());
+        }
+        setPhase({ k: 'edit' });
+      } catch (e) {
+        if (cancelled) return;
+        if (isUserAbort(e)) {
+          setPhase({ k: 'edit' });
+          return;
+        }
+        setPhase({ k: 'err', msg: (e as Error).message });
+      } finally {
+        dispatch({ type: 'SET_OPERATION_IN_PROGRESS', value: false });
       }
     })();
+    return () => {
+      cancelled = true;
+      releaseController(ac);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, [profileDir, slug]);
 
   const footerHint = useMemo(() => {
+    if (phase.k === 'loading') return 'Cover letter · loading…';
+    if (phase.k === 'generating') return 'Cover letter · generating draft… · Esc cancel';
     if (phase.k === 'assist') return 'Cover letter · AI working… · Esc cancel';
     if (phase.k === 'review') return 'Cover letter · ↑↓ Enter accept/reject · Esc reject';
     if (phase.k === 'err') return 'Cover letter · Esc back';
@@ -174,6 +221,30 @@ export function CoverLetterEditor({
     },
     { isActive: phase.k === 'err' },
   );
+
+  if (phase.k === 'loading') {
+    return (
+      <Box flexDirection="column" flexGrow={1} minHeight={0}>
+        <Text bold>
+          Cover letter{company && jobTitle ? ` — ${jobTitle} @ ${company}` : ''}
+        </Text>
+        <Text dimColor>Loading…</Text>
+      </Box>
+    );
+  }
+
+  if (phase.k === 'generating') {
+    return (
+      <Box flexDirection="column" flexGrow={1} minHeight={0}>
+        <Text bold>
+          Cover letter{company && jobTitle ? ` — ${jobTitle} @ ${company}` : ''}
+        </Text>
+        <Box marginTop={1}>
+          <Spinner label="Generating cover letter from your profile and job description…" />
+        </Box>
+      </Box>
+    );
+  }
 
   // Review phase rendering & input
   if (phase.k === 'review') {

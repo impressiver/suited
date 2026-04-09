@@ -2,8 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Eta } from 'eta';
-import type { ResumeDocument } from '../profile/schema.js';
-import { generateAsciiName } from '../utils/ascii-name.js';
+import type { ResumeDocument } from '../profile/schema.ts';
+import { generateAsciiName } from '../utils/ascii-name.ts';
+import { sanitizeResumeDocument } from '../utils/noEmDash.ts';
 
 // TEMPLATES_DIR is only used in dev/npm mode (non-SEA). When bundled to CJS
 // for a SEA binary, import.meta.url is empty — guard so startup doesn't throw.
@@ -33,11 +34,12 @@ export async function renderResumeHtml(
   doc: ResumeDocument,
   fitOverrideCss?: string,
 ): Promise<string> {
-  const templateDir = join(TEMPLATES_DIR, doc.template);
+  const safeDoc = sanitizeResumeDocument(doc);
+  const templateDir = join(TEMPLATES_DIR, safeDoc.template);
 
   const [templateSrc, css] = await Promise.all([
-    loadTemplateFile(doc.template, 'template.eta'),
-    loadTemplateFile(doc.template, 'style.css'),
+    loadTemplateFile(safeDoc.template, 'template.eta'),
+    loadTemplateFile(safeDoc.template, 'style.css'),
   ]);
 
   // autoEscape: true escapes HTML in <%= %> expressions (user data)
@@ -46,16 +48,16 @@ export async function renderResumeHtml(
 
   const extraData: Record<string, unknown> = {};
 
-  if (doc.template === 'retro') {
-    extraData.nameAscii = generateAsciiName(doc.contact.name);
+  if (safeDoc.template === 'retro') {
+    extraData.nameAscii = generateAsciiName(safeDoc.contact.name);
   }
 
   // Logo data URIs are pre-fetched interactively before first render (see generate.ts)
-  if (doc.template === 'timeline' && doc.logoDataUris) {
-    extraData.logoDataUris = doc.logoDataUris;
+  if (safeDoc.template === 'timeline' && safeDoc.logoDataUris) {
+    extraData.logoDataUris = safeDoc.logoDataUris;
   }
 
-  let html = eta.renderString(templateSrc, { ...doc, css, ...extraData });
+  let html = eta.renderString(templateSrc, { ...safeDoc, css, ...extraData });
 
   // Inject fit-override CSS after </head> open tag's style block, before </head>
   if (fitOverrideCss) {

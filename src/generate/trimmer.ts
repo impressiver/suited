@@ -1,6 +1,6 @@
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { callWithTool } from '../claude/client.js';
-import type { ResumeDocument } from '../profile/schema.js';
+import { callWithTool } from '../claude/client.ts';
+import type { ResumeDocument } from '../profile/schema.ts';
 
 // ---------------------------------------------------------------------------
 // Tool schema
@@ -88,7 +88,7 @@ function buildTrimPrompt(doc: ResumeDocument, overflowPct: number): string {
   lines.push('## Experience (positions indexed from 0, newest first)');
   doc.positions.forEach((pos, i) => {
     lines.push(
-      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} – ${pos.endDate ?? 'Present'})`,
+      `\n### [${i}] ${pos.title} at ${pos.company} (${pos.startDate} - ${pos.endDate ?? 'Present'})`,
     );
     if (pos.bullets.length === 0) {
       lines.push('  (no bullets)');

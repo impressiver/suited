@@ -1,11 +1,14 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import puppeteer from 'puppeteer-core';
-import type { TemplateName } from '../profile/schema.js';
-import { findChromePath } from '../utils/chrome.js';
+import type { TemplateName } from '../profile/schema.ts';
+import { findChromePath } from '../utils/chrome.ts';
+
+/** Resume templates plus dedicated cover letter PDF layout (US Letter; same margins map). */
+export type PdfExportTemplate = TemplateName | 'cover-letter';
 
 interface PdfOptions {
-  template: TemplateName;
+  template: PdfExportTemplate;
   outputPath: string;
   /** PDF render scale 0.1–2.0. Defaults to 1. Use <1 to shrink content to fit one page. */
   scale?: number;
@@ -19,14 +22,17 @@ export interface PageFitResult {
 
 // Margins are controlled entirely by CSS (body padding / @page rules).
 // Setting Puppeteer margins to zero prevents double-application.
-const MARGINS: Record<TemplateName, { top: string; right: string; bottom: string; left: string }> =
-  {
-    classic: { top: '0', right: '0', bottom: '0', left: '0' },
-    modern: { top: '0', right: '0', bottom: '0', left: '0' },
-    bold: { top: '0', right: '0', bottom: '0', left: '0' },
-    retro: { top: '0', right: '0', bottom: '0', left: '0' },
-    timeline: { top: '0', right: '0', bottom: '0', left: '0' },
-  };
+const MARGINS: Record<
+  PdfExportTemplate,
+  { top: string; right: string; bottom: string; left: string }
+> = {
+  classic: { top: '0', right: '0', bottom: '0', left: '0' },
+  modern: { top: '0', right: '0', bottom: '0', left: '0' },
+  bold: { top: '0', right: '0', bottom: '0', left: '0' },
+  retro: { top: '0', right: '0', bottom: '0', left: '0' },
+  timeline: { top: '0', right: '0', bottom: '0', left: '0' },
+  'cover-letter': { top: '0', right: '0', bottom: '0', left: '0' },
+};
 
 function launchBrowser() {
   try {

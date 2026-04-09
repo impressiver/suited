@@ -1,4 +1,4 @@
-/* Classic template — ATS-safe, single column, serif */
+/* Classic template  -  ATS-safe, single column, serif */
 :root {
   --color-accent: #000000;
   --color-text: #222222;
@@ -9,7 +9,7 @@
   --page-margin: 0.7in;
 }
 
-/* Flair 2 — Classic+: deep navy accent; name also picks up the color */
+/* Flair 2  -  Classic+: deep navy accent; name also picks up the color */
 body[data-flair="2"] {
   --color-accent: #1a3050;
 }
@@ -49,7 +49,7 @@ a {
   text-decoration: none;
 }
 
-/* Header — left-aligned, name anchored to rule */
+/* Header  -  left-aligned, name anchored to rule */
 .resume-header {
   margin-bottom: 10pt;
   border-bottom: 1.5pt solid var(--color-accent);
@@ -74,7 +74,7 @@ a {
   content: " · ";
 }
 
-/* Sections — small fixed gap between all sections */
+/* Sections  -  small fixed gap between all sections */
 .section {
   margin-bottom: 8pt;
 }
@@ -108,7 +108,7 @@ a {
   margin-bottom: 6pt;
 }
 
-/* Experience — company is the primary identifier, title subordinate */
+/* Experience  -  company is the primary identifier, title subordinate */
 .position {
   margin-bottom: 8pt;
 }

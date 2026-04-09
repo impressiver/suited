@@ -1,34 +1,25 @@
-import { callWithTool } from '../claude/client.js';
+import { callWithTool } from '../claude/client.ts';
 import {
   APPLY_PROFILE_FEEDBACK_SYSTEM,
   buildProfileFeedbackPrompt,
   type ConsultantFinding,
   type ProfileEvaluation,
-} from '../claude/prompts/consultant.js';
-import {
-  buildQAContext,
-  DIRECT_EDIT_SYSTEM,
-  EXPERT_POLISH_SYSTEM,
-  profileToRefineText,
-  questionsToolSchema,
-  REFINE_APPLY_SYSTEM,
-  REFINE_QUESTIONS_SYSTEM,
-  refinementsToolSchema,
-} from '../claude/prompts/refine.js';
+} from '../claude/prompts/consultant.ts';
+import { profileToRefineText, refinementsToolSchema } from '../claude/prompts/refine.ts';
 import {
   enrichFindingsWithUserInput,
   evaluateProfile,
   printProfileEvaluation,
-} from '../generate/consultant.js';
-import { type CuratorResult, curateForJob } from '../generate/curator.js';
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.js';
+} from '../generate/consultant.ts';
+import { type CuratorResult, curateForJob } from '../generate/curator.ts';
+import { markdownToProfile } from '../profile/markdown.ts';
 import type {
   JobRefinement,
   Profile,
   RefinementQuestion,
   RefinementSession,
   Sourced,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 import {
   deleteJobRefinement,
   hashSource,
@@ -42,131 +33,24 @@ import {
   saveJobRefinement,
   saveRefined,
   sourceJsonPath,
-} from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { openInEditor } from '../utils/interactive.js';
-import { runProfileEditor } from './profile-editor.js';
+} from '../profile/serializer.ts';
+import {
+  aiSniffSectionsForProfile,
+  applyDirectEdit,
+  applyRefinements,
+  applyRefinementsFromTool,
+  generateRefinementQuestions,
+  polishProfile,
+  type RefinementsOutput,
+  sniffReduceAiTellsProfile,
+} from '../services/refine.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { openInEditor } from '../utils/interactive.ts';
+import { runProfileEditor } from './profile-editor.ts';
 
 export interface RefineOptions {
   profileDir?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Types returned by Claude tools
-// ---------------------------------------------------------------------------
-
-interface QuestionsOutput {
-  questions: RefinementQuestion[];
-}
-
-interface RefinementsOutput {
-  positionRefinements: Array<{ positionId: string; bullets: string[] }>;
-  improvedSummary?: string;
-  addedSkills?: string[];
-  replacedSkills?: string[];
-  removeSections?: string[];
-  removePositionIds?: string[];
-}
-
-// ---------------------------------------------------------------------------
-// Skill expansion — split bundled entries like "Languages: Python, Go"
-// ---------------------------------------------------------------------------
-
-function expandSkillEntry(s: string): string[] {
-  // Strip category prefix: "Languages: Python, Go" → "Python, Go"
-  const stripped = s.includes(': ') ? s.slice(s.indexOf(': ') + 2) : s;
-  // Split comma-separated bundles into individual skills
-  return stripped
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-// ---------------------------------------------------------------------------
-// Apply refinements to a profile copy
-// ---------------------------------------------------------------------------
-
-function applyRefinements(profile: Profile, refinements: RefinementsOutput): Profile {
-  const now = new Date().toISOString();
-  const userEdit = (value: string) => ({
-    value,
-    source: { kind: 'user-edit' as const, editedAt: now },
-  });
-
-  const updated: Profile = { ...profile, positions: [...profile.positions] };
-
-  // Remove entire sections
-  for (const section of refinements.removeSections ?? []) {
-    switch (section) {
-      case 'projects':
-        updated.projects = [];
-        break;
-      case 'certifications':
-        updated.certifications = [];
-        break;
-      case 'languages':
-        updated.languages = [];
-        break;
-      case 'volunteer':
-        updated.volunteer = [];
-        break;
-      case 'awards':
-        updated.awards = [];
-        break;
-      case 'skills':
-        updated.skills = [];
-        break;
-      case 'education':
-        updated.education = [];
-        break;
-      case 'summary':
-        updated.summary = undefined;
-        break;
-    }
-  }
-
-  // Remove specific positions
-  if (refinements.removePositionIds?.length) {
-    const toRemove = new Set(refinements.removePositionIds);
-    updated.positions = updated.positions.filter((p) => !toRemove.has(p.id));
-  }
-
-  // Update bullets within positions
-  for (const pr of refinements.positionRefinements) {
-    const idx = updated.positions.findIndex((p) => p.id === pr.positionId);
-    if (idx === -1) continue;
-    updated.positions[idx] = {
-      ...updated.positions[idx],
-      bullets: pr.bullets.map((b) => userEdit(b)),
-    };
-  }
-
-  if (refinements.improvedSummary?.trim()) {
-    updated.summary = userEdit(refinements.improvedSummary.trim());
-  }
-
-  if (refinements.replacedSkills !== undefined) {
-    // Expand any bundled entries Claude returned, e.g. "Languages: Python, Go" → ["Python", "Go"]
-    const expanded = refinements.replacedSkills.flatMap(expandSkillEntry);
-    updated.skills = expanded.map((s, i) => ({
-      id: `skill-refined-${i}`,
-      name: userEdit(s),
-    }));
-  } else if (refinements.addedSkills?.length) {
-    const existingNames = new Set(updated.skills.map((s) => s.name.value.toLowerCase()));
-    const nextId = updated.skills.length;
-    const newSkills = refinements.addedSkills
-      .flatMap(expandSkillEntry)
-      .filter((s) => !existingNames.has(s.toLowerCase()))
-      .map((s, i) => ({
-        id: `skill-${nextId + i}`,
-        name: userEdit(s),
-      }));
-    updated.skills = [...updated.skills, ...newSkills];
-  }
-
-  return updated;
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +220,8 @@ async function reviewRefinements(original: Profile, refined: Profile): Promise<P
 
   // Show summary of all proposed changes
   for (const rpos of changedPositions) {
-    const opos = original.positions.find((p) => p.id === rpos.id)!;
+    const opos = original.positions.find((p) => p.id === rpos.id);
+    if (!opos) continue;
     console.log(`\n  ${c.value(`${rpos.title.value} @ ${rpos.company.value}`)}`);
     for (const b of opos.bullets) {
       console.log(`    ${c.removed(`- ${b.value}`)}`);
@@ -382,7 +267,8 @@ async function reviewRefinements(original: Profile, refined: Profile): Promise<P
   const result: Profile = { ...refined, positions: [...refined.positions] };
 
   for (const rpos of changedPositions) {
-    const opos = original.positions.find((p) => p.id === rpos.id)!;
+    const opos = original.positions.find((p) => p.id === rpos.id);
+    if (!opos) continue;
     const label = `${rpos.title.value} @ ${rpos.company.value}`;
     const finalBullets = await reviewBullets(
       inquirer,
@@ -454,18 +340,14 @@ async function applyDirectPrompt(
 
   console.log(c.muted('\nApplying changes with Claude...'));
 
-  const profileText = profileToRefineText(profile);
-  const rawRefinements = await callWithTool<RefinementsOutput>(
-    DIRECT_EDIT_SYSTEM,
-    `${profileText}\n\n## User Instruction\n${instruction.trim()}`,
-    refinementsToolSchema,
-  );
-
-  const proposedProfile = applyRefinements(profile, rawRefinements);
+  let proposedProfile: Profile | undefined;
+  for await (const ev of applyDirectEdit(profile, instruction.trim())) {
+    if (ev.type === 'done') proposedProfile = ev.result;
+  }
+  if (!proposedProfile) return;
   const finalProfile = await reviewRefinements(profile, proposedProfile);
 
-  await saveRefined({ profile: finalProfile, session }, profileDir);
-  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'direct-edit' });
 
   console.log(`\n${c.ok} ${c.success('Refined data saved')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
@@ -566,32 +448,52 @@ async function applyExpertPolish(
   }
   if (selectedSections.includes('skills')) improvingParts.push('the skills list');
 
-  const positionConstraint = targetPositionIds
-    ? `\nFor experience, only improve bullets for these position IDs: ${targetPositionIds.join(', ')}. Leave all other positions unchanged and omit them from positionRefinements.`
-    : '';
-
-  const skillsConstraint = selectedSections.includes('skills')
-    ? '\nFor skills: clean up and reformat the existing skills list for resume use using replacedSkills. Do not leave skills unchanged — always provide a cleaned list when skills are selected.'
-    : '';
-
-  const instruction = `Improve only: ${improvingParts.join(', ')}.${positionConstraint}${skillsConstraint}\n\nLeave all other sections exactly as they are — omit them from the output entirely.\n\n${profileToRefineText(profile)}`;
-
   console.log(c.muted(`\nPolishing ${improvingParts.join(' and ')} with Claude...`));
 
-  const rawRefinements = await callWithTool<RefinementsOutput>(
-    EXPERT_POLISH_SYSTEM,
-    instruction,
-    refinementsToolSchema,
-  );
-
-  const proposedProfile = applyRefinements(profile, rawRefinements);
+  let proposedProfile: Profile | undefined;
+  for await (const ev of polishProfile(profile, {
+    sections: selectedSections,
+    positionIds: targetPositionIds ?? undefined,
+  })) {
+    if (ev.type === 'done') proposedProfile = ev.result;
+  }
+  if (!proposedProfile) return;
   const finalProfile = await reviewRefinements(profile, proposedProfile);
 
   if (finalProfile === profile) return; // nothing accepted
 
-  await saveRefined({ profile: finalProfile, session }, profileDir);
-  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'polish' });
   console.log(`\n${c.ok} ${c.success('Polished profile saved')}`);
+  console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
+}
+
+// ---------------------------------------------------------------------------
+// AI sniff pass — reduce phrasing that scans as generic or AI-generated
+// ---------------------------------------------------------------------------
+
+async function applyAiSniffReduce(
+  profile: Profile,
+  session: RefinementSession,
+  profileDir: string,
+): Promise<void> {
+  if (aiSniffSectionsForProfile(profile).length === 0) {
+    console.log(c.muted('Nothing to scan: add a summary, experience, or skills first.'));
+    return;
+  }
+
+  console.log(c.muted('\nRunning AI sniff pass on summary, experience, and skills...'));
+
+  let proposedProfile: Profile | undefined;
+  for await (const ev of sniffReduceAiTellsProfile(profile)) {
+    if (ev.type === 'done') proposedProfile = ev.result;
+  }
+  if (!proposedProfile) return;
+  const finalProfile = await reviewRefinements(profile, proposedProfile);
+
+  if (finalProfile === profile) return;
+
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'ai-sniff' });
+  console.log(`\n${c.ok} ${c.success('AI sniff pass saved')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
 }
 
@@ -670,12 +572,11 @@ async function runConsultantReview(
     return profile;
   }
 
-  const proposedProfile = applyRefinements(profile, rawRefinements);
+  const proposedProfile = applyRefinementsFromTool(profile, rawRefinements);
   const finalProfile = await reviewRefinements(profile, proposedProfile);
 
   if (finalProfile !== profile) {
-    await saveRefined({ profile: finalProfile, session }, profileDir);
-    await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+    await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'consultant' });
     console.log(`\n${c.ok} ${c.success('Profile updated with consultant feedback.')}`);
   }
 
@@ -729,7 +630,9 @@ async function runJobRefinements(
 
   if (jobId === '__back__') return;
 
-  const { job, refinement } = refinementStatus.find((r) => r.job.id === jobId)!;
+  const picked = refinementStatus.find((r) => r.job.id === jobId);
+  if (!picked) return;
+  const { job, refinement } = picked;
 
   if (refinement) {
     console.log(`\n${c.ok} Stored refinement for ${c.value(`${job.company} — ${job.title}`)}`);
@@ -800,6 +703,7 @@ async function runJobRefinements(
       summary: job.text.slice(0, 200),
     },
     plan: curatorResult.plan,
+    ...(refinement?.pinnedRender != null ? { pinnedRender: refinement.pinnedRender } : {}),
   };
   await saveJobRefinement(newRefinement, profileDir);
 
@@ -837,7 +741,9 @@ export async function runRefine(options: RefineOptions): Promise<void> {
     if (sync) {
       const existing = await loadRefined(profileDir);
       const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
-      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+        reason: 'md-sync',
+      });
       console.log(`${c.ok} ${c.success('refined.json updated from refined.md.')}`);
     }
   }
@@ -862,6 +768,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
           message: 'What would you like to do?',
           choices: [
             { value: 'consultant', name: 'Consultant review — get professional feedback' },
+            { value: 'sniff', name: 'AI sniff pass — reduce AI-looking phrasing' },
             { value: 'polish', name: 'Expert polish — improve writing quality' },
             { value: 'prompt', name: 'Prompt — tell Claude what to change' },
             { value: 'edit', name: 'Edit refined.md manually' },
@@ -883,6 +790,11 @@ export async function runRefine(options: RefineOptions): Promise<void> {
         return;
       }
 
+      if (action === 'sniff') {
+        await applyAiSniffReduce(existing.profile, existing.session, profileDir);
+        return;
+      }
+
       if (action === 'polish') {
         await applyExpertPolish(existing.profile, existing.session, profileDir);
         return;
@@ -897,7 +809,9 @@ export async function runRefine(options: RefineOptions): Promise<void> {
         await openInEditor(refinedMdPath(profileDir));
         const originalProfile = await loadSource(profileDir);
         const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), originalProfile);
-        await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+        await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+          reason: 'md-sync',
+        });
         console.log(`\n${c.ok} ${c.success('refined.json updated from edited markdown.')}`);
         return;
       }
@@ -936,12 +850,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
 
   // Step 1: Generate questions
   console.log(c.muted('Analyzing profile with Claude...'));
-  const profileText = profileToRefineText(source);
-  const { questions } = await callWithTool<QuestionsOutput>(
-    REFINE_QUESTIONS_SYSTEM,
-    `Here is the candidate's profile:\n\n${profileText}`,
-    questionsToolSchema,
-  );
+  const questions = await generateRefinementQuestions(source);
 
   if (questions.length === 0) {
     console.log(`\n${c.ok} ${c.success('Claude found no gaps — your profile looks complete!')}`);
@@ -951,8 +860,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       questions: [],
       answers: {},
     };
-    await saveRefined({ profile: source, session }, profileDir);
-    await profileToMarkdown(source, refinedMdPath(profileDir));
+    await saveRefined({ profile: source, session }, profileDir, { reason: 'qa-save' });
     console.log(`\n${c.ok} ${c.success('Refined data saved')} ${c.muted('(no changes)')}`);
     console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
     return;
@@ -971,21 +879,13 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       questions,
       answers: {},
     };
-    await saveRefined({ profile: source, session }, profileDir);
-    await profileToMarkdown(source, refinedMdPath(profileDir));
+    await saveRefined({ profile: source, session }, profileDir, { reason: 'qa-save' });
     return;
   }
 
-  // Step 3: Generate refinements
+  // Step 3–4: Generate refinements + review
   console.log(c.muted('Generating improvements with Claude...'));
-  const rawRefinements = await callWithTool<RefinementsOutput>(
-    REFINE_APPLY_SYSTEM,
-    `${profileText}\n\n${buildQAContext(questions, answers)}`,
-    refinementsToolSchema,
-  );
-
-  // Step 4: Review and confirm
-  const proposedProfile = applyRefinements(source, rawRefinements);
+  const proposedProfile = await applyRefinements(source, questions, answers);
   const finalProfile = await reviewRefinements(source, proposedProfile);
 
   // Step 5: Save
@@ -995,8 +895,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
     questions,
     answers,
   };
-  await saveRefined({ profile: finalProfile, session }, profileDir);
-  await profileToMarkdown(finalProfile, refinedMdPath(profileDir));
+  await saveRefined({ profile: finalProfile, session }, profileDir, { reason: 'qa-save' });
 
   console.log(`\n${c.ok} ${c.success('Refined data saved:')}`);
   console.log(`   ${c.path(refinedJsonPath(profileDir))}`);
@@ -1014,6 +913,7 @@ export async function runRefine(options: RefineOptions): Promise<void> {
       choices: [
         { value: 'done', name: 'Done' },
         { value: 'polish', name: 'Expert polish — have a pro improve the writing' },
+        { value: 'sniff', name: 'AI sniff pass — reduce AI-looking phrasing' },
         { value: 'prompt', name: 'Prompt — make a targeted change' },
         { value: 'consultant', name: 'Consultant review again' },
         { value: 'jobs', name: 'Job refinements — manage per-job curation plans' },
@@ -1024,6 +924,9 @@ export async function runRefine(options: RefineOptions): Promise<void> {
   if (followUp === 'polish') {
     const saved = await loadRefined(profileDir);
     await applyExpertPolish(saved.profile, saved.session, profileDir);
+  } else if (followUp === 'sniff') {
+    const saved = await loadRefined(profileDir);
+    await applyAiSniffReduce(saved.profile, saved.session, profileDir);
   } else if (followUp === 'prompt') {
     const saved = await loadRefined(profileDir);
     await applyDirectPrompt(saved.profile, saved.session, profileDir);

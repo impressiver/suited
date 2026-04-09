@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { callWithTool } from '../claude/client.js';
+import { callWithTool } from '../claude/client.ts';
 import {
   PARSE_LINKEDIN_SYSTEM,
   type ParsedLinkedInProfile,
   parseLinkedInTool,
-} from '../claude/prompts/parse-linkedin.js';
-import type { DataSource, Profile, Sourced } from '../profile/schema.js';
-import { deduplicateSkills, normalizeDate, splitBullets } from './normalizer.js';
+} from '../claude/prompts/parse-linkedin.ts';
+import type { DataSource, Profile, Sourced } from '../profile/schema.ts';
+import { deduplicateSkills, normalizeDate, splitBullets } from './normalizer.ts';
 
 function makeSource(inputHash: string): DataSource {
   return { kind: 'linkedin-paste', extractedBy: 'claude', inputHash };
@@ -16,7 +16,10 @@ function s<T>(value: T, inputHash: string): Sourced<T> {
   return { value, source: makeSource(inputHash) };
 }
 
-export async function parseLinkedInPaste(pastedText: string): Promise<Profile> {
+export async function parseLinkedInPaste(
+  pastedText: string,
+  signal?: AbortSignal,
+): Promise<Profile> {
   const now = new Date().toISOString();
   const inputHash = createHash('sha256').update(pastedText).digest('hex');
 
@@ -24,6 +27,8 @@ export async function parseLinkedInPaste(pastedText: string): Promise<Profile> {
     PARSE_LINKEDIN_SYSTEM,
     `Please extract the profile data from this LinkedIn profile text:\n\n${pastedText}`,
     parseLinkedInTool,
+    undefined,
+    signal,
   );
 
   const positions = (extracted.positions ?? []).map((p, i) => {

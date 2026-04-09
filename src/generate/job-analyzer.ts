@@ -1,6 +1,6 @@
-import { callWithTool } from '../claude/client.js';
-import { ANALYZE_JD_SYSTEM, analyzeJdTool } from '../claude/prompts/analyze-jd.js';
-import type { JobAnalysis } from '../profile/schema.js';
+import { callWithTool } from '../claude/client.ts';
+import { ANALYZE_JD_SYSTEM, analyzeJdTool } from '../claude/prompts/analyze-jd.ts';
+import type { JobAnalysis } from '../profile/schema.ts';
 
 export async function analyzeJobDescription(jdText: string): Promise<JobAnalysis> {
   return callWithTool<JobAnalysis>(

@@ -5,27 +5,27 @@ import {
   evaluateForJob,
   printJobEvaluation,
   resumeDocContext,
-} from '../generate/consultant.js';
-import { buildRefMapForProfile, curateForJob } from '../generate/curator.js';
+} from '../generate/consultant.ts';
+import { buildRefMapForProfile, curateForJob } from '../generate/curator.ts';
+import { analyzeJobDescription } from '../generate/job-analyzer.ts';
 import {
-  buildFitOverrideCss,
-  SQUEEZE_THRESHOLDS,
-  type SqueezeLevel,
-} from '../generate/fit-adjuster.js';
-import { analyzeJobDescription } from '../generate/job-analyzer.js';
-import { extractLogomark, svgToDataUri } from '../generate/logo-extractor.js';
-import { discoverLogoSvgs, fetchSvgsFromUrl } from '../generate/logo-fetcher.js';
-import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.js';
-import { renderResumeHtml } from '../generate/renderer.js';
+  type AppliedSqueezeLevel,
+  renderWithSqueeze,
+  trySqueeze,
+} from '../generate/layoutSqueeze.ts';
+import { extractLogomark, svgToDataUri } from '../generate/logo-extractor.ts';
+import { discoverLogoSvgs, fetchSvgsFromUrl } from '../generate/logo-fetcher.ts';
+import { polishResumeForJob, tweakResumeContent } from '../generate/polisher.ts';
+import { renderResumeHtml } from '../generate/renderer.ts';
 import {
   assembleFullResumeDocument,
   assembleResumeDocument,
   getFlairInfo,
   getRecommendedFlair,
-} from '../generate/resume-builder.js';
-import { autoTrimToFit } from '../generate/trimmer.js';
-import { exportToPdf, measurePageFit } from '../pdf/exporter.js';
-import { markdownToProfile, profileToMarkdown } from '../profile/markdown.js';
+} from '../generate/resume-builder.ts';
+import { autoTrimToFit } from '../generate/trimmer.ts';
+import { exportToPdf, measurePageFit } from '../pdf/exporter.ts';
+import { markdownToProfile, profileToMarkdown } from '../profile/markdown.ts';
 import type {
   FlairLevel,
   GenerationConfig,
@@ -35,7 +35,7 @@ import type {
   ResumeDocument,
   SavedJob,
   TemplateName,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 import {
   clearGenerationConfig,
   deleteJob,
@@ -50,6 +50,7 @@ import {
   loadJobs,
   loadLogoCache,
   loadRefined,
+  loadSavedJobById,
   makeJobSlug,
   refinedJsonPath,
   refinedMdPath,
@@ -59,17 +60,50 @@ import {
   saveJobRefinement,
   saveLogoCache,
   saveRefined,
-} from '../profile/serializer.js';
-import { c } from '../utils/colors.js';
-import { fileExists } from '../utils/fs.js';
-import { openInEditor } from '../utils/interactive.js';
-import { createSpinner } from '../utils/spinner.js';
+} from '../profile/serializer.ts';
+import { exportCoverLetterPdf } from '../services/coverLetterPdf.ts';
+import { persistJobRefinementPinnedRender } from '../services/jobRefinement.ts';
+import {
+  applyResumeSectionSelection,
+  MIN_VISIBLE_RESUME_POSITIONS,
+} from '../services/sectionSelection.ts';
+import { c } from '../utils/colors.ts';
+import { fileExists } from '../utils/fs.ts';
+import { openInEditor } from '../utils/interactive.ts';
+import { createSpinner } from '../utils/spinner.ts';
+
+type InquirerCLI = typeof import('inquirer').default;
 
 export interface GenerateOptions {
   profileDir?: string;
   output?: string;
   jd?: string;
   flair?: string;
+  /** When job-targeted, also export cover letter PDF after resume (non-empty draft). */
+  coverLetter?: boolean;
+  /** Skip resume; export only cover letter PDF (requires `jobId`). */
+  coverLetterOnly?: boolean;
+  /** Saved job id (required for `coverLetterOnly`). */
+  jobId?: string;
+}
+
+async function persistPinnedRenderForJob(
+  profileDir: string,
+  jobId: string | undefined,
+  resumeDoc: ResumeDocument,
+  requestedFlair: FlairLevel,
+  templateOverride: TemplateName | undefined,
+  squeezeLevel: AppliedSqueezeLevel,
+): Promise<void> {
+  if (!jobId) return;
+  await persistJobRefinementPinnedRender(profileDir, jobId, {
+    requestedFlair,
+    effectiveFlair: resumeDoc.flair,
+    resolvedTemplate: resumeDoc.template,
+    templateOverride,
+    squeezeLevel,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 const INDUSTRY_LABELS: Record<IndustryVertical, string> = {
@@ -89,7 +123,30 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   const { default: inquirer } = await import('inquirer');
 
   const profileDir = options.profileDir ?? 'output';
-  const resumesDir = options.output ?? `${profileDir}/resumes`;
+  const resumesDir = options.output ?? 'resumes';
+
+  if (options.coverLetterOnly) {
+    const jid = options.jobId?.trim();
+    if (!jid) {
+      throw new Error('--cover-letter-only requires --job-id <id>');
+    }
+    const job = await loadSavedJobById(profileDir, jid);
+    if (!job) {
+      throw new Error(`No saved job with id ${jid}`);
+    }
+    const profile = await loadActiveProfile(profileDir);
+    const slug = makeJobSlug(job.company, job.title);
+    const path = await exportCoverLetterPdf({
+      profileDir,
+      resumesDir,
+      jobSlug: slug,
+      profile,
+      company: job.company,
+      jobTitle: job.title,
+    });
+    console.log(`\n${c.ok} ${c.success('Cover letter PDF:')} ${c.path(path)}`);
+    return;
+  }
 
   // Detect external edits to refined.md — sync to JSON before generating
   if (await isMdNewerThanJson(refinedMdPath(profileDir), refinedJsonPath(profileDir))) {
@@ -105,7 +162,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     if (sync) {
       const existing = await loadRefined(profileDir);
       const updatedProfile = await markdownToProfile(refinedMdPath(profileDir), existing.profile);
-      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
+      await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+        reason: 'generate-md-sync',
+      });
       console.log(`${c.ok} ${c.success('refined.json updated from refined.md.')}`);
     }
   }
@@ -290,7 +349,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
       if (!useEditedJobProfile) {
         // [2/4] Curation — with in-session re-run support (Phase 3 preview)
-        let curatorResult: import('../generate/curator.js').CuratorResult | undefined;
+        let curatorResult: import('../generate/curator.ts').CuratorResult | undefined;
         let usedStoredRefinement = false;
         let skipStoredForThisRun = false;
         let previewApproved = false;
@@ -329,11 +388,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             }
             // Save this refinement for future reuse
             if (config.jobId) {
+              const prevRef = await loadJobRefinement(profileDir, config.jobId);
               const refinement: JobRefinement = {
                 jobId: config.jobId,
                 createdAt: new Date().toISOString(),
                 jobAnalysis: config.jobAnalysis,
                 plan: curatorResult.plan,
+                ...(prevRef?.pinnedRender != null ? { pinnedRender: prevRef.pinnedRender } : {}),
               };
               await saveJobRefinement(refinement, profileDir);
             }
@@ -618,11 +679,17 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     } else {
       // Single template — render, fit-check, export
       let outputPath = `${resumeOutputDir}/${fileBaseName}_${date}-${hhmm}.pdf`;
-      let html = await renderResumeHtml(resumeDoc);
+
+      const jobRefinementForPin =
+        config.jobId != null ? await loadJobRefinement(profileDir, config.jobId) : null;
 
       let fitCancelled = false;
       console.log(c.muted('Checking page fit...'));
-      html = await trySqueeze(html, resumeDoc);
+      let { html, appliedSqueezeLevel } = await renderWithSqueeze(resumeDoc, {
+        requestedFlair: config.flair,
+        templateOverride,
+        reusePin: jobRefinementForPin?.pinnedRender,
+      });
 
       while (true) {
         // eslint-disable-line no-constant-condition
@@ -671,13 +738,50 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             inquirer,
           ));
         }
-        html = await renderResumeHtml(resumeDoc);
-        html = await trySqueeze(html, resumeDoc);
+        const squeezed = await renderWithSqueeze(resumeDoc, {
+          requestedFlair: config.flair,
+          templateOverride,
+        });
+        html = squeezed.html;
+        appliedSqueezeLevel = squeezed.appliedSqueezeLevel;
       }
       if (fitCancelled) break;
 
       console.log(c.muted('Generating PDF...'));
       await exportToPdf(html, { template: resumeDoc.template, outputPath });
+
+      await persistPinnedRenderForJob(
+        profileDir,
+        config.jobId,
+        resumeDoc,
+        config.flair,
+        templateOverride,
+        appliedSqueezeLevel,
+      );
+
+      if (options.coverLetter) {
+        if (config.jobId && jobSlug) {
+          try {
+            const clPath = await exportCoverLetterPdf({
+              profileDir,
+              resumesDir,
+              jobSlug,
+              profile,
+              company: config.company,
+              jobTitle: config.jobTitle,
+            });
+            console.log(c.muted(`  Cover letter PDF: ${clPath}`));
+          } catch (e) {
+            console.log(
+              `\n${c.warn} ${c.warning(`Cover letter export failed: ${(e as Error).message}`)}`,
+            );
+          }
+        } else {
+          console.log(
+            `\n${c.warn} ${c.warning('--cover-letter ignored: run is not job-targeted (no saved job).')}`,
+          );
+        }
+      }
 
       // Save config; stamp resolved template + profile version
       config.profileUpdatedAt = profile.updatedAt;
@@ -751,9 +855,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             const newDate = newNowTs.toISOString().slice(0, 10);
             const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
             outputPath = `${resumeOutputDir}/${fileBaseName}-${newDate}-${newHhmm}.pdf`;
-            let tweakedHtml = await renderResumeHtml(resumeDoc);
-            tweakedHtml = await trySqueeze(tweakedHtml, resumeDoc);
-            await exportToPdf(tweakedHtml, { template: resumeDoc.template, outputPath });
+            const tweakedSq = await renderWithSqueeze(resumeDoc, {
+              requestedFlair: config.flair,
+              templateOverride,
+            });
+            await exportToPdf(tweakedSq.html, { template: resumeDoc.template, outputPath });
+            await persistPinnedRenderForJob(
+              profileDir,
+              config.jobId,
+              resumeDoc,
+              config.flair,
+              templateOverride,
+              tweakedSq.appliedSqueezeLevel,
+            );
             console.log(`${c.ok} ${c.success('Tweaked and ready:')} ${c.path(outputPath)}`);
             console.log(
               c.muted('  (Previous PDF still exists with its original timestamp — no work lost.)'),
@@ -789,9 +903,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const newDate = newNowTs.toISOString().slice(0, 10);
           const newHhmm = newNowTs.toTimeString().slice(0, 5).replace(':', '');
           outputPath = `${resumeOutputDir}/${fileBaseName}-${newDate}-${newHhmm}.pdf`;
-          let templateHtml = await renderResumeHtml(resumeDoc);
-          templateHtml = await trySqueeze(templateHtml, resumeDoc);
-          await exportToPdf(templateHtml, { template: resumeDoc.template, outputPath });
+          const templateSq = await renderWithSqueeze(resumeDoc, {
+            requestedFlair: config.flair,
+            templateOverride,
+          });
+          await exportToPdf(templateSq.html, { template: resumeDoc.template, outputPath });
+          await persistPinnedRenderForJob(
+            profileDir,
+            config.jobId,
+            resumeDoc,
+            config.flair,
+            templateOverride,
+            templateSq.appliedSqueezeLevel,
+          );
           console.log(`${c.ok} ${c.success('Resume generated:')} ${c.path(outputPath)}`);
         } else if (next === 'newjd') {
           reuseConfig = false;
@@ -857,8 +981,7 @@ async function openPdf(filePath: string): Promise<void> {
 
 async function buildConfig(
   options: GenerateOptions,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileDir: string,
   profile?: Profile,
 ): Promise<GenerationConfig> {
@@ -932,7 +1055,7 @@ async function buildConfig(
   // Flair
   let flair: FlairLevel = options.flair ? (parseInt(options.flair, 10) as FlairLevel) : 3;
 
-  let templateOverride: import('../profile/schema.js').TemplateName | undefined;
+  let templateOverride: import('../profile/schema.ts').TemplateName | undefined;
 
   if (!options.flair) {
     const { selectedFlair } = (await inquirer.prompt([
@@ -1022,8 +1145,7 @@ async function autoSaveJob(
 }
 
 async function pickSavedJob(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   jobs: SavedJob[],
   profileDir: string,
 ): Promise<{ text: string; id: string } | undefined> {
@@ -1077,14 +1199,14 @@ async function pickSavedJob(
 
 async function selectSections(
   doc: ResumeDocument,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   savedSelection?: string[],
 ): Promise<{ doc: ResumeDocument; selected: string[] }> {
   const savedSet = savedSelection ? new Set(savedSelection) : null;
 
   // Build a merged list: individual position items + other sections
-  type Choice = { name: string; value: string; checked: boolean };
+  type Choice = { name: string; value: string; checked: boolean; disabled?: string };
+  const positionFloor = Math.min(MIN_VISIBLE_RESUME_POSITIONS, doc.positions.length);
   const choices: Choice[] = [
     ...(doc.summary
       ? [{ name: 'Summary', value: 'summary', checked: savedSet ? savedSet.has('summary') : true }]
@@ -1093,7 +1215,10 @@ async function selectSections(
     ...doc.positions.map((p, i) => ({
       name: `${p.title} @ ${p.company}  ${c.muted(`${p.startDate} – ${p.endDate ?? 'Present'} · ${p.bullets.length} bullet${p.bullets.length === 1 ? '' : 's'}`)}`,
       value: `pos:${i}`,
-      checked: savedSet ? savedSet.has(`pos:${i}`) : true,
+      checked: i < positionFloor ? true : savedSet ? savedSet.has(`pos:${i}`) : true,
+      ...(i < positionFloor
+        ? { disabled: '(always included — keeps experience section full)' }
+        : {}),
     })),
     ...(doc.education.length
       ? [
@@ -1169,48 +1294,14 @@ async function selectSections(
     },
   ])) as { selected: string[] };
 
-  const enabled = new Set(selected);
-
-  // Derive selected position indices from pos:N values
-  const selectedPosIdxs = selected
-    .filter((v) => v.startsWith('pos:'))
-    .map((v) => parseInt(v.slice(4), 10))
-    .sort((a, b) => a - b);
-
-  // Gap-fill: positions are newest-first; include every entry between selected extremes
-  const selectedPositions: ResumeDocument['positions'] = [];
-  if (selectedPosIdxs.length > 0) {
-    const maxIdx = Math.max(...selectedPosIdxs);
-    const selectedSet = new Set(selectedPosIdxs);
-    const autoFilled: string[] = [];
-    for (let i = 0; i <= maxIdx; i++) {
-      if (!selectedSet.has(i)) autoFilled.push(doc.positions[i]?.company ?? '');
-    }
-    if (autoFilled.length > 0) {
-      console.log(
-        `  ${c.warn} ${c.warning(`Re-included to avoid employment gaps: ${autoFilled.join(', ')}`)}`,
-      );
-    }
-    for (let i = 0; i <= maxIdx; i++) {
-      selectedPositions.push(doc.positions[i]);
-    }
+  const { doc: nextDoc, gapReincludedCompanies } = applyResumeSectionSelection(doc, selected);
+  if (gapReincludedCompanies.length > 0) {
+    console.log(
+      `  ${c.warn} ${c.warning(`Re-included to avoid employment gaps: ${gapReincludedCompanies.join(', ')}`)}`,
+    );
   }
 
-  return {
-    doc: {
-      ...doc,
-      summary: enabled.has('summary') ? doc.summary : undefined,
-      positions: selectedPositions,
-      education: enabled.has('education') ? doc.education : [],
-      skills: enabled.has('skills') ? doc.skills : [],
-      projects: enabled.has('projects') ? doc.projects : [],
-      certifications: enabled.has('certifications') ? doc.certifications : [],
-      languages: enabled.has('languages') ? doc.languages : [],
-      volunteer: enabled.has('volunteer') ? doc.volunteer : [],
-      awards: enabled.has('awards') ? doc.awards : [],
-    },
-    selected,
-  };
+  return { doc: nextDoc, selected };
 }
 
 // ---------------------------------------------------------------------------
@@ -1218,7 +1309,7 @@ async function selectSections(
 // ---------------------------------------------------------------------------
 
 const ALL_TEMPLATE_CONFIGS: Array<{
-  template: import('../profile/schema.js').TemplateName;
+  template: import('../profile/schema.ts').TemplateName;
   flair: FlairLevel;
   label: string;
 }> = [
@@ -1233,8 +1324,7 @@ async function generateAllTemplates(
   baseDoc: ResumeDocument,
   namePart: string,
   resumesDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileDir: string,
 ): Promise<string[]> {
   const paths: string[] = [];
@@ -1256,7 +1346,7 @@ async function generateAllTemplates(
     let html = await renderResumeHtml(doc);
 
     // Phase 1: try CSS squeeze before content removal
-    html = await trySqueeze(html, doc);
+    html = (await trySqueeze(html, doc)).html;
 
     // Phase 2: if still overflowing, ask user
     let skip = false;
@@ -1301,7 +1391,7 @@ async function generateAllTemplates(
       }
       doc = { ...currentBase, template: tc.template, flair: tc.flair };
       html = await renderResumeHtml(doc);
-      html = await trySqueeze(html, doc);
+      html = (await trySqueeze(html, doc)).html;
     }
 
     if (skip) {
@@ -1319,51 +1409,12 @@ async function generateAllTemplates(
 }
 
 // ---------------------------------------------------------------------------
-// CSS squeeze — try progressive layout tightening before content removal
-// ---------------------------------------------------------------------------
-
-async function trySqueeze(html: string, doc: ResumeDocument): Promise<string> {
-  const initial = await measurePageFit(html);
-  if (!initial.overflows) return html;
-
-  const levels: SqueezeLevel[] = [1, 2, 3];
-  let best = html;
-
-  for (const level of levels) {
-    if (initial.ratio < SQUEEZE_THRESHOLDS[level]) continue;
-
-    const squeezed = await renderResumeHtml(doc, buildFitOverrideCss(level));
-    const fit = await measurePageFit(squeezed);
-
-    if (!fit.overflows) {
-      const pct = Math.round(initial.ratio * 100);
-      console.log(c.muted(`  Fits after layout adjustments (was ${pct}%, squeeze level ${level})`));
-      return squeezed;
-    }
-    best = squeezed; // keep the tightest version as the base for user prompts
-  }
-
-  // Still overflowing after max squeeze — return the maximally-squeezed HTML
-  // so at least the remaining overflow is minimised before the user decides
-  const finalFit = await measurePageFit(best);
-  if (finalFit.ratio < initial.ratio) {
-    console.log(
-      c.muted(
-        `  Applied max layout adjustments (${Math.round(initial.ratio * 100)}% → ${Math.round(finalFit.ratio * 100)}%)`,
-      ),
-    );
-  }
-  return best;
-}
-
-// ---------------------------------------------------------------------------
 // Timeline logo collection — interactive, runs once before first render
 // ---------------------------------------------------------------------------
 
 async function collectTimelineLogos(
   doc: ResumeDocument,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileDir: string,
 ): Promise<Record<string, string>> {
   const names = [
@@ -1564,7 +1615,8 @@ async function editRefinedProfile(profileDir: string): Promise<void> {
   await openInEditor(refinedMd);
   const existing = await loadRefined(profileDir);
   const updatedProfile = await markdownToProfile(refinedMd, existing.profile);
-  await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir);
-  await profileToMarkdown(updatedProfile, refinedMd);
+  await saveRefined({ profile: updatedProfile, session: existing.session }, profileDir, {
+    reason: 'generate-md-sync',
+  });
   console.log('Refined data reloaded from markdown.');
 }

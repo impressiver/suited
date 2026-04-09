@@ -386,10 +386,10 @@ export interface RefinedData {
 }
 
 // ---------------------------------------------------------------------------
-// Persistent contact metadata — survives re-imports
+// Persistent contact metadata — survives re-imports (global XDG config, not profile dir)
 // ---------------------------------------------------------------------------
 
-/** Plain-string contact fields entered by the user, persisted in contact.json. */
+/** Plain-string contact fields entered by the user; stored in suited config dir (see `getGlobalContactMetaPath`). */
 export interface ContactMeta {
   headline?: string; // current professional title / tagline
   email?: string;
@@ -404,11 +404,31 @@ export interface ContactMeta {
 // Job refinements — per-job curation plan, stored for reuse
 // ---------------------------------------------------------------------------
 
+/**
+ * Last successful layout/CSS squeeze settings for this job so re-generating with the same
+ * flair + template choices reproduces the same fit-override path (see `trySqueeze` / `renderWithSqueeze`).
+ */
+export interface PinnedJobRender {
+  /** User-requested flair (before industry caps). */
+  requestedFlair: FlairLevel;
+  /** Flair on the `ResumeDocument` used for export (after caps). */
+  effectiveFlair: FlairLevel;
+  /** Template name on disk (`classic`, `modern`, …) used for the last PDF. */
+  resolvedTemplate: TemplateName;
+  /** Same as generate options — `undefined` means flair-driven selection only. */
+  templateOverride?: TemplateName;
+  /** `0` = no fit-override CSS; otherwise `buildFitOverrideCss(level)` tier applied. */
+  squeezeLevel: 0 | 1 | 2 | 3;
+  updatedAt: string;
+}
+
 export interface JobRefinement {
   jobId: string;
   createdAt: string;
   jobAnalysis: JobAnalysis;
   plan: CurationPlan;
+  /** When set, reuse these render parameters for the same job + flair + templateOverride to keep PDF layout squeeze repeatable. */
+  pinnedRender?: PinnedJobRender;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,15 +11,16 @@
  * Use responsibly and only on your own profile.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import puppeteer, { type Browser, type CookieData, type Page } from 'puppeteer-core';
-import { findChromePath } from '../utils/chrome.js';
-import { fileExists } from '../utils/fs.js';
-
-const SESSION_DIR = join(homedir(), '.suited');
-const SESSION_FILE = join(SESSION_DIR, 'linkedin-session.json');
+import { throwIfAborted } from '../utils/abort.ts';
+import { findChromePath } from '../utils/chrome.ts';
+import { fileExists } from '../utils/fs.ts';
+import {
+  getLegacyLinkedInSessionPath,
+  getLinkedInSessionPath,
+  getSuitedConfigDir,
+} from '../utils/suitedDirs.ts';
 
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
@@ -30,10 +31,19 @@ const USER_AGENT =
 // Session persistence — only linkedin.com cookies are saved/restored
 // ---------------------------------------------------------------------------
 
+async function resolveSessionReadPath(): Promise<string | undefined> {
+  const primary = getLinkedInSessionPath();
+  if (await fileExists(primary)) return primary;
+  const legacy = getLegacyLinkedInSessionPath();
+  if (await fileExists(legacy)) return legacy;
+  return undefined;
+}
+
 async function loadSession(): Promise<CookieData[]> {
   try {
-    if (await fileExists(SESSION_FILE)) {
-      const raw = await readFile(SESSION_FILE, 'utf-8');
+    const path = await resolveSessionReadPath();
+    if (path) {
+      const raw = await readFile(path, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed as CookieData[];
     }
@@ -48,22 +58,32 @@ async function saveSession(cookies: CookieData[]): Promise<void> {
   const linkedInCookies = cookies.filter(
     (c) => typeof c.domain === 'string' && c.domain.includes('linkedin.com'),
   );
+  const sessionDir = getSuitedConfigDir();
+  const sessionFile = getLinkedInSessionPath();
   try {
-    await mkdir(SESSION_DIR, { recursive: true });
-    await writeFile(SESSION_FILE, JSON.stringify(linkedInCookies, null, 2), 'utf-8');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionFile, JSON.stringify(linkedInCookies, null, 2), 'utf-8');
   } catch (err) {
     // Non-fatal: warn so the user knows why they'll be re-prompted next time
     console.warn(`  ⚠  Could not save LinkedIn session: ${(err as Error).message}`);
     console.warn(`     You will need to log in again on the next run.`);
   }
+  await unlink(getLegacyLinkedInSessionPath()).catch(() => {});
 }
 
 export async function clearLinkedInSession(): Promise<void> {
   try {
-    await writeFile(SESSION_FILE, '[]', 'utf-8');
+    await mkdir(getSuitedConfigDir(), { recursive: true });
+    await writeFile(getLinkedInSessionPath(), '[]', 'utf-8');
     console.log('LinkedIn session cleared.');
   } catch {
-    // File didn't exist — nothing to do
+    // Could not write new location — still try legacy below
+  }
+  try {
+    const legacy = getLegacyLinkedInSessionPath();
+    if (await fileExists(legacy)) await unlink(legacy);
+  } catch {
+    // ignore
   }
 }
 
@@ -410,7 +430,7 @@ async function gotoProfile(page: Page, url: string): Promise<void> {
  * Poll until LinkedIn's nav shows an authenticated session, then return.
  * Times out after 5 minutes.
  */
-async function waitForManualLogin(page: Page): Promise<void> {
+async function waitForManualLogin(page: Page, signal?: AbortSignal): Promise<void> {
   console.log('  Browser is open — log in to LinkedIn in the browser window...');
 
   const POLL_MS = 2_000;
@@ -418,6 +438,7 @@ async function waitForManualLogin(page: Page): Promise<void> {
   const deadline = Date.now() + TIMEOUT_MS;
 
   while (Date.now() < deadline) {
+    throwIfAborted(signal);
     await new Promise((r) => setTimeout(r, POLL_MS));
     // li_at is LinkedIn's primary session cookie — present immediately after
     // a successful login regardless of which page the browser has landed on.
@@ -439,6 +460,8 @@ export interface ScrapeOptions {
   credentials?: { email: string; password: string };
   /** Show the browser window (useful for 2FA / CAPTCHA) */
   headed?: boolean;
+  /** When aborted (e.g. TUI Esc), scraper stops between navigation steps. */
+  signal?: AbortSignal;
 }
 
 export async function scrapeLinkedInProfile(
@@ -446,6 +469,8 @@ export async function scrapeLinkedInProfile(
   options: ScrapeOptions = {},
 ): Promise<string> {
   const url = validateAndNormaliseUrl(rawUrl);
+  const { signal } = options;
+  throwIfAborted(signal);
 
   let browser: Browser | undefined;
 
@@ -463,6 +488,8 @@ export async function scrapeLinkedInProfile(
         );
       });
 
+    throwIfAborted(signal);
+
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
     await page.setViewport({ width: 1280, height: 900 });
@@ -475,12 +502,13 @@ export async function scrapeLinkedInProfile(
 
     console.log(`  Navigating to ${url} ...`);
     await gotoProfile(page, url);
+    throwIfAborted(signal);
 
     // Handle auth wall — in headed mode, wait for the user to log in manually;
     // in headless mode, prompt for credentials and drive the login form.
     if (!(await isLoggedIn(page))) {
       if (options.headed) {
-        await waitForManualLogin(page);
+        await waitForManualLogin(page, signal);
       } else {
         let creds = options.credentials;
 
@@ -508,10 +536,11 @@ export async function scrapeLinkedInProfile(
 
       console.log('  Loading profile...');
       await gotoProfile(page, url);
+      throwIfAborted(signal);
 
       // Save session after confirmed successful navigation to the profile
       await saveSession((await page.cookies()) as CookieData[]);
-      console.log(`  Session saved to ${SESSION_FILE}`);
+      console.log(`  Session saved to ${getLinkedInSessionPath()}`);
     }
 
     // Guard: confirm we're on the profile, not an auth wall or error page
@@ -523,8 +552,10 @@ export async function scrapeLinkedInProfile(
     }
 
     // Step 1: expand inline content on profile page, scroll, extract main profile text
+    throwIfAborted(signal);
     await expandInlineContent(page);
     await scrollAndWait(page);
+    throwIfAborted(signal);
 
     const profileText = await extractProfileText(page);
     assertLooksLikeProfile(profileText, url);
@@ -540,6 +571,7 @@ export async function scrapeLinkedInProfile(
     // Step 3: visit each detail page and extract its full content
     const sectionTexts: string[] = [profileText];
     for (const detailUrl of detailUrls) {
+      throwIfAborted(signal);
       const sectionName = detailUrl.match(/\/details\/([^/]+)/)?.[1] ?? 'section';
       console.log(`  Scraping ${sectionName}...`);
       try {

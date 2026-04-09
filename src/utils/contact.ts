@@ -1,4 +1,4 @@
-import type { Profile } from '../profile/schema.js';
+import type { Profile } from '../profile/schema.ts';
 import {
   loadContactMeta,
   loadRefined,
@@ -6,26 +6,33 @@ import {
   saveContactMeta,
   saveRefined,
   saveSource,
-} from '../profile/serializer.js';
-import { c } from './colors.js';
-import { fileExists } from './fs.js';
+} from '../profile/serializer.ts';
+import { c } from './colors.ts';
+import { fileExists } from './fs.ts';
 
-/**
- * Prompts for any missing contact fields (headline, email, phone, LinkedIn),
- * saves them to the active profile and to contact.json for future imports.
- * Returns the updated profile (unchanged if no fields were missing).
- */
-export async function ensureContactDetails(
-  profile: Profile,
-  profileDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inquirer: any,
-): Promise<Profile> {
+type InquirerCLI = typeof import('inquirer').default;
+
+/** Same fields as `ensureContactDetails` prompts for (human-readable labels). */
+export function missingContactDetailPromptLabels(profile: Profile): string[] {
   const missing: string[] = [];
   if (!profile.contact.headline) missing.push('job title');
   if (!profile.contact.email) missing.push('email');
   if (!profile.contact.phone) missing.push('phone');
   if (!profile.contact.linkedin) missing.push('LinkedIn URL');
+  return missing;
+}
+
+/**
+ * Prompts for any missing contact fields (headline, email, phone, LinkedIn),
+ * saves them to the active profile and to global contact config for future imports.
+ * Returns the updated profile (unchanged if no fields were missing).
+ */
+export async function ensureContactDetails(
+  profile: Profile,
+  profileDir: string,
+  inquirer: InquirerCLI,
+): Promise<Profile> {
+  const missing = missingContactDetailPromptLabels(profile);
   if (missing.length === 0) return profile;
 
   console.log(`\n${c.warn} ${c.warning(`Missing contact info: ${missing.join(', ')}`)}`);
@@ -76,12 +83,12 @@ export async function ensureContactDetails(
   // Persist to whichever profile is active
   if (await fileExists(refinedJsonPath(profileDir))) {
     const refined = await loadRefined(profileDir);
-    await saveRefined({ ...refined, profile: updated }, profileDir);
+    await saveRefined({ ...refined, profile: updated }, profileDir, { reason: 'contact-merge' });
   } else {
     await saveSource(updated, profileDir);
   }
 
-  // Also persist to contact.json so these details survive future re-imports
+  // Also persist to global contact config so these details survive future re-imports
   const existing = await loadContactMeta(profileDir);
   await saveContactMeta(
     {

@@ -1,17 +1,17 @@
-import { assertAccurate } from '../claude/accuracy-guard.js';
-import { callWithTool } from '../claude/client.js';
+import { assertAccurate } from '../claude/accuracy-guard.ts';
+import { callWithTool } from '../claude/client.ts';
 import {
   buildRefList,
   CURATE_SYSTEM,
   curateTool,
   type RefEntry,
-} from '../claude/prompts/curate.js';
+} from '../claude/prompts/curate.ts';
 import {
   type CurationPlan,
   CurationPlanSchema,
   type JobAnalysis,
   type Profile,
-} from '../profile/schema.js';
+} from '../profile/schema.ts';
 
 export interface CuratorResult {
   plan: CurationPlan;
@@ -53,7 +53,8 @@ function ensureConsecutiveEmployment(plan: CurationPlan, profile: Profile): Cura
   // Every position from index 0 to lastIdx must be included to avoid gaps
   const existingByPositionId = new Map(plan.selectedPositions.map((p) => [p.positionId, p]));
   const filledPositions = sorted.slice(0, lastIdx + 1).map((pos) => {
-    if (existingByPositionId.has(pos.id)) return existingByPositionId.get(pos.id)!;
+    const existing = existingByPositionId.get(pos.id);
+    if (existing !== undefined) return existing;
     // Gap-fill: include the position with all its bullets
     return {
       positionId: pos.id,

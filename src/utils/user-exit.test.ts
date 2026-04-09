@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUserExit } from './user-exit.js';
+import { isUserExit } from './user-exit.ts';
 
 describe('isUserExit', () => {
   it('returns false for non-Error values', () => {

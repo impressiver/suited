@@ -142,8 +142,10 @@ async function svgsFromHtml(html: string, origin: string): Promise<string[]> {
   for (const m of html.matchAll(/(?:src|href)=["']([^"']*\.svg[^"'?#]*)/gi)) {
     const url = resolveHref(m[1], origin);
     if (linkedUrls.has(url)) continue; // already captured via <link>
+    const idx = m.index;
+    if (idx === undefined) continue;
     // A bit of context before the match to detect logo intent
-    const ctx = html.slice(Math.max(0, m.index! - 100), m.index!);
+    const ctx = html.slice(Math.max(0, idx - 100), idx);
     if (/logo|brand|header|nav/i.test(ctx) || /logo|brand/i.test(m[1])) {
       logoPriority.push(url);
     } else {

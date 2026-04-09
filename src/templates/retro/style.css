@@ -1,4 +1,4 @@
-/* Retro Terminal template — amber phosphor on black, 1970s mainframe aesthetic */
+/* Retro Terminal template  -  amber phosphor on black, 1970s mainframe aesthetic */
 @import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
 
 :root {
@@ -168,7 +168,7 @@ a {
   margin-bottom: 2pt;
 }
 
-/* Company is primary — bold amber; title subordinate — dim */
+/* Company is primary  -  bold amber; title subordinate  -  dim */
 .position-company {
   font-weight: bold;
   font-size: 9pt;

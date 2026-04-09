@@ -1,5 +1,6 @@
+import { APIUserAbortError } from '@anthropic-ai/sdk';
 import chalk from 'chalk';
-import { callWithTool } from '../claude/client.js';
+import { callWithTool } from '../claude/client.ts';
 import {
   APPLY_JOB_FEEDBACK_SYSTEM,
   applyJobFeedbackTool,
@@ -7,6 +8,7 @@ import {
   buildJobFeedbackPrompt,
   type ConsultantFinding,
   FEEDBACK_QUESTIONS_SYSTEM,
+  type FeedbackQuestion,
   type FeedbackQuestionsOutput,
   feedbackQuestionsTool,
   JOB_CONSULTANT_SYSTEM,
@@ -17,18 +19,79 @@ import {
   type ProfileEvaluation,
   profileEvalTool,
   resumeDocToConsultantText,
-} from '../claude/prompts/consultant.js';
-import { profileToRefineText } from '../claude/prompts/refine.js';
-import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.js';
-import { c } from '../utils/colors.js';
+} from '../claude/prompts/consultant.ts';
+import { profileToRefineText } from '../claude/prompts/refine.ts';
+import type { JobAnalysis, Profile, ResumeDocument } from '../profile/schema.ts';
+import { c } from '../utils/colors.ts';
+import {
+  replaceEmDashes,
+  sanitizeConsultantFindings,
+  sanitizeJobEvaluation,
+  sanitizeProfileEvaluation,
+  sanitizeResumeDocument,
+} from '../utils/noEmDash.ts';
+
+/** User message label for section consultant when scoped to one experience role (`<!-- pos-id -->`). */
+export function buildExperiencePositionConsultantLabel(
+  profile: Profile,
+  positionId: string,
+): string {
+  const pos = profile.positions.find((p) => p.id === positionId);
+  if (pos == null) {
+    return `Experience (position id: ${positionId}). Evaluate only this role block; ignore other jobs.`;
+  }
+  return [
+    `Experience — ${pos.title.value} at ${pos.company.value} (position id: ${positionId}).`,
+    "Evaluate ONLY this role's bullets, title line, company, dates, and location.",
+    'Do not give feedback on other positions.',
+  ].join(' ');
+}
+
+type InquirerCLI = typeof import('inquirer').default;
+
+/**
+ * User message for a section-scoped hiring-consultant pass (document shell).
+ * The model still receives full profile text for context but instructions restrict feedback.
+ */
+export function buildSectionScopedProfileEvaluationUserMessage(
+  sectionLabel: string,
+  profile: Profile,
+): string {
+  const body = profileToRefineText(profile);
+  return [
+    `Evaluate ONLY the resume section described as: "${sectionLabel}".`,
+    'Give findings whose `area` field refers to that section (or a specific bullet within it).',
+    'Do NOT produce improvements for other sections — if you have no feedback for this section, return an empty improvements array and a short verdict.',
+    'You may use the rest of the profile only for context.',
+    '',
+    body,
+  ].join('\n');
+}
+
+/** Hiring consultant evaluation scoped to one section (TUI document shell / palette). */
+export async function evaluateProfileSection(
+  profile: Profile,
+  sectionLabel: string,
+  signal?: AbortSignal,
+): Promise<ProfileEvaluation> {
+  const ev = await callWithTool<ProfileEvaluation>(
+    PROFILE_CONSULTANT_SYSTEM,
+    buildSectionScopedProfileEvaluationUserMessage(sectionLabel, profile),
+    profileEvalTool,
+    undefined,
+    signal,
+  );
+  return sanitizeProfileEvaluation(ev);
+}
 
 /** Run the hiring consultant evaluation on a general (non-tailored) profile. */
 export async function evaluateProfile(profile: Profile): Promise<ProfileEvaluation> {
-  return callWithTool<ProfileEvaluation>(
+  const ev = await callWithTool<ProfileEvaluation>(
     PROFILE_CONSULTANT_SYSTEM,
     `Please evaluate this candidate's resume profile:\n\n${profileToRefineText(profile)}`,
     profileEvalTool,
   );
+  return sanitizeProfileEvaluation(ev);
 }
 
 /** Run the hiring consultant evaluation on a resume tailored for a specific job. */
@@ -36,16 +99,58 @@ export async function evaluateForJob(
   doc: ResumeDocument,
   jobAnalysis: JobAnalysis,
 ): Promise<JobEvaluation> {
-  return callWithTool<JobEvaluation>(
+  const ev = await callWithTool<JobEvaluation>(
     JOB_CONSULTANT_SYSTEM,
     `Please evaluate how well this resume is tailored for the role:\n\n${resumeDocToConsultantText(doc, jobAnalysis)}`,
     jobEvalTool,
   );
+  return sanitizeJobEvaluation(ev);
 }
 
 // ---------------------------------------------------------------------------
 // User enrichment — ask Claude what questions are needed, then prompt the user
 // ---------------------------------------------------------------------------
+
+/** Append factual answers to findings (same shape the apply prompt expects). */
+export function mergeConsultantFindingAnswers(
+  findings: ConsultantFinding[],
+  answersByFindingIndex: Map<number, string>,
+): ConsultantFinding[] {
+  return findings.map((f, i) => {
+    const answer = answersByFindingIndex.get(i);
+    return answer ? { ...f, suggestion: `${f.suggestion}\n  Candidate's details: ${answer}` } : f;
+  });
+}
+
+/**
+ * Asks the model which findings need extra facts from the candidate before apply.
+ * On failure, returns an empty list (caller proceeds without follow-up questions).
+ */
+export async function fetchConsultantFeedbackQuestions(
+  findings: ConsultantFinding[],
+  profileContext: string,
+  signal?: AbortSignal,
+): Promise<FeedbackQuestion[]> {
+  try {
+    const out = await callWithTool<FeedbackQuestionsOutput>(
+      FEEDBACK_QUESTIONS_SYSTEM,
+      buildFeedbackQuestionsPrompt(findings, profileContext),
+      feedbackQuestionsTool,
+      undefined,
+      signal,
+    );
+    const qs = out.questions ?? [];
+    return qs.map((q) => ({
+      findingIndex: q.findingIndex,
+      question: replaceEmDashes(q.question),
+    }));
+  } catch (err) {
+    if (err instanceof APIUserAbortError || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
+    return [];
+  }
+}
 
 /**
  * Uses Claude to determine which selected findings require additional factual
@@ -53,26 +158,13 @@ export async function evaluateForJob(
  * isn't already in the profile. Prompts the user only for those specific facts,
  * then returns findings enriched with the answers.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function enrichFindingsWithUserInput(
   findings: ConsultantFinding[],
-  inquirer: any,
+  inquirer: InquirerCLI,
   profileContext: string,
 ): Promise<ConsultantFinding[]> {
-  let questionsOutput: FeedbackQuestionsOutput;
-  try {
-    questionsOutput = await callWithTool<FeedbackQuestionsOutput>(
-      FEEDBACK_QUESTIONS_SYSTEM,
-      buildFeedbackQuestionsPrompt(findings, profileContext),
-      feedbackQuestionsTool,
-    );
-  } catch {
-    // If the question-generation call fails, proceed without enrichment
-    return findings;
-  }
-
-  const { questions } = questionsOutput;
-  if (questions.length === 0) return findings;
+  const questions = await fetchConsultantFeedbackQuestions(findings, profileContext);
+  if (questions.length === 0) return sanitizeConsultantFindings(findings);
 
   console.log(c.muted('\n  A few questions to fill in the details:'));
 
@@ -95,10 +187,8 @@ export async function enrichFindingsWithUserInput(
     if (answer.trim()) answers.set(q.findingIndex, answer.trim());
   }
 
-  return findings.map((f, i) => {
-    const answer = answers.get(i);
-    return answer ? { ...f, suggestion: `${f.suggestion}\n  Candidate's details: ${answer}` } : f;
-  });
+  const merged = mergeConsultantFindingAnswers(findings, answers);
+  return sanitizeConsultantFindings(merged);
 }
 
 /** Serialise a ResumeDocument into plain text for use as profile context. */
@@ -139,7 +229,7 @@ export async function applyJobFeedback(
   if (output.summary?.trim()) updated.summary = output.summary.trim();
   if (output.skills && output.skills.length > 0) updated.skills = output.skills;
 
-  return updated;
+  return sanitizeResumeDocument(updated);
 }
 
 // ---------------------------------------------------------------------------

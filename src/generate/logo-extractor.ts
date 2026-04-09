@@ -8,7 +8,7 @@
  */
 
 import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
-import { callWithTool } from '../claude/client.js';
+import { callWithTool } from '../claude/client.ts';
 
 // ---------------------------------------------------------------------------
 // Tool schema

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title><%= it.contact.name %> — Resume</title>
+  <title><%= it.contact.name %>  -  Resume</title>
   <style><%~ it.css %></style>
 </head>
 <body data-flair="<%= it.flair %>">

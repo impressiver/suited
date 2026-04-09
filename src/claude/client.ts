@@ -1,5 +1,9 @@
-import Anthropic, { APIError } from '@anthropic-ai/sdk';
-import type { Tool } from '@anthropic-ai/sdk/resources/messages/messages.js';
+import Anthropic, { APIError, APIUserAbortError } from '@anthropic-ai/sdk';
+import type {
+  ContentBlock,
+  RawMessageStreamEvent,
+  Tool,
+} from '@anthropic-ai/sdk/resources/messages/messages.js';
 import OpenAI from 'openai';
 
 export type StructuredResult<T> = T;
@@ -28,16 +32,24 @@ let _openrouter: OpenAI | null = null;
 
 function getAnthropicClient(): Anthropic {
   if (!_anthropic) {
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY is not set');
+    }
+    _anthropic = new Anthropic({ apiKey });
   }
   return _anthropic;
 }
 
 function getOpenRouterClient(): OpenAI {
   if (!_openrouter) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENROUTER_API_KEY is not set');
+    }
     _openrouter = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY!,
+      apiKey,
     });
   }
   return _openrouter;
@@ -86,16 +98,20 @@ async function callAnthropicTool<T>(
   userMessage: string,
   tool: Tool,
   model: string,
+  signal?: AbortSignal,
 ): Promise<T> {
   const client = getAnthropicClient();
-  const response = await client.messages.create({
-    model,
-    max_tokens: 8096,
-    system: systemPrompt,
-    tools: [tool],
-    tool_choice: { type: 'tool', name: tool.name },
-    messages: [{ role: 'user', content: userMessage }],
-  });
+  const response = await client.messages.create(
+    {
+      model,
+      max_tokens: 8096,
+      system: systemPrompt,
+      tools: [tool],
+      tool_choice: { type: 'tool', name: tool.name },
+      messages: [{ role: 'user', content: userMessage }],
+    },
+    { signal },
+  );
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
@@ -113,6 +129,7 @@ async function callOpenRouterTool<T>(
   userMessage: string,
   tool: Tool,
   model: string,
+  _signal?: AbortSignal,
 ): Promise<T> {
   const client = getOpenRouterClient();
 
@@ -153,17 +170,21 @@ export async function callWithTool<T>(
   userMessage: string,
   tool: Tool,
   model = 'claude-sonnet-4-6',
+  signal?: AbortSignal,
 ): Promise<StructuredResult<T>> {
   const backend = getBackend();
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       if (backend === 'openrouter') {
-        return await callOpenRouterTool<T>(systemPrompt, userMessage, tool, model);
+        return await callOpenRouterTool<T>(systemPrompt, userMessage, tool, model, signal);
       } else {
-        return await callAnthropicTool<T>(systemPrompt, userMessage, tool, model);
+        return await callAnthropicTool<T>(systemPrompt, userMessage, tool, model, signal);
       }
     } catch (err: unknown) {
+      if (err instanceof APIUserAbortError || (err instanceof Error && err.name === 'AbortError')) {
+        throw err;
+      }
       const isLast = attempt === MAX_RETRIES;
       if (!isRetryable(err) || isLast) throw err;
       await sleep(retryDelay(attempt, err));
@@ -171,4 +192,89 @@ export async function callWithTool<T>(
   }
 
   throw new Error('Unreachable');
+}
+
+async function* streamAnthropicToolUse<T>(
+  systemPrompt: string,
+  userMessage: string,
+  tool: Tool,
+  model: string,
+  signal?: AbortSignal,
+): AsyncGenerator<
+  | { type: 'text'; text: string }
+  | { type: 'tool_start'; name: string }
+  | { type: 'tool_end'; name: string }
+  | { type: 'done'; result: T }
+> {
+  const client = getAnthropicClient();
+  const stream = client.messages.stream(
+    {
+      model,
+      max_tokens: 8096,
+      system: systemPrompt,
+      tools: [tool],
+      tool_choice: { type: 'tool', name: tool.name },
+      messages: [{ role: 'user', content: userMessage }],
+    },
+    { signal },
+  );
+
+  for await (const ev of stream as AsyncIterable<RawMessageStreamEvent>) {
+    switch (ev.type) {
+      case 'content_block_start':
+        if (ev.content_block.type === 'tool_use') {
+          yield { type: 'tool_start', name: ev.content_block.name };
+        }
+        break;
+      case 'content_block_delta':
+        if (ev.delta.type === 'text_delta') {
+          yield { type: 'text', text: ev.delta.text };
+        }
+        break;
+      case 'content_block_stop': {
+        const snap = stream.currentMessage;
+        const block = snap?.content[ev.index];
+        if (block?.type === 'tool_use') {
+          yield { type: 'tool_end', name: block.name };
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  const final = await stream.finalMessage();
+  const toolUse = final.content.find((b: ContentBlock) => b.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  yield { type: 'done', result: toolUse.input as T };
+}
+
+/**
+ * Streams assistant output and tool-use lifecycle for the TUI. Anthropic uses
+ * {@link Anthropic.Messages#stream}; OpenRouter falls back to {@link callWithTool}
+ * (single `done` event) until a streaming tool path exists there.
+ */
+export async function* callWithToolStreaming<T>(
+  systemPrompt: string,
+  userMessage: string,
+  tool: Tool,
+  model = 'claude-sonnet-4-6',
+  signal?: AbortSignal,
+): AsyncGenerator<
+  | { type: 'text'; text: string }
+  | { type: 'tool_start'; name: string }
+  | { type: 'tool_end'; name: string }
+  | { type: 'done'; result: T }
+> {
+  const backend = getBackend();
+  if (backend === 'openrouter') {
+    const result = await callWithTool<T>(systemPrompt, userMessage, tool, model, signal);
+    yield { type: 'done', result };
+    return;
+  }
+
+  yield* streamAnthropicToolUse<T>(systemPrompt, userMessage, tool, model, signal);
 }

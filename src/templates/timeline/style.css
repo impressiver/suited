@@ -1,4 +1,4 @@
-/* Timeline template — dark header band, two-column body, prose experience entries */
+/* Timeline template  -  dark header band, two-column body, prose experience entries */
 :root {
   --header-bg: #1c2b3a;
   --header-text: #f1f5f9;
@@ -245,7 +245,7 @@ a {
   line-height: 1.35;
 }
 
-/* Company: muted — role is the primary identifier here */
+/* Company: muted  -  role is the primary identifier here */
 .entry-company {
   font-size: 7.5pt;
   color: var(--color-muted);
@@ -253,7 +253,7 @@ a {
   margin-right: 5pt;
 }
 
-/* Title: bold and dark — the thing that matters most */
+/* Title: bold and dark  -  the thing that matters most */
 .entry-title {
   font-size: 8.5pt;
   font-weight: 700;

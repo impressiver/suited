@@ -1,4 +1,4 @@
-/* Bold template — full sidebar, color block header */
+/* Bold template  -  full sidebar, color block header */
 :root {
   --color-accent: #3b1f2b;
   --color-highlight: #c9a84c;
@@ -43,7 +43,7 @@ a {
   text-decoration: none;
 }
 
-/* Sidebar — contact and skills only */
+/* Sidebar  -  contact and skills only */
 .sidebar {
   background: var(--color-sidebar-bg);
   color: var(--color-sidebar-text);
@@ -127,7 +127,7 @@ a {
   line-height: 1.5;
 }
 
-/* Sections — small fixed gap between all sections */
+/* Sections  -  small fixed gap between all sections */
 .section {
   margin-bottom: 8pt;
 }
@@ -161,7 +161,7 @@ a {
   margin-bottom: 6pt;
 }
 
-/* Experience — company primary, title subordinate */
+/* Experience  -  company primary, title subordinate */
 .position {
   margin-bottom: 8pt;
 }

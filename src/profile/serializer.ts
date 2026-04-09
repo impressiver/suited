@@ -1,7 +1,15 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileExists } from '../utils/fs.js';
+import { fileExists } from '../utils/fs.ts';
+import { isNoHistorySnapshotEnv } from '../utils/refinementHistoryEnv.ts';
+import { getGlobalContactMetaPath, getGlobalLogoCachePath } from '../utils/suitedDirs.ts';
+import { profileMarkdownContent } from './markdown.ts';
+import {
+  commitRefinementSnapshot,
+  type RefinementSaveReason,
+  refinedDataIdentityCanon,
+} from './refinementHistory.ts';
 import {
   type ContactMeta,
   type GenerationConfig,
@@ -10,7 +18,9 @@ import {
   ProfileSchema,
   type RefinedData,
   type SavedJob,
-} from './schema.js';
+} from './schema.ts';
+
+export type { RefinementSaveReason } from './refinementHistory.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,21 +104,77 @@ export function refinedMdPath(profileDir: string): string {
   return join(profileDir, 'refined.md');
 }
 
-export async function saveRefined(data: RefinedData, profileDir: string): Promise<void> {
-  data.profile.updatedAt = new Date().toISOString();
-  await writeJson(refinedJsonPath(profileDir), data);
+export interface SaveRefinedOptions {
+  /** Why the refined profile is being written (refinement history §3.2). */
+  reason?: RefinementSaveReason;
+  /** When reason is manual-restore, the snapshot id being restored from (§5). */
+  restoreSourceId?: string;
+  maxHistorySnapshots?: number;
+  /**
+   * When true, do not append a `refined-history/` snapshot before overwriting (§4 exception).
+   * Also set via CLI `--no-history-snapshot` or env `SUITED_NO_HISTORY_SNAPSHOT=1`.
+   */
+  skipHistorySnapshot?: boolean;
 }
 
-export async function loadRefined(profileDir: string): Promise<RefinedData> {
-  const path = refinedJsonPath(profileDir);
-  if (!(await fileExists(path))) {
-    throw new Error(`refined.json not found in ${profileDir}. Run 'resume refine' first.`);
+export async function saveRefined(
+  data: RefinedData,
+  profileDir: string,
+  options?: SaveRefinedOptions,
+): Promise<void> {
+  const jsonPath = refinedJsonPath(profileDir);
+  const mdPath = refinedMdPath(profileDir);
+  const existing = await loadRefinedIfExists(profileDir);
+
+  const nextUpdatedAt = new Date().toISOString();
+  const pending: RefinedData = {
+    profile: { ...data.profile, updatedAt: nextUpdatedAt },
+    session: data.session,
+  };
+  const skipSnapshot = options?.skipHistorySnapshot === true || isNoHistorySnapshotEnv();
+
+  if (existing) {
+    if (refinedDataIdentityCanon(pending) === refinedDataIdentityCanon(existing)) {
+      return;
+    }
+    if (!skipSnapshot) {
+      await commitRefinementSnapshot(profileDir, existing, options?.reason ?? 'unspecified', {
+        restoreSourceId: options?.restoreSourceId,
+        maxSnapshots: options?.maxHistorySnapshots,
+      });
+    }
   }
+
+  data.profile.updatedAt = nextUpdatedAt;
+
+  await mkdir(dirname(jsonPath), { recursive: true });
+  const jsonTmp = join(dirname(jsonPath), `.refined.json.tmp.${randomBytes(8).toString('hex')}`);
+  await writeFile(jsonTmp, JSON.stringify(pending, null, 2), 'utf-8');
+  await rename(jsonTmp, jsonPath);
+
+  await mkdir(dirname(mdPath), { recursive: true });
+  const mdTmp = join(dirname(mdPath), `.refined.md.tmp.${randomBytes(8).toString('hex')}`);
+  await writeFile(mdTmp, profileMarkdownContent(pending.profile), 'utf-8');
+  await rename(mdTmp, mdPath);
+}
+
+/** Load refined data when `refined.json` exists; otherwise `null` (no throw). */
+export async function loadRefinedIfExists(profileDir: string): Promise<RefinedData | null> {
+  const path = refinedJsonPath(profileDir);
+  if (!(await fileExists(path))) return null;
   const raw = await readJson<{ profile: unknown; session: unknown }>(path);
   return {
     profile: parseProfile(raw.profile),
     session: raw.session as RefinedData['session'],
   };
+}
+
+export async function loadRefined(profileDir: string): Promise<RefinedData> {
+  const data = await loadRefinedIfExists(profileDir);
+  if (!data) {
+    throw new Error(`refined.json not found in ${profileDir}. Run 'resume refine' first.`);
+  }
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +187,11 @@ export function jobRefinedJsonPath(profileDir: string, slug: string): string {
 
 export function jobRefinedMdPath(profileDir: string, slug: string): string {
   return join(profileDir, 'jobs', slug, 'refined.md');
+}
+
+/** Per-job cover letter draft (Markdown). See specs/cover-letter-pdf.md. */
+export function coverLetterMdPath(profileDir: string, slug: string): string {
+  return join(profileDir, 'jobs', slug, 'cover-letter.md');
 }
 
 export async function saveJobRefinedProfile(
@@ -189,6 +260,11 @@ export async function loadJobs(profileDir: string): Promise<SavedJob[]> {
   return readJson<SavedJob[]>(path);
 }
 
+export async function loadSavedJobById(profileDir: string, id: string): Promise<SavedJob | null> {
+  const jobs = await loadJobs(profileDir);
+  return jobs.find((j) => j.id === id) ?? null;
+}
+
 export async function saveJob(job: SavedJob, profileDir: string): Promise<void> {
   const jobs = await loadJobs(profileDir);
   if (jobs.some((j) => j.textHash === job.textHash)) return; // already saved
@@ -204,17 +280,38 @@ export async function deleteJob(id: string, profileDir: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Contact metadata — persisted across re-imports
+// Contact metadata — global config (XDG); legacy under profileDir migrated on read/write
 // ---------------------------------------------------------------------------
 
-export function contactMetaPath(profileDir: string): string {
+function legacyContactMetaPath(profileDir: string): string {
   return join(profileDir, 'contact.json');
 }
 
+function contactMetaHasValues(meta: ContactMeta): boolean {
+  return Object.values(meta).some((v) => typeof v === 'string' && v.length > 0);
+}
+
 export async function loadContactMeta(profileDir: string): Promise<ContactMeta> {
-  const path = contactMetaPath(profileDir);
-  if (!(await fileExists(path))) return {};
-  return readJson<ContactMeta>(path);
+  const globalPath = getGlobalContactMetaPath();
+  let fromGlobal: ContactMeta = {};
+  if (await fileExists(globalPath)) {
+    try {
+      fromGlobal = await readJson<ContactMeta>(globalPath);
+    } catch {
+      fromGlobal = {};
+    }
+  }
+  if (contactMetaHasValues(fromGlobal)) return fromGlobal;
+
+  const legacy = legacyContactMetaPath(profileDir);
+  if (await fileExists(legacy)) {
+    try {
+      return await readJson<ContactMeta>(legacy);
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 export async function saveContactMeta(meta: ContactMeta, profileDir: string): Promise<void> {
@@ -222,7 +319,8 @@ export async function saveContactMeta(meta: ContactMeta, profileDir: string): Pr
   const clean: ContactMeta = Object.fromEntries(
     Object.entries(meta).filter(([, v]) => typeof v === 'string' && (v as string).length > 0),
   ) as ContactMeta;
-  await writeJson(contactMetaPath(profileDir), clean);
+  await writeJson(getGlobalContactMetaPath(), clean);
+  await unlink(legacyContactMetaPath(profileDir)).catch(() => {});
 }
 
 /**
@@ -277,6 +375,16 @@ export async function deleteJobRefinement(jobId: string, profileDir: string): Pr
   });
 }
 
+/** After a global refined restore, drop layout squeeze hints that may no longer match content (§5.1 refinement-history). */
+export async function clearPinnedRenderForAllJobs(profileDir: string): Promise<void> {
+  const jobs = await loadJobs(profileDir);
+  for (const job of jobs) {
+    const refinement = await loadJobRefinement(profileDir, job.id);
+    if (!refinement?.pinnedRender) continue;
+    await saveJobRefinement({ ...refinement, pinnedRender: undefined }, profileDir);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Invalidation helpers
 // ---------------------------------------------------------------------------
@@ -302,26 +410,50 @@ export async function clearGenerationConfig(profileDir: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Logo cache — persists resolved SVG data URIs keyed by company/institution name
+// Logo cache — global XDG cache; legacy under profileDir merged then removed
 // ---------------------------------------------------------------------------
 
-export function logoCachePath(profileDir: string): string {
+function legacyLogoCachePath(profileDir: string): string {
   return join(profileDir, 'logo-cache.json');
 }
 
 export async function loadLogoCache(profileDir: string): Promise<Record<string, string>> {
-  try {
-    return await readJson<Record<string, string>>(logoCachePath(profileDir));
-  } catch {
-    return {};
+  const globalPath = getGlobalLogoCachePath();
+  let globalCache: Record<string, string> = {};
+  if (await fileExists(globalPath)) {
+    try {
+      globalCache = await readJson<Record<string, string>>(globalPath);
+    } catch {
+      globalCache = {};
+    }
   }
+
+  const legacyPath = legacyLogoCachePath(profileDir);
+  let legacyCache: Record<string, string> = {};
+  if (await fileExists(legacyPath)) {
+    try {
+      legacyCache = await readJson<Record<string, string>>(legacyPath);
+    } catch {
+      legacyCache = {};
+    }
+  }
+
+  if (Object.keys(legacyCache).length === 0) return globalCache;
+
+  const merged = { ...legacyCache, ...globalCache };
+  await writeJson(globalPath, merged);
+  await unlink(legacyPath).catch(() => {
+    /* already gone */
+  });
+  return merged;
 }
 
 export async function saveLogoCache(
   cache: Record<string, string>,
   profileDir: string,
 ): Promise<void> {
-  await writeJson(logoCachePath(profileDir), cache);
+  await writeJson(getGlobalLogoCachePath(), cache);
+  await unlink(legacyLogoCachePath(profileDir)).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------

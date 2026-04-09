@@ -2,7 +2,17 @@
  * Profile ↔ Markdown serialization.
  *
  * Every sourced value is emitted with an inline <!-- src:{...} --> annotation.
- * The parser reads those annotations back and compares values to detect user edits.
+ * Block metadata (`<!-- pos-id -->`, `<!-- edu-id -->`, schema headers, etc.) is
+ * internal. The TUI refined editor buffer is {@link stripHtmlCommentsFromProfileMarkdown}
+ * (no `<!-- ... -->` in the field; comment-only physical lines are removed so there are no
+ * blank “metadata” rows). The editor renders **one terminal cell per character** so caret,
+ * mouse, and selection stay aligned. The read-only resume pane still uses lightweight hint
+ * styling (dim/bold) without eliding characters.
+ * Parse with {@link parseDisplayMarkdownStringToProfile}; save re-runs {@link profileMarkdownContent}
+ * so comments and `src` tags are restored — diffing on-disk `refined.md` against the
+ * in-memory display string shows metadata as the only structural addition.
+ *
+ * The canonical parser reads `src` annotations back and compares values to detect user edits.
  * Changed values are upgraded to { kind: 'user-edit', editedAt: now }.
  *
  * Sections handled for round-trip: contact (all fields), summary, experience
@@ -11,7 +21,7 @@
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { deduplicateSkills } from '../ingestion/normalizer.js';
+import { deduplicateSkills } from '../ingestion/normalizer.ts';
 import type {
   Certification,
   DataSource,
@@ -23,7 +33,7 @@ import type {
   Skill,
   Sourced,
   VolunteerRole,
-} from './schema.js';
+} from './schema.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,7 +62,7 @@ function upgradeIfChanged<T>(parsed: T, original: Sourced<T> | undefined, now: s
 // Profile → Markdown
 // ---------------------------------------------------------------------------
 
-export async function profileToMarkdown(profile: Profile, filePath: string): Promise<void> {
+export function profileMarkdownContent(profile: Profile): string {
   const lines: string[] = [];
 
   lines.push('# Resume Profile\n\n');
@@ -62,6 +72,7 @@ export async function profileToMarkdown(profile: Profile, filePath: string): Pro
   // Contact
   lines.push('## Contact\n\n');
   lines.push(sf('Name', profile.contact.name));
+  lines.push(sf('Headline', profile.contact.headline));
   lines.push(sf('Email', profile.contact.email));
   lines.push(sf('Phone', profile.contact.phone));
   lines.push(sf('Location', profile.contact.location));
@@ -177,7 +188,11 @@ export async function profileToMarkdown(profile: Profile, filePath: string): Pro
     }
   }
 
-  await writeFile(filePath, lines.filter(Boolean).join(''), 'utf-8');
+  return lines.filter(Boolean).join('');
+}
+
+export async function profileToMarkdown(profile: Profile, filePath: string): Promise<void> {
+  await writeFile(filePath, profileMarkdownContent(profile), 'utf-8');
 }
 
 // ---------------------------------------------------------------------------
@@ -203,8 +218,31 @@ interface ParsedField {
   source: DataSource;
 }
 
+/**
+ * Remove `<!-- ... -->` metadata for the TUI editor.
+ *
+ * Physical lines that are **only** HTML comments (e.g. `<!-- pos-id:… -->`) are **dropped**
+ * entirely so the buffer has no “hidden” rows — the caret and mouse map 1:1 to visible lines.
+ * Lines that still contain text after stripping (inline `src`, etc.) are kept.
+ */
+export function stripHtmlCommentsFromProfileMarkdown(md: string): string {
+  const normalized = md.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  const HTML_COMMENT = /<!--[\s\S]*?-->/g;
+  const HAS_COMMENT = /<!--[\s\S]*?-->/;
+  const out: string[] = [];
+  for (const row of normalized.split('\n')) {
+    const hadHtmlComment = HAS_COMMENT.test(row);
+    const without = row.replace(HTML_COMMENT, '').replace(/\s+$/, '');
+    if (hadHtmlComment && without.trim() === '') {
+      continue;
+    }
+    out.push(without);
+  }
+  return out.join('\n');
+}
+
 /** Extract `**Label:** value <!-- src:{...} -->` from a line */
-function parseField(line: string): ParsedField | null {
+function parseFieldStrict(line: string): ParsedField | null {
   const m = line.match(/^\*\*([^*]+):\*\*\s+(.*?)\s+<!--\s*src:(\{.*?\})\s*-->/);
   if (!m) return null;
   try {
@@ -214,8 +252,19 @@ function parseField(line: string): ParsedField | null {
   }
 }
 
+/** `**Label:** value` without provenance comment (TUI display markdown). */
+function parseFieldDisplay(line: string, now: string): ParsedField | null {
+  const m = line.match(/^\*\*([^*]+):\*\*\s+(.*)$/);
+  if (!m) return null;
+  return { label: m[1].trim(), value: m[2].trim(), source: userEditSource(now) };
+}
+
+function parseFieldFromLine(line: string, display: boolean, now: string): ParsedField | null {
+  return display ? parseFieldDisplay(line, now) : parseFieldStrict(line);
+}
+
 /** Extract inline item `- value <!-- src:{...} -->` from a line */
-function parseInlineItem(line: string): { value: string; source: DataSource } | null {
+function parseInlineItemStrict(line: string): { value: string; source: DataSource } | null {
   const m = line.match(/^(?:<!--[^>]*-->\s*)?-\s+(.*?)\s+<!--\s*src:(\{.*?\})\s*-->/);
   if (!m) return null;
   try {
@@ -225,10 +274,61 @@ function parseInlineItem(line: string): { value: string; source: DataSource } | 
   }
 }
 
+function parseInlineItemDisplay(
+  line: string,
+  now: string,
+): { value: string; source: DataSource } | null {
+  const m = line.trim().match(/^\s*-\s+(.+)$/);
+  if (!m) return null;
+  return { value: m[1].trim(), source: userEditSource(now) };
+}
+
+function parseInlineItemFromLine(
+  line: string,
+  display: boolean,
+  now: string,
+): { value: string; source: DataSource } | null {
+  return display ? parseInlineItemDisplay(line, now) : parseInlineItemStrict(line);
+}
+
+/** `### Title at Company` heading body (emitted format for experience). */
+function parseExperienceHeadingLine(line: string): { title: string; company: string } | null {
+  const t = line.trim().replace(/^###\s+/, '');
+  const at = t.lastIndexOf(' at ');
+  if (at === -1) return null;
+  const title = t.slice(0, at).trim();
+  const company = t.slice(at + 4).trim();
+  if (!title || !company) return null;
+  return { title, company };
+}
+
+/** `### Institution` (education block start). */
+function parseEducationHeadingLine(line: string): string | null {
+  const m = line.trim().match(/^###\s+(.+)$/);
+  return m?.[1]?.trim() ?? null;
+}
+
 /** Extract `<!-- key:value -->` from a line */
 function parseMetaComment(line: string, key: string): string | null {
   const m = line.match(new RegExp(`<!--\\s*${key}:([^\\s>]+)\\s*-->`));
   return m ? m[1] : null;
+}
+
+/**
+ * Parse resume markdown from a string (same rules as on-disk `refined.md`).
+ * Use when the TUI holds markdown in memory instead of reading a temp file.
+ */
+export function parseMarkdownStringToProfile(md: string, originalProfile: Profile): Profile {
+  return parseMarkdownBodyToProfile(md.split('\n'), originalProfile, false);
+}
+
+/**
+ * Parse markdown shown in the TUI editor after {@link stripHtmlCommentsFromProfileMarkdown}
+ * (no `<!-- ... -->` lines or inline comments). Re-serialize with {@link profileMarkdownContent}
+ * to restore metadata on save.
+ */
+export function parseDisplayMarkdownStringToProfile(md: string, originalProfile: Profile): Profile {
+  return parseMarkdownBodyToProfile(md.split('\n'), originalProfile, true);
 }
 
 export async function markdownToProfile(
@@ -236,10 +336,16 @@ export async function markdownToProfile(
   originalProfile: Profile,
 ): Promise<Profile> {
   const md = await readFile(mdPath, 'utf-8');
+  return parseMarkdownBodyToProfile(md.split('\n'), originalProfile, false);
+}
+
+function parseMarkdownBodyToProfile(
+  lines: string[],
+  originalProfile: Profile,
+  display: boolean,
+): Profile {
   const now = new Date().toISOString();
   const up = (v: string, orig: Sourced<string> | undefined) => upgradeIfChanged(v, orig, now);
-
-  const lines = md.split('\n');
 
   // Working state
   let section: Section = '';
@@ -287,6 +393,13 @@ export async function markdownToProfile(
   let skillCounter = 0;
   let langCounter = 0;
 
+  const experienceOrder: string[] = [];
+  const educationOrder: string[] = [];
+  const certificationsOrder: string[] = [];
+  const projectsOrder: string[] = [];
+  const volunteerOrder: string[] = [];
+  let expBlockIdx = -1;
+
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const line = raw.trim();
@@ -304,11 +417,18 @@ export async function markdownToProfile(
       section = 'experience';
       currentPosId = null;
       inBullets = false;
+      if (display) {
+        experienceOrder.length = 0;
+        expBlockIdx = -1;
+      }
       continue;
     }
     if (/^## Education/.test(line)) {
       section = 'education';
       currentEduId = null;
+      if (display) {
+        educationOrder.length = 0;
+      }
       continue;
     }
     if (/^## Skills/.test(line)) {
@@ -318,11 +438,17 @@ export async function markdownToProfile(
     if (/^## Certifications/.test(line)) {
       section = 'certifications';
       currentCertId = null;
+      if (display) {
+        certificationsOrder.length = 0;
+      }
       continue;
     }
     if (/^## Projects/.test(line)) {
       section = 'projects';
       currentProjId = null;
+      if (display) {
+        projectsOrder.length = 0;
+      }
       continue;
     }
     if (/^## Languages/.test(line)) {
@@ -332,6 +458,9 @@ export async function markdownToProfile(
     if (/^## Volunteer/.test(line)) {
       section = 'volunteer';
       currentVolId = null;
+      if (display) {
+        volunteerOrder.length = 0;
+      }
       continue;
     }
     if (/^## Awards/.test(line)) {
@@ -344,11 +473,16 @@ export async function markdownToProfile(
 
     // --- Contact section ---
     if (section === 'contact') {
-      const f = parseField(line);
+      const f = parseFieldFromLine(line, display, now);
       if (!f) continue;
       switch (f.label) {
         case 'Name':
           contact.name = up(f.value, contact.name);
+          break;
+        case 'Headline':
+          contact.headline = contact.headline
+            ? up(f.value, contact.headline)
+            : { value: f.value, source: f.source };
           break;
         case 'Email':
           contact.email = contact.email
@@ -386,27 +520,33 @@ export async function markdownToProfile(
 
     // --- Summary section ---
     if (section === 'summary') {
-      const m = line.match(/^(.*?)\s+<!--\s*src:(\{.*?\})\s*-->/);
-      if (m) {
-        const text = m[1].trim();
-        parsedSummary = up(text, parsedSummary);
+      if (display) {
+        parsedSummary = up(line, parsedSummary);
+      } else {
+        const m = line.match(/^(.*?)\s+<!--\s*src:(\{.*?\})\s*-->/);
+        if (m) {
+          const text = m[1].trim();
+          parsedSummary = up(text, parsedSummary);
+        }
       }
       continue;
     }
 
     // --- Experience section ---
     if (section === 'experience') {
-      const posId = parseMetaComment(line, 'pos-id');
-      if (posId) {
-        currentPosId = posId;
-        inBullets = false;
-        bulletIdx = 0;
-        // Ensure we have a clone in posMap
-        if (!posMap.has(posId)) {
-          const orig = originalProfile.positions.find((p) => p.id === posId);
-          if (orig) posMap.set(posId, structuredClone(orig) as Position);
+      if (!display) {
+        const posId = parseMetaComment(line, 'pos-id');
+        if (posId) {
+          currentPosId = posId;
+          inBullets = false;
+          bulletIdx = 0;
+          // Ensure we have a clone in posMap
+          if (!posMap.has(posId)) {
+            const orig = originalProfile.positions.find((p) => p.id === posId);
+            if (orig) posMap.set(posId, structuredClone(orig) as Position);
+          }
+          continue;
         }
-        continue;
       }
       if (line === '**Bullets:**') {
         inBullets = true;
@@ -414,6 +554,46 @@ export async function markdownToProfile(
         continue;
       }
       if (line.startsWith('### ')) {
+        if (display) {
+          expBlockIdx++;
+          const ph = parseExperienceHeadingLine(line);
+          let id: string | undefined;
+          if (ph) {
+            const found = originalProfile.positions.find(
+              (p) => p.title.value === ph.title && p.company.value === ph.company,
+            );
+            id = found?.id;
+          }
+          if (!id) {
+            id =
+              originalProfile.positions[expBlockIdx]?.id ??
+              `pos-new-${expBlockIdx}-${skillCounter++}`;
+          }
+          currentPosId = id;
+          if (!posMap.has(id)) {
+            const origByIdx = originalProfile.positions[expBlockIdx];
+            if (origByIdx?.id === id) {
+              posMap.set(id, structuredClone(origByIdx) as Position);
+            } else if (ph) {
+              posMap.set(id, {
+                id,
+                title: { value: ph.title, source: userEditSource(now) },
+                company: { value: ph.company, source: userEditSource(now) },
+                startDate: { value: '', source: userEditSource(now) },
+                bullets: [],
+              });
+            } else {
+              posMap.set(id, {
+                id,
+                title: { value: 'Title', source: userEditSource(now) },
+                company: { value: 'Company', source: userEditSource(now) },
+                startDate: { value: '', source: userEditSource(now) },
+                bullets: [],
+              });
+            }
+          }
+          experienceOrder.push(id);
+        }
         inBullets = false;
         bulletIdx = 0;
         continue;
@@ -424,17 +604,19 @@ export async function markdownToProfile(
       if (!pos) continue;
 
       if (inBullets) {
-        const item = parseInlineItem(line);
+        const item = parseInlineItemFromLine(line, display, now);
         if (item) {
           if (bulletIdx < pos.bullets.length) {
             pos.bullets[bulletIdx] = up(item.value, pos.bullets[bulletIdx]);
+          } else if (display) {
+            pos.bullets.push({ value: item.value, source: item.source });
           }
           bulletIdx++;
         }
         continue;
       }
 
-      const f = parseField(line);
+      const f = parseFieldFromLine(line, display, now);
       if (!f) continue;
       switch (f.label) {
         case 'Title':
@@ -462,20 +644,49 @@ export async function markdownToProfile(
 
     // --- Education section ---
     if (section === 'education') {
-      const eduId = parseMetaComment(line, 'edu-id');
-      if (eduId) {
-        currentEduId = eduId;
-        if (!eduMap.has(eduId)) {
-          const orig = originalProfile.education.find((e) => e.id === eduId);
-          if (orig) eduMap.set(eduId, structuredClone(orig) as Education);
+      if (display) {
+        if (line.startsWith('### ')) {
+          const inst = parseEducationHeadingLine(line);
+          if (inst) {
+            const found = originalProfile.education.find((e) => e.institution.value === inst);
+            const id =
+              found?.id ??
+              originalProfile.education[educationOrder.length]?.id ??
+              `edu-new-${educationOrder.length}`;
+            currentEduId = id;
+            if (!eduMap.has(id)) {
+              const origByIdx = originalProfile.education[educationOrder.length];
+              if (found) {
+                eduMap.set(id, structuredClone(found) as Education);
+              } else if (origByIdx?.id === id) {
+                eduMap.set(id, structuredClone(origByIdx) as Education);
+              } else {
+                eduMap.set(id, {
+                  id,
+                  institution: { value: inst, source: userEditSource(now) },
+                });
+              }
+            }
+            educationOrder.push(id);
+          }
+          continue;
         }
-        continue;
+      } else {
+        const eduId = parseMetaComment(line, 'edu-id');
+        if (eduId) {
+          currentEduId = eduId;
+          if (!eduMap.has(eduId)) {
+            const orig = originalProfile.education.find((e) => e.id === eduId);
+            if (orig) eduMap.set(eduId, structuredClone(orig) as Education);
+          }
+          continue;
+        }
       }
       if (!currentEduId || line.startsWith('### ')) continue;
       const edu = eduMap.get(currentEduId);
       if (!edu) continue;
 
-      const f = parseField(line);
+      const f = parseFieldFromLine(line, display, now);
       if (!f) continue;
       switch (f.label) {
         case 'Institution':
@@ -513,13 +724,14 @@ export async function markdownToProfile(
 
     // --- Skills section ---
     if (section === 'skills') {
-      // Format: <!-- skill-id:skill-0 --> - Skill Name <!-- src:{...} -->
-      const idMatch = line.match(/<!--\s*skill-id:([^\s>]+)\s*-->/);
-      const item = parseInlineItem(line);
+      const idMatch = display ? null : line.match(/<!--\s*skill-id:([^\s>]+)\s*-->/);
+      const item = parseInlineItemFromLine(line, display, now);
       if (item) {
         const origSkillId = idMatch?.[1];
-        const origSkill = originalProfile.skills.find((s) => s.id === origSkillId);
-        const skillId = origSkillId ?? `skill-${skillCounter++}`;
+        const origSkill = display
+          ? originalProfile.skills[parsedSkills.length]
+          : originalProfile.skills.find((s) => s.id === origSkillId);
+        const skillId = origSkillId ?? origSkill?.id ?? `skill-${skillCounter++}`;
         parsedSkills.push({
           id: skillId,
           name: up(item.value, origSkill?.name),
@@ -530,20 +742,49 @@ export async function markdownToProfile(
 
     // --- Certifications section ---
     if (section === 'certifications') {
-      const certId = parseMetaComment(line, 'cert-id');
-      if (certId) {
-        currentCertId = certId;
-        if (!certMap.has(certId)) {
-          const orig = originalProfile.certifications.find((c) => c.id === certId);
-          if (orig) certMap.set(certId, structuredClone(orig) as Certification);
+      if (display) {
+        if (line.startsWith('### ')) {
+          const title = parseEducationHeadingLine(line);
+          if (title) {
+            const found = originalProfile.certifications.find((c) => c.name.value === title);
+            const id =
+              found?.id ??
+              originalProfile.certifications[certificationsOrder.length]?.id ??
+              `cert-new-${certificationsOrder.length}`;
+            currentCertId = id;
+            if (!certMap.has(id)) {
+              const origByIdx = originalProfile.certifications[certificationsOrder.length];
+              if (found) {
+                certMap.set(id, structuredClone(found) as Certification);
+              } else if (origByIdx?.id === id) {
+                certMap.set(id, structuredClone(origByIdx) as Certification);
+              } else {
+                certMap.set(id, {
+                  id,
+                  name: { value: title, source: userEditSource(now) },
+                });
+              }
+            }
+            certificationsOrder.push(id);
+          }
+          continue;
         }
-        continue;
+      } else {
+        const certId = parseMetaComment(line, 'cert-id');
+        if (certId) {
+          currentCertId = certId;
+          if (!certMap.has(certId)) {
+            const orig = originalProfile.certifications.find((c) => c.id === certId);
+            if (orig) certMap.set(certId, structuredClone(orig) as Certification);
+          }
+          continue;
+        }
       }
       if (!currentCertId || line.startsWith('### ')) continue;
       const cert = certMap.get(currentCertId);
       if (!cert) continue;
 
-      const f = parseField(line);
+      const f = parseFieldFromLine(line, display, now);
       if (!f) continue;
       switch (f.label) {
         case 'Name':
@@ -565,20 +806,49 @@ export async function markdownToProfile(
 
     // --- Projects section ---
     if (section === 'projects') {
-      const projId = parseMetaComment(line, 'proj-id');
-      if (projId) {
-        currentProjId = projId;
-        if (!projMap.has(projId)) {
-          const orig = originalProfile.projects.find((p) => p.id === projId);
-          if (orig) projMap.set(projId, structuredClone(orig) as Project);
+      if (display) {
+        if (line.startsWith('### ')) {
+          const title = parseEducationHeadingLine(line);
+          if (title) {
+            const found = originalProfile.projects.find((p) => p.title.value === title);
+            const id =
+              found?.id ??
+              originalProfile.projects[projectsOrder.length]?.id ??
+              `proj-new-${projectsOrder.length}`;
+            currentProjId = id;
+            if (!projMap.has(id)) {
+              const origByIdx = originalProfile.projects[projectsOrder.length];
+              if (found) {
+                projMap.set(id, structuredClone(found) as Project);
+              } else if (origByIdx?.id === id) {
+                projMap.set(id, structuredClone(origByIdx) as Project);
+              } else {
+                projMap.set(id, {
+                  id,
+                  title: { value: title, source: userEditSource(now) },
+                });
+              }
+            }
+            projectsOrder.push(id);
+          }
+          continue;
         }
-        continue;
+      } else {
+        const projId = parseMetaComment(line, 'proj-id');
+        if (projId) {
+          currentProjId = projId;
+          if (!projMap.has(projId)) {
+            const orig = originalProfile.projects.find((p) => p.id === projId);
+            if (orig) projMap.set(projId, structuredClone(orig) as Project);
+          }
+          continue;
+        }
       }
       if (!currentProjId || line.startsWith('### ')) continue;
       const proj = projMap.get(currentProjId);
       if (!proj) continue;
 
-      const f = parseField(line);
+      const f = parseFieldFromLine(line, display, now);
       if (!f) continue;
       switch (f.label) {
         case 'Title':
@@ -608,17 +878,18 @@ export async function markdownToProfile(
 
     // --- Languages section ---
     if (section === 'languages') {
-      const idMatch = line.match(/<!--\s*lang-id:([^\s>]+)\s*-->/);
-      // Format: <!-- lang-id:lang-0 --> - Name (Proficiency) <!-- src:{...} -->
-      const item = parseInlineItem(line);
+      const idMatch = display ? null : line.match(/<!--\s*lang-id:([^\s>]+)\s*-->/);
+      const item = parseInlineItemFromLine(line, display, now);
       if (item) {
         const origLangId = idMatch?.[1];
-        const origLang = originalProfile.languages.find((l) => l.id === origLangId);
+        const origLang = display
+          ? originalProfile.languages[parsedLangs.length]
+          : originalProfile.languages.find((l) => l.id === origLangId);
         // Split "(Proficiency)" if present
         const profMatch = item.value.match(/^(.*?)\s*\(([^)]+)\)$/);
         const nameVal = profMatch ? profMatch[1].trim() : item.value;
         const profVal = profMatch ? profMatch[2] : undefined;
-        const langId = origLangId ?? `lang-${langCounter++}`;
+        const langId = origLangId ?? origLang?.id ?? `lang-${langCounter++}`;
         const lang: Language = {
           id: langId,
           name: up(nameVal, origLang?.name),
@@ -635,20 +906,49 @@ export async function markdownToProfile(
 
     // --- Volunteer section ---
     if (section === 'volunteer') {
-      const volId = parseMetaComment(line, 'vol-id');
-      if (volId) {
-        currentVolId = volId;
-        if (!volMap.has(volId)) {
-          const orig = originalProfile.volunteer.find((v) => v.id === volId);
-          if (orig) volMap.set(volId, structuredClone(orig) as VolunteerRole);
+      if (display) {
+        if (line.startsWith('### ')) {
+          const org = parseEducationHeadingLine(line);
+          if (org) {
+            const found = originalProfile.volunteer.find((v) => v.organization.value === org);
+            const id =
+              found?.id ??
+              originalProfile.volunteer[volunteerOrder.length]?.id ??
+              `vol-new-${volunteerOrder.length}`;
+            currentVolId = id;
+            if (!volMap.has(id)) {
+              const origByIdx = originalProfile.volunteer[volunteerOrder.length];
+              if (found) {
+                volMap.set(id, structuredClone(found) as VolunteerRole);
+              } else if (origByIdx?.id === id) {
+                volMap.set(id, structuredClone(origByIdx) as VolunteerRole);
+              } else {
+                volMap.set(id, {
+                  id,
+                  organization: { value: org, source: userEditSource(now) },
+                });
+              }
+            }
+            volunteerOrder.push(id);
+          }
+          continue;
         }
-        continue;
+      } else {
+        const volId = parseMetaComment(line, 'vol-id');
+        if (volId) {
+          currentVolId = volId;
+          if (!volMap.has(volId)) {
+            const orig = originalProfile.volunteer.find((v) => v.id === volId);
+            if (orig) volMap.set(volId, structuredClone(orig) as VolunteerRole);
+          }
+          continue;
+        }
       }
       if (!currentVolId || line.startsWith('### ')) continue;
       const vol = volMap.get(currentVolId);
       if (!vol) continue;
 
-      const f = parseField(line);
+      const f = parseFieldFromLine(line, display, now);
       if (!f) continue;
       switch (f.label) {
         case 'Organization':
@@ -676,7 +976,7 @@ export async function markdownToProfile(
 
     // --- Awards section ---
     if (section === 'awards') {
-      const item = parseInlineItem(line);
+      const item = parseInlineItemFromLine(line, display, now);
       if (item) {
         const origAward = originalProfile.awards.find((a) => a.value === item.value);
         parsedAwards.push(origAward ?? { value: item.value, source: item.source });
@@ -684,26 +984,37 @@ export async function markdownToProfile(
     }
   }
 
-  // Reassemble in original order (preserves ordering even if parser doesn't re-order)
-  const positions = originalProfile.positions
-    .filter((p) => posMap.has(p.id))
-    .map((p) => posMap.get(p.id)!);
+  const positions = display
+    ? experienceOrder.map((id) => posMap.get(id)).filter((p): p is Position => p !== undefined)
+    : originalProfile.positions
+        .map((p) => posMap.get(p.id))
+        .filter((p): p is NonNullable<typeof p> => p !== undefined);
 
-  const education = originalProfile.education
-    .filter((e) => eduMap.has(e.id))
-    .map((e) => eduMap.get(e.id)!);
+  const education = display
+    ? educationOrder.map((id) => eduMap.get(id)).filter((e): e is Education => e !== undefined)
+    : originalProfile.education
+        .map((e) => eduMap.get(e.id))
+        .filter((e): e is NonNullable<typeof e> => e !== undefined);
 
-  const certifications = originalProfile.certifications
-    .filter((c) => certMap.has(c.id))
-    .map((c) => certMap.get(c.id)!);
+  const certifications = display
+    ? certificationsOrder
+        .map((id) => certMap.get(id))
+        .filter((c): c is Certification => c !== undefined)
+    : originalProfile.certifications
+        .map((c) => certMap.get(c.id))
+        .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
-  const projects = originalProfile.projects
-    .filter((p) => projMap.has(p.id))
-    .map((p) => projMap.get(p.id)!);
+  const projects = display
+    ? projectsOrder.map((id) => projMap.get(id)).filter((p): p is Project => p !== undefined)
+    : originalProfile.projects
+        .map((p) => projMap.get(p.id))
+        .filter((p): p is NonNullable<typeof p> => p !== undefined);
 
-  const volunteer = originalProfile.volunteer
-    .filter((v) => volMap.has(v.id))
-    .map((v) => volMap.get(v.id)!);
+  const volunteer = display
+    ? volunteerOrder.map((id) => volMap.get(id)).filter((v): v is VolunteerRole => v !== undefined)
+    : originalProfile.volunteer
+        .map((v) => volMap.get(v.id))
+        .filter((v): v is NonNullable<typeof v> => v !== undefined);
 
   // Skills: use parsed list if any were found, else keep originals
   const skills = parsedSkills.length > 0 ? deduplicateSkills(parsedSkills) : originalProfile.skills;
